@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server implementation for JetBrains YouTrack, allowing AI assistants to interact with YouTrack issue tracking system.
 
+![Screenshot](screenshot/CleanShot%202025-04-14%20at%2023.24.21@2x.png)
+
 ## What is MCP?
 
 Model Context Protocol (MCP) is an open standard that enables AI models to interact with external tools and services through a unified interface. This project provides an MCP server that exposes YouTrack functionality to AI assistants that support the MCP standard, such as Claude in VS Code and GitHub Copilot in agent mode.
