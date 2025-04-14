@@ -36,8 +36,8 @@ The recommended way to run the YouTrack MCP server is using Docker:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/tonyzorin/prodcamp-mcp.git
-   cd prodcamp-mcp
+   git clone https://github.com/tonyzorin/youtrack-mcp.git
+   cd youtrack-mcp
    ```
 
 2. Build the Docker image:
@@ -59,11 +59,40 @@ The recommended way to run the YouTrack MCP server is using Docker:
 
 ⚠️ **API Token Security**
 
-- Always use environment variables to pass credentials to the Docker container
-- Never hardcode sensitive information in configuration files
-- For production use, consider using a secure method for managing secrets
+- Treat your mcp.json file as .env
 - Rotate your YouTrack API tokens periodically
 - Use tokens with the minimum required permissions for your use case
+
+
+## Using with Cursor
+
+To use your YouTrack MCP server with Cursor:
+
+1. Make sure you have the Docker image built:
+   ```
+   docker build -t youtrack-mcp .
+   ```
+
+2. Create a `.cursor/mcp.json` file with the following content:
+
+    ```
+    {
+        "mcpServers": {
+            "YouTrack": {
+                "type": "stdio",
+                "command": "docker",
+                "args": ["run", "-i", "--rm", 
+                "-e", "YOUTRACK_URL=https://yourinstance.youtrack.cloud",
+                "-e", "YOUTRACK_API_TOKEN=perm:your-token",
+                "youtrack-mcp"
+                ]
+            }
+        }
+    }
+    ```
+Replace `yourinstance.youtrack.cloud` with your actual YouTrack instance URL and `perm:your-token` with your actual API token.
+
+
 
 ## Using with VS Code
 
