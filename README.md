@@ -156,28 +156,18 @@ Add a comment to issue PROJECT-456 saying "I've fixed this issue in the latest c
 
 ## Configuration
 
-The server can be configured via environment variables or a `.env` file:
+The server can be configured via environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `YOUTRACK_URL` | YouTrack instance URL (not needed for cloud instances) | `""` |
+| `YOUTRACK_URL` | YouTrack instance URL | (required) |
 | `YOUTRACK_API_TOKEN` | YouTrack permanent API token | (required) |
 | `YOUTRACK_VERIFY_SSL` | Verify SSL certificates | `true` |
 | `MCP_SERVER_NAME` | Name of the MCP server | `youtrack-mcp` |
 | `MCP_SERVER_DESCRIPTION` | Description of the MCP server | `YouTrack MCP Server` |
 | `MCP_DEBUG` | Enable debug logging | `false` |
 
-### YouTrack Cloud Support
-
-
-
-```bash
-docker run -i --rm \
-  -e YOUTRACK_API_TOKEN=perm:your-permanent-token \
-  youtrack-mcp
-```
-
-### Self-Signed Certificates
+### SSL Certificate Verification
 
 For self-hosted instances with self-signed SSL certificates, you can disable SSL verification:
 
@@ -191,13 +181,13 @@ docker run -i --rm \
 
 This option is only recommended for development or in controlled environments where you cannot add the certificate to the trust store.
 
-### Docker Environment Variables
+### Debug Mode
 
-When running with Docker, you can pass these environment variables using the `-e` flag:
+You can enable debug logging for troubleshooting:
 
 ```bash
 docker run -i --rm \
-  -e YOUTRACK_URL=https://yourinstance.myjetbrains.com/youtrack \
+  -e YOUTRACK_URL=https://yourinstance.youtrack.cloud \
   -e YOUTRACK_API_TOKEN=perm:your-permanent-token \
   -e MCP_DEBUG=true \
   youtrack-mcp

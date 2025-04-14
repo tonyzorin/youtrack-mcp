@@ -37,7 +37,8 @@ env/
 
 # IDE files
 .idea/
-.vscode/
+.vscode/*
+.vscode/mcp.json.example
 *.swp
 *.swo
 .DS_Store
@@ -50,4 +51,11 @@ htmlcov/
 
 # Logs
 *.log
-logs/ 
+logs/
+
+# Development files
+plan.md
+IMPLEMENTATION_STATUS.md
+todo.md
+integration_tests/
+.python-version 
