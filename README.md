@@ -36,8 +36,8 @@ The recommended way to run the YouTrack MCP server is using Docker:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/tonyzorin/youtrack-mcp.git
-   cd youtrack-mcp
+   git clone https://github.com/tonyzorin/prodcamp-mcp.git
+   cd prodcamp-mcp
    ```
 
 2. Build the Docker image:
@@ -191,4 +191,5 @@ docker run -i --rm \
   -e YOUTRACK_API_TOKEN=perm:your-permanent-token \
   -e MCP_DEBUG=true \
   youtrack-mcp
+```
 ```
