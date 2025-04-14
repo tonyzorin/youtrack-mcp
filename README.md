@@ -75,7 +75,7 @@ To use your YouTrack MCP server with Cursor:
 
 2. Create a `.cursor/mcp.json` file with the following content:
 
-    ```
+    ```json
     {
         "mcpServers": {
             "YouTrack": {
@@ -220,5 +220,4 @@ docker run -i --rm \
   -e YOUTRACK_API_TOKEN=perm:your-permanent-token \
   -e MCP_DEBUG=true \
   youtrack-mcp
-```
 ```
