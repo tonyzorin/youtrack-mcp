@@ -1,4 +1,4 @@
-# YouTrack MCP Server v0.3.6
+# YouTrack MCP Server v0.3.7
 
 A Model Context Protocol (MCP) server implementation for JetBrains YouTrack, allowing AI assistants to interact with YouTrack issue tracking system.
 
@@ -32,18 +32,44 @@ Model Context Protocol (MCP) is an open standard that enables AI models to inter
   - Structured filtering
   - Sorting options
 
-## Quick Start
-
-The easiest way to run the YouTrack MCP server is using the pre-built Docker image from Docker Hub:
+## Quick Start with Docker
 
 ```bash
+# Run with Docker (for YouTrack Cloud instances)
 docker run -i --rm \
-  -e YOUTRACK_URL=https://your-instance.youtrack.cloud \
-  -e YOUTRACK_API_TOKEN=your-api-token \
-  tonyzorin/youtrack-mcp:latest
+     -e YOUTRACK_API_TOKEN=perm:your-api-token \
+     -e YOUTRACK_CLOUD=true \
+     tonyzorin/youtrack-mcp:latest
+
+# Or for self-hosted YouTrack instances
+docker run -i --rm \
+     -e YOUTRACK_URL=https://your-instance.youtrack.cloud \
+     -e YOUTRACK_API_TOKEN=your-api-token \
+     tonyzorin/youtrack-mcp:latest
 ```
 
-Note: The `-i` flag is important as it keeps STDIN open, which is required for the MCP stdio transport.
+For Cursor IDE, add to `.cursor/mcp.json`:
+
+```json
+{
+    "mcpServers": {
+        "YouTrack": {
+            "type": "stdio",
+            "command": "docker",
+            "args": ["run", "-i", "--rm",
+            "-e", "YOUTRACK_API_TOKEN=perm:your-api-token", 
+            "-e", "YOUTRACK_CLOUD=true",
+            "tonyzorin/youtrack-mcp:latest"
+            ]
+        }
+    }
+}
+```
+
+For Claude Desktop, set as MCP server:
+```
+docker run -i --rm -e YOUTRACK_API_TOKEN=perm:your-api-token -e YOUTRACK_CLOUD=true tonyzorin/youtrack-mcp:latest
+```
 
 ## Installation & Usage
 
@@ -85,6 +111,25 @@ If you prefer to build the image yourself:
      youtrack-mcp
    ```
 
+### Building Multi-Platform Images
+
+To build and push multi-architecture images (for both ARM64 and AMD64 platforms):
+
+1. Make sure you have Docker BuildX set up:
+   ```bash
+   docker buildx create --use
+   ```
+
+2. Build and push for multiple platforms:
+   ```bash
+   docker buildx build --platform linux/amd64,linux/arm64 \
+     -t tonyzorin/youtrack-mcp:0.3.7 \
+     -t tonyzorin/youtrack-mcp:latest \
+     --push .
+   ```
+
+This builds the image for both ARM64 (Apple Silicon) and AMD64 (Intel/AMD) architectures and pushes it with both version-specific and latest tags.
+
 ### Security Considerations
 
 ⚠️ **API Token Security**
@@ -108,8 +153,9 @@ To use your YouTrack MCP server with Cursor IDE:
                 "type": "stdio",
                 "command": "docker",
                 "args": ["run", "-i", "--rm", 
-                "-e", "YOUTRACK_URL=https://yourinstance.youtrack.cloud",
-                "-e", "YOUTRACK_API_TOKEN=perm:your-token",
+                "-e", "YOUTRACK_API_TOKEN=perm:your-api-token",
+                "-e", "YOUTRACK_URL=https://your-instance.youtrack.cloud",
+                "-e", "YOUTRACK_CLOUD=true",
                 "tonyzorin/youtrack-mcp:latest"
                 ]
             }
@@ -130,7 +176,7 @@ To use with Claude Desktop:
 3. Add a new MCP server with:
    - Name: YouTrack
    - Command: docker
-   - Arguments: run -i --rm -e YOUTRACK_URL=https://yourinstance.youtrack.cloud -e YOUTRACK_API_TOKEN=perm:your-token tonyzorin/youtrack-mcp:latest
+   - Arguments: run -i --rm -e YOUTRACK_API_TOKEN=perm:your-api-token -e YOUTRACK_CLOUD=true tonyzorin/youtrack-mcp:latest
 
 Replace the URL and token with your actual values.
 
@@ -147,8 +193,9 @@ To use the YouTrack MCP server with VS Code:
          "type": "stdio",
          "command": "docker",
          "args": ["run", "-i", "--rm", 
-           "-e", "YOUTRACK_URL=https://yourinstance.youtrack.cloud",
-           "-e", "YOUTRACK_API_TOKEN=perm:your-token",
+           "-e", "YOUTRACK_API_TOKEN=perm:your-api-token",
+           "-e", "YOUTRACK_URL=https://your-instance.youtrack.cloud",
+           "-e", "YOUTRACK_CLOUD=true",
            "tonyzorin/youtrack-mcp:latest"
          ]
        }
@@ -299,7 +346,7 @@ You can enable debug logging for troubleshooting:
 
 ```bash
 docker run -i --rm \
-  -e YOUTRACK_URL=https://yourinstance.youtrack.cloud \
+  -e YOUTRACK_URL=https://your-instance.youtrack.cloud \
   -e YOUTRACK_API_TOKEN=perm:your-permanent-token \
   -e MCP_DEBUG=true \
   tonyzorin/youtrack-mcp:latest

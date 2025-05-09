@@ -131,8 +131,6 @@ class Config:
                             workspace = os.getenv("YOUTRACK_WORKSPACE")
                             return f"https://{workspace}.youtrack.cloud/api"
                         
-                        # Remove hardcoded prodcamp reference
-                        # Use environment variable instead
                         if os.getenv("YOUTRACK_URL"):
                             return f"{os.getenv('YOUTRACK_URL')}/api"
             

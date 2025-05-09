@@ -1,15 +1,12 @@
-"""
-YouTrack User MCP tools.
-"""
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, Any, List, Optional
 
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.users import UsersClient
+from youtrack_mcp.mcp_wrappers import sync_wrapper
 
 logger = logging.getLogger(__name__)
-
 
 class UserTools:
     """User-related MCP tools."""
@@ -19,99 +16,162 @@ class UserTools:
         self.client = YouTrackClient()
         self.users_api = UsersClient(self.client)
     
+    @sync_wrapper
     def get_current_user(self) -> str:
         """
         Get information about the currently authenticated user.
         
+        FORMAT: get_current_user()
+        
         Returns:
-            JSON string with user information
+            JSON string with current user information
         """
         try:
-            # Get user data with all fields
-            fields = "id,login,name,email,jabber,ringId,guest,online,banned"
-            response = self.client.get(f"users/me?fields={fields}")
-            return json.dumps(response, indent=2)
+            user = self.users_api.get_current_user()
+            return json.dumps(user.model_dump(), indent=2)
         except Exception as e:
             logger.exception("Error getting current user")
             return json.dumps({"error": str(e)})
     
-    def get_user(self, user_id: str) -> str:
+    @sync_wrapper
+    def get_user(self, user_id: str = None, user: str = None) -> str:
         """
         Get information about a specific user.
         
+        FORMAT: get_user(user_id="1-1")
+        
         Args:
             user_id: The user ID
+            user: Alternative parameter name for user_id
             
         Returns:
             JSON string with user information
         """
         try:
-            # Get user data with all fields
-            fields = "id,login,name,email,jabber,ringId,guest,online,banned"
-            response = self.client.get(f"users/{user_id}?fields={fields}")
-            return json.dumps(response, indent=2)
+            # Use either user_id or user parameter
+            user_identifier = user_id or user
+            if not user_identifier:
+                return json.dumps({"error": "User ID is required"})
+                
+            user_obj = self.users_api.get_user(user_identifier)
+            
+            # Handle both Pydantic models and dictionaries in the response
+            if user_obj is None:
+                return json.dumps({"error": "User not found"})
+            
+            if hasattr(user_obj, 'model_dump'):
+                result = user_obj.model_dump()
+            else:
+                result = user_obj  # Assume it's already a dict
+                
+            return json.dumps(result, indent=2)
         except Exception as e:
-            logger.exception(f"Error getting user {user_id}")
+            logger.exception(f"Error getting user {user_id or user}")
             return json.dumps({"error": str(e)})
     
-    def search_users(self, query: str, limit: int = 10) -> str:
-        """
-        Search for users using YouTrack query.
-        
-        Args:
-            query: The search query (name, login, or email)
-            limit: Maximum number of users to return
-            
-        Returns:
-            JSON string with matching users
-        """
-        try:
-            # Request with explicit fields to get complete data
-            fields = "id,login,name,email,jabber,ringId,guest,online,banned"
-            params = {"query": query, "$top": limit, "fields": fields}
-            raw_users = self.client.get("users", params=params)
-            
-            # Return the raw users data directly
-            return json.dumps(raw_users, indent=2)
-        except Exception as e:
-            logger.exception(f"Error searching users with query: {query}")
-            return json.dumps({"error": str(e)})
-    
+    @sync_wrapper
     def get_user_by_login(self, login: str) -> str:
         """
         Get a user by their login name.
         
+        FORMAT: get_user_by_login(login="johndoe")
+        
         Args:
-            login: The user login name
+            login: The user's login name
             
         Returns:
             JSON string with user information
         """
         try:
+            if not login:
+                return json.dumps({"error": "Login is required"})
+                
             user = self.users_api.get_user_by_login(login)
-            if user:
-                return json.dumps(user.model_dump(), indent=2)
+            
+            # Handle both Pydantic models and dictionaries in the response
+            if user is None:
+                return json.dumps({"error": "User not found"})
+            
+            if hasattr(user, 'model_dump'):
+                result = user.model_dump()
             else:
-                return json.dumps({"error": f"User with login '{login}' not found"})
+                result = user  # Assume it's already a dict
+                
+            return json.dumps(result, indent=2)
         except Exception as e:
-            logger.exception(f"Error getting user by login: {login}")
+            logger.exception(f"Error getting user with login {login}")
             return json.dumps({"error": str(e)})
     
-    def get_user_groups(self, user_id: str) -> str:
+    @sync_wrapper
+    def get_user_groups(self, user_id: str = None, user: str = None) -> str:
         """
         Get groups for a user.
         
+        FORMAT: get_user_groups(user_id="1-1")
+        
         Args:
             user_id: The user ID
+            user: Alternative parameter name for user_id
             
         Returns:
             JSON string with user groups
         """
         try:
-            groups = self.users_api.get_user_groups(user_id)
-            return json.dumps(groups, indent=2)
+            # Use either user_id or user parameter
+            user_identifier = user_id or user
+            if not user_identifier:
+                return json.dumps({"error": "User ID is required"})
+                
+            groups = self.users_api.get_user_groups(user_identifier)
+            
+            # Handle various response formats safely
+            if groups is None:
+                return json.dumps([])
+            
+            # If it's a dictionary (direct API response)
+            if isinstance(groups, dict):
+                return json.dumps(groups, indent=2)
+            
+            # If it's a list of objects
+            try:
+                result = []
+                # Try to iterate, but handle errors safely
+                for group in groups:
+                    if hasattr(group, 'model_dump'):
+                        result.append(group.model_dump())
+                    elif isinstance(group, dict):
+                        result.append(group)
+                    else:
+                        # Last resort: convert to string
+                        result.append(str(group))
+                return json.dumps(result, indent=2)
+            except Exception as e:
+                # If we can't iterate, return the raw string representation
+                logger.warning(f"Could not process groups response: {str(e)}")
+                return json.dumps({"groups": str(groups)})
         except Exception as e:
-            logger.exception(f"Error getting groups for user {user_id}")
+            logger.exception(f"Error getting groups for user {user_id or user}")
+            return json.dumps({"error": str(e)})
+    
+    @sync_wrapper
+    def search_users(self, query: str, limit: int = 10) -> str:
+        """
+        Search for users using YouTrack query.
+        
+        FORMAT: search_users(query="John", limit=10)
+        
+        Args:
+            query: The search query
+            limit: Maximum number of users to return (default: 10)
+            
+        Returns:
+            JSON string with matching users
+        """
+        try:
+            users = self.users_api.search_users(query, limit=limit)
+            return json.dumps([u.model_dump() for u in users], indent=2)
+        except Exception as e:
+            logger.exception(f"Error searching users with query {query}")
             return json.dumps({"error": str(e)})
     
     def close(self) -> None:
@@ -128,36 +188,38 @@ class UserTools:
         return {
             "get_current_user": {
                 "function": self.get_current_user,
-                "description": "Get information about the currently authenticated YouTrack user",
-                "parameter_descriptions": {}
+                "description": "Get information about the currently authenticated user. FORMAT: get_current_user()",
+                "parameters": {}
             },
             "get_user": {
                 "function": self.get_user,
-                "description": "Get information about a specific YouTrack user by ID",
-                "parameter_descriptions": {
-                    "user_id": "The user ID"
-                }
-            },
-            "search_users": {
-                "function": self.search_users,
-                "description": "Search for YouTrack users",
-                "parameter_descriptions": {
-                    "query": "The search query (name, login, or email)",
-                    "limit": "Maximum number of users to return (default: 10)"
+                "description": "Get information about a specific user. FORMAT: get_user(user_id=\"1-1\")",
+                "parameters": {
+                    "user_id": "The user ID",
+                    "user": "Alternative parameter name for user_id"
                 }
             },
             "get_user_by_login": {
                 "function": self.get_user_by_login,
-                "description": "Get a YouTrack user by login name",
-                "parameter_descriptions": {
-                    "login": "The user login name"
+                "description": "Get a user by their login name. FORMAT: get_user_by_login(login=\"johndoe\")",
+                "parameters": {
+                    "login": "The user's login name"
                 }
             },
             "get_user_groups": {
                 "function": self.get_user_groups,
-                "description": "Get groups for a YouTrack user",
-                "parameter_descriptions": {
-                    "user_id": "The user ID"
+                "description": "Get groups for a user. FORMAT: get_user_groups(user_id=\"1-1\")",
+                "parameters": {
+                    "user_id": "The user ID",
+                    "user": "Alternative parameter name for user_id"
+                }
+            },
+            "search_users": {
+                "function": self.search_users,
+                "description": "Search for users using YouTrack query. FORMAT: search_users(query=\"John\", limit=10)",
+                "parameters": {
+                    "query": "The search query",
+                    "limit": "Maximum number of users to return (optional, default: 10)"
                 }
             }
         } 

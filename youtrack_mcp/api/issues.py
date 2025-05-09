@@ -2,10 +2,14 @@
 YouTrack Issues API client.
 """
 from typing import Any, Dict, List, Optional
+import json
+import logging
 
 from pydantic import BaseModel, Field
 
-from youtrack_mcp.api.client import YouTrackClient
+from youtrack_mcp.api.client import YouTrackClient, YouTrackAPIError
+
+logger = logging.getLogger(__name__)
 
 
 class Issue(BaseModel):
@@ -77,9 +81,19 @@ class IssuesClient:
         Returns:
             The created issue data
         """
+        # Make sure we have valid input data
+        if not project_id:
+            raise ValueError("Project ID is required")
+        if not summary:
+            raise ValueError("Summary is required")
+            
+        # Format request data according to YouTrack API requirements
+        # Note: YouTrack API requires a specific format for some fields
         data = {
-            "project": {"id": project_id},
-            "summary": summary,
+            "project": {
+                "id": project_id
+            },
+            "summary": summary
         }
         
         if description:
@@ -87,9 +101,47 @@ class IssuesClient:
             
         if additional_fields:
             data.update(additional_fields)
+        
+        try:
+            # For debugging
+            logger.info(f"Creating issue with data: {json.dumps(data)}")
             
-        response = self.client.post("issues", data=data)
-        return Issue.model_validate(response)
+            # Post directly with the json parameter to ensure correct format
+            url = "issues"
+            response = self.client.session.post(
+                f"{self.client.base_url}/{url}",
+                json=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+            )
+            
+            # Handle the response
+            if response.status_code >= 400:
+                error_msg = f"Error creating issue: {response.status_code}"
+                try:
+                    error_content = response.json()
+                    error_msg += f" - {json.dumps(error_content)}"
+                except:
+                    error_msg += f" - {response.text}"
+                    
+                logger.error(error_msg)
+                raise YouTrackAPIError(error_msg, response.status_code, response)
+                
+            # Process successful response
+            try:
+                result = response.json()
+                return Issue.model_validate(result)
+            except Exception as e:
+                logger.error(f"Error parsing response: {str(e)}")
+                # Return raw response if we can't parse it
+                return Issue(id=str(response.status_code), summary="Created successfully")
+                
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error creating issue: {str(e)}, Data: {data}")
+            raise
     
     def update_issue(self, 
                      issue_id: str, 

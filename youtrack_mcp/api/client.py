@@ -5,6 +5,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Union
 import json
+import random
 
 import requests
 from pydantic import BaseModel, Field, model_validator
@@ -200,44 +201,52 @@ class YouTrackClient:
         delay = self.retry_delay
         last_error = None
         
+        # For debugging purposes, log essential request details
+        if 'json' in kwargs:
+            logger.debug(f"{method} {url} with JSON: {json.dumps(kwargs['json'])}")
+        elif 'data' in kwargs:
+            logger.debug(f"{method} {url} with data: {kwargs['data']}")
+        else:
+            logger.debug(f"{method} {url}")
+            
         while retries <= self.max_retries:
             try:
-                logger.debug(f"Making {method} request to {url}")
                 response = self.session.request(method, url, **kwargs)
                 return self._handle_response(response)
-            except (RateLimitError, ServerError) as e:
-                # Retry transient errors
+            except (ServerError, RateLimitError) as e:
+                # These are potentially transient, so we retry
                 last_error = e
                 retries += 1
                 
-                if retries <= self.max_retries:
-                    sleep_time = delay * (2 ** (retries - 1))  # Exponential backoff
-                    logger.warning(f"Transient error occurred: {str(e)}. Retrying in {sleep_time:.2f}s ({retries}/{self.max_retries})")
-                    time.sleep(sleep_time)
-                else:
-                    logger.error(f"Max retries exceeded for {method} {url}")
-                    raise
-            except YouTrackAPIError as e:
-                # Don't retry non-transient errors
-                logger.error(f"API error occurred: {str(e)}")
-                raise
-            except requests.RequestException as e:
-                # Handle connection errors
-                last_error = YouTrackAPIError(f"Request failed: {str(e)}")
-                retries += 1
+                if retries > self.max_retries:
+                    logger.error(f"Maximum retries reached for {method} {url}")
+                    break
                 
-                if retries <= self.max_retries:
-                    sleep_time = delay * (2 ** (retries - 1))
-                    logger.warning(f"Connection error occurred: {str(e)}. Retrying in {sleep_time:.2f}s ({retries}/{self.max_retries})")
-                    time.sleep(sleep_time)
-                else:
-                    logger.error(f"Max retries exceeded for {method} {url}")
-                    raise last_error
+                # Calculate backoff delay (exponential with jitter)
+                backoff = delay * (2 ** retries) * (0.5 + 0.5 * random.random())
+                logger.warning(f"Transient error, retrying in {backoff:.2f}s: {str(e)}")
+                time.sleep(backoff)
+            except YouTrackAPIError as e:
+                # Non-transient errors
+                logger.error(f"API error for {method} {url}: {str(e)}")
+                if hasattr(e, 'response') and e.response is not None:
+                    try:
+                        error_content = e.response.content.decode('utf-8', errors='replace')
+                        logger.error(f"Response content: {error_content}")
+                    except:
+                        pass
+                raise
+            except Exception as e:
+                # Unexpected errors
+                logger.exception(f"Unexpected error for {method} {url}: {str(e)}")
+                raise YouTrackAPIError(f"Unexpected error: {str(e)}")
         
-        # Should not reach here, but just in case
+        # If we got here, we've exceeded retries
         if last_error:
             raise last_error
-        raise YouTrackAPIError(f"Failed to make request to {url} after {self.max_retries} retries")
+        
+        # This should never happen, but just in case
+        raise YouTrackAPIError(f"Maximum retries exceeded for {method} {url}")
     
     def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """
@@ -266,6 +275,15 @@ class YouTrackClient:
         Returns:
             Parsed JSON response
         """
+        # If data is provided but json_data is not, use data as json
+        if data is not None and json_data is None:
+            # Log the data being sent for debugging
+            logger.debug(f"POST {endpoint} with data: {json.dumps(data)}")
+            
+            # Some endpoints expect parameters in different formats
+            # YouTrack API usually expects data as JSON
+            return self._make_request("POST", endpoint, json=data, **kwargs)
+        
         return self._make_request("POST", endpoint, data=data, json=json_data, **kwargs)
     
     def put(self, endpoint: str, data: Optional[Dict[str, Any]] = None, json_data: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:

@@ -1,15 +1,17 @@
 """
 YouTrack Project MCP tools.
 """
+
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from youtrack_mcp.api.client import YouTrackClient
+from youtrack_mcp.api.issues import IssuesClient
 from youtrack_mcp.api.projects import ProjectsClient
+from youtrack_mcp.mcp_wrappers import sync_wrapper
 
 logger = logging.getLogger(__name__)
-
 
 class ProjectTools:
     """Project-related MCP tools."""
@@ -19,9 +21,15 @@ class ProjectTools:
         self.client = YouTrackClient()
         self.projects_api = ProjectsClient(self.client)
         
+        # Also initialize the issues API for fetching issue details
+        self.issues_api = IssuesClient(self.client)
+    
+    @sync_wrapper
     def get_projects(self, include_archived: bool = False) -> str:
         """
         Get a list of all projects.
+        
+        FORMAT: get_projects(include_archived=False)
         
         Args:
             include_archived: Whether to include archived projects
@@ -30,148 +38,307 @@ class ProjectTools:
             JSON string with projects information
         """
         try:
-            projects = self.projects_api.get_projects(include_archived)
-            return json.dumps([project.model_dump() for project in projects], indent=2)
+            projects = self.projects_api.get_projects(include_archived=include_archived)
+            
+            # Handle both Pydantic models and dictionaries in the response
+            result = []
+            for project in projects:
+                if hasattr(project, 'model_dump'):
+                    result.append(project.model_dump())
+                else:
+                    result.append(project)  # Assume it's already a dict
+                    
+            return json.dumps(result, indent=2)
         except Exception as e:
             logger.exception("Error getting projects")
             return json.dumps({"error": str(e)})
     
-    def get_project(self, project_id: str) -> str:
+    @sync_wrapper
+    def get_project(self, project_id: str = None, project: str = None) -> str:
         """
         Get information about a specific project.
         
+        FORMAT: get_project(project_id="0-0")
+        
         Args:
             project_id: The project ID
+            project: Alternative parameter name for project_id
             
         Returns:
             JSON string with project information
         """
         try:
-            project = self.projects_api.get_project(project_id)
-            return json.dumps(project.model_dump(), indent=2)
+            # Use either project_id or project parameter
+            project_identifier = project_id or project
+            if not project_identifier:
+                return json.dumps({"error": "Project ID is required"})
+                
+            project_obj = self.projects_api.get_project(project_identifier)
+            
+            # Handle both Pydantic models and dictionaries in the response
+            if hasattr(project_obj, 'model_dump'):
+                result = project_obj.model_dump()
+            else:
+                result = project_obj  # Assume it's already a dict
+                
+            return json.dumps(result, indent=2)
         except Exception as e:
-            logger.exception(f"Error getting project {project_id}")
+            logger.exception(f"Error getting project {project_id or project}")
             return json.dumps({"error": str(e)})
     
+    @sync_wrapper
     def get_project_by_name(self, project_name: str) -> str:
         """
         Find a project by its name.
+        
+        FORMAT: get_project_by_name(project_name="DEMO")
         
         Args:
             project_name: The project name or short name
             
         Returns:
-            JSON string with project information or error if not found
+            JSON string with project information
         """
         try:
             project = self.projects_api.get_project_by_name(project_name)
             if project:
-                return json.dumps(project.model_dump(), indent=2)
+                # Handle both Pydantic models and dictionaries in the response
+                if hasattr(project, 'model_dump'):
+                    result = project.model_dump()
+                else:
+                    result = project  # Assume it's already a dict
+                    
+                return json.dumps(result, indent=2)
             else:
                 return json.dumps({"error": f"Project '{project_name}' not found"})
         except Exception as e:
-            logger.exception(f"Error finding project '{project_name}'")
+            logger.exception(f"Error finding project by name {project_name}")
             return json.dumps({"error": str(e)})
     
-    def get_project_issues(self, project_id: str, limit: int = 10) -> str:
+    @sync_wrapper
+    def get_project_issues(self, project_id: str = None, project: str = None, limit: int = 50) -> str:
         """
         Get issues for a specific project.
         
+        FORMAT: get_project_issues(project_id="0-0", limit=10)
+        
         Args:
-            project_id: The project ID
-            limit: Maximum number of issues to return
+            project_id: The project ID (e.g., '0-0')
+            project: Alternative parameter name for project_id
+            limit: Maximum number of issues to return (default: 50)
             
         Returns:
-            JSON string with project issues
+            JSON string with the issues
         """
         try:
-            issues = self.projects_api.get_project_issues(project_id, limit)
-            return json.dumps(issues, indent=2)
+            # Use either project_id or project parameter
+            project_identifier = project_id or project
+            if not project_identifier:
+                return json.dumps({"error": "Project ID is required"})
+            
+            # First try with the direct project ID
+            try:
+                issues = self.projects_api.get_project_issues(project_identifier, limit)
+                if issues:
+                    return json.dumps(issues, indent=2)
+            except Exception as e:
+                # If that fails, check if it was a non-ID format error
+                if not str(e).startswith("Project not found"):
+                    logger.exception(f"Error getting issues for project {project_identifier}")
+                    return json.dumps({"error": str(e)})
+                
+            # If that failed, try to find project by name
+            try:
+                project_obj = self.projects_api.get_project_by_name(project_identifier)
+                if project_obj:
+                    issues = self.projects_api.get_project_issues(project_obj.id, limit)
+                    return json.dumps(issues, indent=2)
+                else:
+                    return json.dumps({"error": f"Project not found: {project_identifier}"})
+            except Exception as e:
+                logger.exception(f"Error getting issues for project {project_identifier}")
+                return json.dumps({"error": str(e)})
         except Exception as e:
-            logger.exception(f"Error getting issues for project {project_id}")
+            logger.exception(f"Error processing get_project_issues({project_id or project}, {limit})")
             return json.dumps({"error": str(e)})
     
-    def create_project(self, name: str, short_name: str, 
-                     lead_id: str,
-                     description: Optional[str] = None) -> str:
+    @sync_wrapper
+    def get_custom_fields(self, project_id: str = None, project: str = None) -> str:
+        """
+        Get custom fields for a project.
+        
+        FORMAT: get_custom_fields(project_id="0-0")
+        
+        Args:
+            project_id: The project ID
+            project: Alternative parameter name for project_id
+            
+        Returns:
+            JSON string with custom fields information
+        """
+        try:
+            # Use either project_id or project parameter
+            project_identifier = project_id or project
+            if not project_identifier:
+                return json.dumps({"error": "Project ID is required"})
+                
+            fields = self.projects_api.get_custom_fields(project_identifier)
+            
+            # Handle various response formats safely
+            if fields is None:
+                return json.dumps([])
+            
+            # If it's a dictionary (direct API response)
+            if isinstance(fields, dict):
+                return json.dumps(fields, indent=2)
+            
+            # If it's a list of objects
+            try:
+                result = []
+                # Try to iterate, but handle errors safely
+                for field in fields:
+                    if hasattr(field, 'model_dump'):
+                        result.append(field.model_dump())
+                    elif isinstance(field, dict):
+                        result.append(field)
+                    else:
+                        # Last resort: convert to string
+                        result.append(str(field))
+                return json.dumps(result, indent=2)
+            except Exception as e:
+                # If we can't iterate, return the raw string representation
+                logger.warning(f"Could not process custom fields response: {str(e)}")
+                return json.dumps({"custom_fields": str(fields)})
+        except Exception as e:
+            logger.exception(f"Error getting custom fields for project {project_id or project}")
+            return json.dumps({"error": str(e)})
+    
+    @sync_wrapper
+    def create_project(self, name: str, short_name: str, lead_id: str, description: Optional[str] = None) -> str:
         """
         Create a new project with a required leader.
         
+        FORMAT: create_project(name="Project Name", short_name="PROJ", lead_id="1-1", description="Description")
+        
         Args:
-            name: The project name
-            short_name: The project short name (used in issue IDs)
-            lead_id: ID of the user who will be the project leader (required)
-            description: Optional project description
+            name: The name of the project
+            short_name: The short name of the project (used as prefix for issues)
+            lead_id: The ID of the user who will be the project leader
+            description: The project description (optional)
             
         Returns:
             JSON string with the created project information
         """
         try:
-            # Directly create the project with the required leader
-            data = {
-                "name": name,
-                "shortName": short_name,
-                "leader": {"id": lead_id}
-            }
+            # Check for missing required parameters
+            if not name:
+                return json.dumps({"error": "Project name is required"})
+            if not short_name:
+                return json.dumps({"error": "Project short name is required"})
+            if not lead_id:
+                return json.dumps({"error": "Project leader ID is required"})
             
-            if description:
-                data["description"] = description
+            project = self.projects_api.create_project(
+                name=name,
+                short_name=short_name,
+                lead_id=lead_id,
+                description=description
+            )
             
-            # Log the data being sent
-            logger.info(f"Creating project with leader data: {data}")
-            
-            # Make direct API call
-            response = self.client.post("admin/projects", data=data)
-            return json.dumps(response, indent=2)
+            # Handle both Pydantic models and dictionaries in the response
+            if hasattr(project, 'model_dump'):
+                result = project.model_dump()
+            else:
+                result = project  # Assume it's already a dict
+                
+            return json.dumps(result, indent=2)
         except Exception as e:
             logger.exception(f"Error creating project {name}")
             return json.dumps({"error": str(e)})
     
-    def update_project(self, project_id: str, name: Optional[str] = None, 
-                      description: Optional[str] = None, 
-                      archived: Optional[bool] = None,
-                      lead_id: Optional[str] = None) -> str:
+    @sync_wrapper
+    def update_project(self, project_id: str = None, project: str = None, name: Optional[str] = None, 
+                   description: Optional[str] = None, archived: Optional[bool] = None, 
+                   lead_id: Optional[str] = None, short_name: Optional[str] = None) -> str:
         """
         Update an existing project.
         
+        FORMAT: update_project(project_id="0-0", name="New Name", description="New Description", archived=False, lead_id="1-1", short_name="NEWKEY")
+        
         Args:
-            project_id: The project ID
-            name: The new project name
-            description: The new project description
-            archived: Whether the project should be archived
-            lead_id: ID of the user who will be the project leader
+            project_id: The project ID to update
+            project: Alternative parameter name for project_id
+            name: The new name for the project (optional)
+            description: The new project description (optional)
+            archived: Whether the project should be archived (optional)
+            lead_id: The ID of the new project leader (optional)
+            short_name: The new short name for the project (optional) - used as prefix for issue IDs
             
         Returns:
             JSON string with the updated project information
         """
         try:
-            project = self.projects_api.update_project(
-                project_id=project_id,
-                name=name,
-                description=description,
-                archived=archived,
-                lead_id=lead_id
-            )
-            return json.dumps(project.model_dump(), indent=2)
-        except Exception as e:
-            logger.exception(f"Error updating project {project_id}")
-            return json.dumps({"error": str(e)})
-    
-    def get_custom_fields(self, project_id: str) -> str:
-        """
-        Get custom fields for a project.
-        
-        Args:
-            project_id: The project ID
+            # Use either project_id or project parameter
+            project_identifier = project_id or project
+            if not project_identifier:
+                return json.dumps({"error": "Project ID is required"})
             
-        Returns:
-            JSON string with custom fields
-        """
-        try:
-            custom_fields = self.projects_api.get_custom_fields(project_id)
-            return json.dumps(custom_fields, indent=2)
+            # First, get the existing project to maintain required fields
+            try:
+                existing_project = self.projects_api.get_project(project_identifier)
+                logger.info(f"Found existing project: {existing_project.name} ({existing_project.id})")
+                
+                # Prepare data for direct API call
+                data = {}
+                
+                # Only include parameters that were explicitly provided
+                if name is not None:
+                    data["name"] = name
+                if description is not None:
+                    data["description"] = description
+                if archived is not None:
+                    data["archived"] = archived
+                if lead_id is not None:
+                    data["leader"] = {"id": lead_id}
+                if short_name is not None:
+                    data["shortName"] = short_name
+                
+                # If no parameters were provided, return current project
+                if not data:
+                    logger.info("No parameters to update, returning current project")
+                    if hasattr(existing_project, 'model_dump'):
+                        return json.dumps(existing_project.model_dump(), indent=2)
+                    else:
+                        return json.dumps(existing_project, indent=2)
+                
+                # Log the data being sent
+                logger.info(f"Updating project with data: {data}")
+                
+                # Make direct API call
+                try:
+                    # Use the client directly instead of the API method
+                    self.client.post(f"admin/projects/{project_identifier}", data=data)
+                    logger.info("Update API call successful")
+                except Exception as e:
+                    logger.warning(f"Update API call error: {str(e)}")
+                    # Continue anyway as the update might still have worked
+                
+                # Get the updated project data
+                try:
+                    updated_project = self.projects_api.get_project(project_identifier)
+                    logger.info(f"Retrieved updated project: {updated_project.name}")
+                    
+                    if hasattr(updated_project, 'model_dump'):
+                        return json.dumps(updated_project.model_dump(), indent=2)
+                    else:
+                        return json.dumps(updated_project, indent=2)
+                except Exception as e:
+                    logger.error(f"Error retrieving updated project: {str(e)}")
+                    return json.dumps({"error": f"Project was updated but could not retrieve the result: {str(e)}"})
+            except Exception as e:
+                return json.dumps({"error": f"Could not update project: {str(e)}"})
         except Exception as e:
-            logger.exception(f"Error getting custom fields for project {project_id}")
+            logger.exception(f"Error updating project {project_id or project}")
             return json.dumps({"error": str(e)})
     
     def close(self) -> None:
@@ -187,60 +354,58 @@ class ProjectTools:
         """
         return {
             "get_projects": {
-                "function": self.get_projects,
-                "description": "Get a list of all YouTrack projects",
+                "description": "Get a list of all projects.",
                 "parameter_descriptions": {
-                    "include_archived": "Whether to include archived projects (default: false)"
+                    "include_archived": "Whether to include archived projects (optional, default: false)"
                 }
             },
             "get_project": {
-                "function": self.get_project,
-                "description": "Get information about a specific YouTrack project by its ID",
+                "description": "Get information about a specific project.",
                 "parameter_descriptions": {
-                    "project_id": "The project ID"
+                    "project_id": "The project ID (e.g., '0-0')",
+                    "project": "Alternative parameter name for project_id"
                 }
             },
             "get_project_by_name": {
-                "function": self.get_project_by_name,
-                "description": "Find a YouTrack project by its name or short name",
+                "description": "Find a project by its name.",
                 "parameter_descriptions": {
-                    "project_name": "The project name or short name to search for"
+                    "project_name": "The project name or short name (e.g., 'DEMO')"
                 }
             },
             "get_project_issues": {
-                "function": self.get_project_issues,
-                "description": "Get issues for a specific YouTrack project",
+                "description": "Get issues for a specific project.",
                 "parameter_descriptions": {
-                    "project_id": "The project ID",
-                    "limit": "Maximum number of issues to return (default: 10)"
-                }
-            },
-            "create_project": {
-                "function": self.create_project,
-                "description": "Create a new YouTrack project",
-                "parameter_descriptions": {
-                    "name": "The project name",
-                    "short_name": "The project short name (used in issue IDs)",
-                    "lead_id": "ID of the user who will be the project leader (required)",
-                    "description": "Optional project description"
-                }
-            },
-            "update_project": {
-                "function": self.update_project,
-                "description": "Update an existing YouTrack project",
-                "parameter_descriptions": {
-                    "project_id": "The project ID",
-                    "name": "The new project name (optional)",
-                    "description": "The new project description (optional)",
-                    "archived": "Whether the project should be archived (optional)",
-                    "lead_id": "ID of the user who will be the project leader (optional)"
+                    "project_id": "The project ID (e.g., '0-0')",
+                    "project": "Alternative parameter name for project_id",
+                    "limit": "Maximum number of issues to return (optional, default: 50)"
                 }
             },
             "get_custom_fields": {
-                "function": self.get_custom_fields,
-                "description": "Get custom fields for a YouTrack project",
+                "description": "Get custom fields for a project.",
                 "parameter_descriptions": {
-                    "project_id": "The project ID"
+                    "project_id": "The project ID (e.g., '0-0')",
+                    "project": "Alternative parameter name for project_id"
+                }
+            },
+            "create_project": {
+                "description": "Create a new project with a required leader.",
+                "parameter_descriptions": {
+                    "name": "The name of the project",
+                    "short_name": "The short name of the project (used as prefix for issues)",
+                    "lead_id": "The ID of the user who will be the project leader",
+                    "description": "The project description (optional)"
+                }
+            },
+            "update_project": {
+                "description": "Update an existing project.",
+                "parameter_descriptions": {
+                    "project_id": "The project ID to update (e.g., '0-0')",
+                    "project": "Alternative parameter name for project_id",
+                    "name": "The new name for the project (optional)",
+                    "description": "The new project description (optional)",
+                    "archived": "Whether the project should be archived (optional)",
+                    "lead_id": "The ID of the new project leader (optional)",
+                    "short_name": "The new short name for the project (optional) - used as prefix for issue IDs"
                 }
             }
         } 

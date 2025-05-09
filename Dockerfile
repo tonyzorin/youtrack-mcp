@@ -14,10 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY . .
 
 # Default environment variables (will be overridden at runtime)
+ENV APP_VERSION="0.3.7"
 ENV MCP_SERVER_NAME="youtrack-mcp"
 ENV MCP_SERVER_DESCRIPTION="YouTrack MCP Server"
 ENV MCP_DEBUG="false"
 ENV YOUTRACK_VERIFY_SSL="true"
 
-# Run the MCP server
-CMD ["python", "main.py"]
+# Run the MCP server in stdio mode for Claude integration by default
+CMD ["python", "main.py", "--transport", "stdio"]
