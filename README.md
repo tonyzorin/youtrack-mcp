@@ -1,4 +1,4 @@
-# YouTrack MCP Server
+# YouTrack MCP Server v0.3.6
 
 A Model Context Protocol (MCP) server implementation for JetBrains YouTrack, allowing AI assistants to interact with YouTrack issue tracking system.
 
@@ -6,7 +6,7 @@ A Model Context Protocol (MCP) server implementation for JetBrains YouTrack, all
 
 ## What is MCP?
 
-Model Context Protocol (MCP) is an open standard that enables AI models to interact with external tools and services through a unified interface. This project provides an MCP server that exposes YouTrack functionality to AI assistants that support the MCP standard, such as Claude in VS Code and GitHub Copilot in agent mode.
+Model Context Protocol (MCP) is an open standard that enables AI models to interact with external tools and services through a unified interface. This project provides an MCP server that exposes YouTrack functionality to AI assistants that support the MCP standard, such as Claude in VS Code, Claude Desktop, GitHub Copilot, and Cursor IDE.
 
 ## Features
 
@@ -32,30 +32,58 @@ Model Context Protocol (MCP) is an open standard that enables AI models to inter
   - Structured filtering
   - Sorting options
 
+## Quick Start
+
+The easiest way to run the YouTrack MCP server is using the pre-built Docker image from Docker Hub:
+
+```bash
+docker run -i --rm \
+  -e YOUTRACK_URL=https://your-instance.youtrack.cloud \
+  -e YOUTRACK_API_TOKEN=your-api-token \
+  tonyzorin/youtrack-mcp:latest
+```
+
+Note: The `-i` flag is important as it keeps STDIN open, which is required for the MCP stdio transport.
+
 ## Installation & Usage
 
-The recommended way to run the YouTrack MCP server is using Docker:
+### Using Docker Hub Image (Recommended)
+
+1. Pull the Docker image:
+   ```bash
+   docker pull tonyzorin/youtrack-mcp:latest
+   ```
+
+2. Run the container with your YouTrack credentials:
+   ```bash
+   docker run -i --rm \
+     -e YOUTRACK_URL=https://your-instance.youtrack.cloud \
+     -e YOUTRACK_API_TOKEN=your-api-token \
+     tonyzorin/youtrack-mcp:latest
+   ```
+
+### Alternative: Build from Source
+
+If you prefer to build the image yourself:
 
 1. Clone the repository:
-   ```
+   ```bash
    git clone https://github.com/tonyzorin/youtrack-mcp.git
    cd youtrack-mcp
    ```
 
 2. Build the Docker image:
-   ```
+   ```bash
    docker build -t youtrack-mcp .
    ```
 
-3. Run the container with your YouTrack credentials:
-   ```
+3. Run your locally built container:
+   ```bash
    docker run -i --rm \
      -e YOUTRACK_URL=https://your-instance.youtrack.cloud \
      -e YOUTRACK_API_TOKEN=your-api-token \
      youtrack-mcp
    ```
-
-   Note: The `-i` flag is important as it keeps STDIN open, which is required for the MCP stdio transport.
 
 ### Security Considerations
 
@@ -65,17 +93,13 @@ The recommended way to run the YouTrack MCP server is using Docker:
 - Rotate your YouTrack API tokens periodically
 - Use tokens with the minimum required permissions for your use case
 
+## Using with AI Applications
 
-## Using with Cursor
+### Cursor IDE
 
-To use your YouTrack MCP server with Cursor:
+To use your YouTrack MCP server with Cursor IDE:
 
-1. Make sure you have the Docker image built:
-   ```
-   docker build -t youtrack-mcp .
-   ```
-
-2. Create a `.cursor/mcp.json` file with the following content:
+1. Create a `.cursor/mcp.json` file in your project with the following content:
 
     ```json
     {
@@ -86,26 +110,35 @@ To use your YouTrack MCP server with Cursor:
                 "args": ["run", "-i", "--rm", 
                 "-e", "YOUTRACK_URL=https://yourinstance.youtrack.cloud",
                 "-e", "YOUTRACK_API_TOKEN=perm:your-token",
-                "youtrack-mcp"
+                "tonyzorin/youtrack-mcp:latest"
                 ]
             }
         }
     }
     ```
-Replace `yourinstance.youtrack.cloud` with your actual YouTrack instance URL and `perm:your-token` with your actual API token.
 
+2. Replace `yourinstance.youtrack.cloud` with your actual YouTrack instance URL and `perm:your-token` with your actual API token.
 
+3. Restart Cursor or reload the project for the changes to take effect.
 
-## Using with VS Code
+### Claude Desktop
+
+To use with Claude Desktop:
+
+1. Open Claude Desktop preferences
+2. Navigate to the MCP section
+3. Add a new MCP server with:
+   - Name: YouTrack
+   - Command: docker
+   - Arguments: run -i --rm -e YOUTRACK_URL=https://yourinstance.youtrack.cloud -e YOUTRACK_API_TOKEN=perm:your-token tonyzorin/youtrack-mcp:latest
+
+Replace the URL and token with your actual values.
+
+### VS Code with Claude Extension
 
 To use the YouTrack MCP server with VS Code:
 
-1. Make sure you have the Docker image built:
-   ```
-   docker build -t youtrack-mcp .
-   ```
-
-2. Create a `.vscode/mcp.json` file with the following content:
+1. Create a `.vscode/mcp.json` file with the following content:
 
    ```json
    {
@@ -116,14 +149,14 @@ To use the YouTrack MCP server with VS Code:
          "args": ["run", "-i", "--rm", 
            "-e", "YOUTRACK_URL=https://yourinstance.youtrack.cloud",
            "-e", "YOUTRACK_API_TOKEN=perm:your-token",
-           "youtrack-mcp"
+           "tonyzorin/youtrack-mcp:latest"
          ]
        }
      }
    }
    ```
 
-   Replace `yourinstance.youtrack.cloud` with your actual YouTrack instance URL and `perm:your-token` with your actual API token.
+2. Replace `yourinstance.youtrack.cloud` with your actual YouTrack instance URL and `perm:your-token` with your actual API token.
 
 ## Available Tools
 
@@ -156,6 +189,54 @@ The YouTrack MCP server provides the following tools:
 - `advanced_search` - Advanced search with sorting options
 - `filter_issues` - Search with structured filtering
 - `search_with_custom_fields` - Search using custom field values
+
+## Tool Parameter Format
+
+When using the YouTrack MCP tools, it's important to use the correct parameter format to ensure your requests are processed correctly. Here's how to use the most common tools:
+
+### Get Issue
+
+To get information about a specific issue, you must provide the `issue_id` parameter:
+
+```python
+# Correct format
+get_issue(issue_id="DEMO-123")
+```
+
+The issue ID can be either the readable ID (e.g., "DEMO-123") or the internal ID (e.g., "3-14").
+
+### Add Comment
+
+To add a comment to an issue, you must provide both the `issue_id` and `text` parameters:
+
+```python
+# Correct format
+add_comment(issue_id="DEMO-123", text="This is a test comment")
+```
+
+### Create Issue
+
+To create a new issue, you must provide at least the `project` and `summary` parameters:
+
+```python
+# Correct format
+create_issue(project="DEMO", summary="Bug: Login page not working")
+
+# With optional description
+create_issue(
+    project="DEMO", 
+    summary="Bug: Login page not working", 
+    description="Users cannot log in after the latest update"
+)
+```
+
+The project parameter can be either the project's short name (e.g., "DEMO") or its internal ID.
+
+### Common MCP Format Issues
+
+When using MCP tools through AI assistants, parameters may sometimes be passed in different formats. The YouTrack MCP server is designed to handle various parameter formats, but using the explicit format above is recommended for best results.
+
+If you encounter errors with parameter format, try using the explicit key=value format shown in the examples above.
 
 ## Examples
 
@@ -207,7 +288,7 @@ docker run -i --rm \
   -e YOUTRACK_URL=https://youtrack.internal.company.com \
   -e YOUTRACK_API_TOKEN=perm:your-permanent-token \
   -e YOUTRACK_VERIFY_SSL=false \
-  youtrack-mcp
+  tonyzorin/youtrack-mcp:latest
 ```
 
 This option is only recommended for development or in controlled environments where you cannot add the certificate to the trust store.
@@ -221,5 +302,5 @@ docker run -i --rm \
   -e YOUTRACK_URL=https://yourinstance.youtrack.cloud \
   -e YOUTRACK_API_TOKEN=perm:your-permanent-token \
   -e MCP_DEBUG=true \
-  youtrack-mcp
+  tonyzorin/youtrack-mcp:latest
 ```

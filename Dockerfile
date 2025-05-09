@@ -1,11 +1,9 @@
-FROM python:3.10-slim
+FROM python:3.12-alpine
 
 WORKDIR /app
 
-# Install git for pip dependencies from GitHub
-RUN apt-get update && apt-get install -y --no-install-recommends git && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Install git and build dependencies for Python packages
+RUN apk add --no-cache git gcc musl-dev python3-dev libffi-dev openssl-dev
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
