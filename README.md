@@ -37,6 +37,7 @@ Model Context Protocol (MCP) is an open standard that enables AI models to inter
 ```bash
 # Run with Docker (for YouTrack Cloud instances)
 docker run -i --rm \
+     -e YOUTRACK_URL=https://your-instance.youtrack.cloud \
      -e YOUTRACK_API_TOKEN=perm:your-api-token \
      -e YOUTRACK_CLOUD=true \
      tonyzorin/youtrack-mcp:latest
@@ -45,6 +46,7 @@ docker run -i --rm \
 docker run -i --rm \
      -e YOUTRACK_URL=https://your-instance.youtrack.cloud \
      -e YOUTRACK_API_TOKEN=your-api-token \
+     -e YOUTRACK_CLOUD=false \
      tonyzorin/youtrack-mcp:latest
 ```
 
@@ -57,6 +59,7 @@ For Cursor IDE, add to `.cursor/mcp.json`:
             "type": "stdio",
             "command": "docker",
             "args": ["run", "-i", "--rm",
+            "-e", "YOUTRACK_URL=https://your-instance.youtrack.cloud",
             "-e", "YOUTRACK_API_TOKEN=perm:your-api-token", 
             "-e", "YOUTRACK_CLOUD=true",
             "tonyzorin/youtrack-mcp:latest"
@@ -173,10 +176,25 @@ To use with Claude Desktop:
 
 1. Open Claude Desktop preferences
 2. Navigate to the MCP section
-3. Add a new MCP server with:
-   - Name: YouTrack
-   - Command: docker
-   - Arguments: run -i --rm -e YOUTRACK_API_TOKEN=perm:your-api-token -e YOUTRACK_CLOUD=true tonyzorin/youtrack-mcp:latest
+3. Click Edit.
+4. Open claude_desktop_config.json
+5. Add a new MCP server with:
+    ```json
+    {
+        "mcpServers": {
+            "YouTrack": {
+                "type": "stdio",
+                "command": "docker",
+                "args": ["run", "-i", "--rm", 
+                "-e", "YOUTRACK_API_TOKEN=perm:your-api-token",
+                "-e", "YOUTRACK_URL=https://your-instance.youtrack.cloud",
+                "-e", "YOUTRACK_CLOUD=true",
+                "tonyzorin/youtrack-mcp:latest"
+                ]
+            }
+        }
+    }
+    ```
 
 Replace the URL and token with your actual values.
 
