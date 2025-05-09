@@ -102,22 +102,50 @@ class Config:
         
         For self-hosted instances, this is the configured URL.
         For cloud instances, this is the workspace-specific youtrack.cloud API URL,
-        which is extracted from the API token.
+        which is extracted from the API token or used directly if provided.
         
         Returns:
             Base URL for the YouTrack API
         """
+        # If URL is explicitly provided, use it regardless of cloud setting
+        if cls.YOUTRACK_URL:
+            return f"{cls.YOUTRACK_URL}/api"
+            
+        # For cloud instances without explicit URL, try to extract from token
         if cls.is_cloud_instance():
-            # Extract workspace name from API token
-            # Format: perm:username.workspace.12345...
-            if "." in cls.YOUTRACK_API_TOKEN and cls.YOUTRACK_API_TOKEN.startswith("perm:"):
+            # Handle both token formats: perm: and perm-
+            if "." in cls.YOUTRACK_API_TOKEN and (cls.YOUTRACK_API_TOKEN.startswith("perm:") or cls.YOUTRACK_API_TOKEN.startswith("perm-")):
                 token_parts = cls.YOUTRACK_API_TOKEN.split(".")
+                
+                # Extract workspace from specific token formats
                 if len(token_parts) > 1:
-                    workspace = token_parts[1]
-                    return f"https://{workspace}.youtrack.cloud/api"
-            # Fallback to default if we can't extract workspace
-            raise ValueError("Could not determine workspace from API token. For YouTrack Cloud, token should be in format: perm:username.workspace.12345...")
-        return f"{cls.YOUTRACK_URL}/api"
+                    # For format: perm:username.workspace.12345...
+                    if cls.YOUTRACK_API_TOKEN.startswith("perm:"):
+                        workspace = token_parts[1]
+                        return f"https://{workspace}.youtrack.cloud/api"
+                    
+                    # For format: perm-base64.base64.hash
+                    elif cls.YOUTRACK_API_TOKEN.startswith("perm-"):
+                        # If we have a fixed workspace name from environment, use it
+                        if os.getenv("YOUTRACK_WORKSPACE"):
+                            workspace = os.getenv("YOUTRACK_WORKSPACE")
+                            return f"https://{workspace}.youtrack.cloud/api"
+                        
+                        # Remove hardcoded prodcamp reference
+                        # Use environment variable instead
+                        if os.getenv("YOUTRACK_URL"):
+                            return f"{os.getenv('YOUTRACK_URL')}/api"
+            
+            # Fallback error with better guidance
+            raise ValueError(
+                "Could not determine YouTrack Cloud URL. Please either:\n"
+                "1. Set YOUTRACK_URL to your YouTrack Cloud URL (e.g., https://yourworkspace.youtrack.cloud)\n"
+                "2. Set YOUTRACK_WORKSPACE to your workspace name\n"
+                "3. Use a token in the format perm:username.workspace.12345..."
+            )
+            
+        # Should never reach here as is_cloud_instance() returns True if URL is missing
+        raise ValueError("YouTrack URL is required. Please set YOUTRACK_URL environment variable.")
 
 
 # Create a global config instance
