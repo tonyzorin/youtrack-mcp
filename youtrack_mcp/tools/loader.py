@@ -39,7 +39,7 @@ def load_all_tools() -> Dict[str, Callable]:
     Available tools:
     - get_projects, get_project, get_project_by_name, get_project_issues, get_custom_fields, 
       create_project, update_project (from ProjectTools)
-    - get_issue, get_issue_raw, search_issues, create_issue, add_comment (from IssueTools)
+    - get_issue, get_issue_raw, search_issues, create_issue, add_comment, read_all_issue_comments (from IssueTools)
     - get_user, get_user_by_login, get_user_groups, search_users, get_current_user (from UserTools)
     - advanced_search, filter_issues, search_with_custom_fields (from SearchTools)
     

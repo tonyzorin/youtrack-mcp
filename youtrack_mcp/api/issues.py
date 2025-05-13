@@ -217,4 +217,20 @@ class IssuesClient:
             The created comment data
         """
         data = {"text": text}
-        return self.client.post(f"issues/{issue_id}/comments", data=data) 
+        return self.client.post(f"issues/{issue_id}/comments", data=data)
+        
+    def get_comments(self, issue_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get all comments for an issue.
+        
+        Args:
+            issue_id: The issue ID or readable ID
+            limit: Maximum number of comments to return (default: 100)
+            
+        Returns:
+            List of comments for the issue
+        """
+        # Request with fields to include author and other relevant information
+        fields = "id,text,created,updated,author(id,login,name)"
+        params = {"$top": limit, "fields": fields}
+        return self.client.get(f"issues/{issue_id}/comments", params=params) 
