@@ -195,6 +195,27 @@ class IssueTools:
         except Exception as e:
             logger.exception(f"Error adding comment to issue {issue_id}")
             return json.dumps({"error": str(e)})
+            
+    @sync_wrapper
+    def read_all_issue_comments(self, issue_id: str, limit: int = 100) -> str:
+        """
+        Get all comments for a specific issue.
+        
+        FORMAT: read_all_issue_comments(issue_id="DEMO-123", limit=50)
+        
+        Args:
+            issue_id: The issue ID or readable ID (e.g., PROJECT-123)
+            limit: Maximum number of comments to return (optional, default: 100)
+            
+        Returns:
+            JSON string with all comments for the issue
+        """
+        try:
+            comments = self.issues_api.get_comments(issue_id, limit)
+            return json.dumps(comments, indent=2)
+        except Exception as e:
+            logger.exception(f"Error getting comments for issue {issue_id}")
+            return json.dumps({"error": str(e)})
     
     def close(self) -> None:
         """Close the API client."""
@@ -234,6 +255,13 @@ class IssueTools:
                 "parameter_descriptions": {
                     "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)",
                     "text": "The comment text to add to the issue"
+                }
+            },
+            "read_all_issue_comments": {
+                "description": "Get all comments for a specific issue in YouTrack.",
+                "parameter_descriptions": {
+                    "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)",
+                    "limit": "Maximum number of comments to return (optional, default: 100)"
                 }
             },
             "get_issue_raw": {
