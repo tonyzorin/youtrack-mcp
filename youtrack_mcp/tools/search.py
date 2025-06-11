@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Union
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.issues import IssuesClient
 from youtrack_mcp.mcp_wrappers import sync_wrapper
+from youtrack_mcp.utils import format_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,8 @@ class SearchTools:
                 
             raw_issues = self.client.get("issues", params=params)
             
-            # Return the raw issues data directly
-            return json.dumps(raw_issues, indent=2)
+            # Return the raw issues data with ISO8601 timestamps
+            return format_json_response(raw_issues)
             
         except Exception as e:
             logger.exception(f"Error performing advanced search with query: {query}")

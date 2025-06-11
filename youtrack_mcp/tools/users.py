@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.users import UsersClient
 from youtrack_mcp.mcp_wrappers import sync_wrapper
+from youtrack_mcp.utils import format_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class UserTools:
         """
         try:
             user = self.users_api.get_current_user()
-            return json.dumps(user.model_dump(), indent=2)
+            return format_json_response(user.model_dump())
         except Exception as e:
             logger.exception("Error getting current user")
             return json.dumps({"error": str(e)})
@@ -64,7 +65,7 @@ class UserTools:
             else:
                 result = user_obj  # Assume it's already a dict
                 
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception(f"Error getting user {user_id or user}")
             return json.dumps({"error": str(e)})
@@ -97,7 +98,7 @@ class UserTools:
             else:
                 result = user  # Assume it's already a dict
                 
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception(f"Error getting user with login {login}")
             return json.dumps({"error": str(e)})
@@ -130,7 +131,7 @@ class UserTools:
             
             # If it's a dictionary (direct API response)
             if isinstance(groups, dict):
-                return json.dumps(groups, indent=2)
+                return format_json_response(groups)
             
             # If it's a list of objects
             try:
@@ -144,7 +145,7 @@ class UserTools:
                     else:
                         # Last resort: convert to string
                         result.append(str(group))
-                return json.dumps(result, indent=2)
+                return format_json_response(result)
             except Exception as e:
                 # If we can't iterate, return the raw string representation
                 logger.warning(f"Could not process groups response: {str(e)}")
@@ -169,7 +170,7 @@ class UserTools:
         """
         try:
             users = self.users_api.search_users(query, limit=limit)
-            return json.dumps([u.model_dump() for u in users], indent=2)
+            return format_json_response([u.model_dump() for u in users])
         except Exception as e:
             logger.exception(f"Error searching users with query {query}")
             return json.dumps({"error": str(e)})

@@ -10,6 +10,7 @@ from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.issues import IssuesClient
 from youtrack_mcp.api.projects import ProjectsClient
 from youtrack_mcp.mcp_wrappers import sync_wrapper
+from youtrack_mcp.utils import format_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class ProjectTools:
                 else:
                     result.append(project)  # Assume it's already a dict
                     
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception("Error getting projects")
             return json.dumps({"error": str(e)})
@@ -81,7 +82,7 @@ class ProjectTools:
             else:
                 result = project_obj  # Assume it's already a dict
                 
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception(f"Error getting project {project_id or project}")
             return json.dumps({"error": str(e)})
@@ -108,7 +109,7 @@ class ProjectTools:
                 else:
                     result = project  # Assume it's already a dict
                     
-                return json.dumps(result, indent=2)
+                return format_json_response(result)
             else:
                 return json.dumps({"error": f"Project '{project_name}' not found"})
         except Exception as e:
@@ -140,7 +141,7 @@ class ProjectTools:
             try:
                 issues = self.projects_api.get_project_issues(project_identifier, limit)
                 if issues:
-                    return json.dumps(issues, indent=2)
+                    return format_json_response(issues)
             except Exception as e:
                 # If that fails, check if it was a non-ID format error
                 if not str(e).startswith("Project not found"):
@@ -152,7 +153,7 @@ class ProjectTools:
                 project_obj = self.projects_api.get_project_by_name(project_identifier)
                 if project_obj:
                     issues = self.projects_api.get_project_issues(project_obj.id, limit)
-                    return json.dumps(issues, indent=2)
+                    return format_json_response(issues)
                 else:
                     return json.dumps({"error": f"Project not found: {project_identifier}"})
             except Exception as e:
@@ -190,7 +191,7 @@ class ProjectTools:
             
             # If it's a dictionary (direct API response)
             if isinstance(fields, dict):
-                return json.dumps(fields, indent=2)
+                return format_json_response(fields)
             
             # If it's a list of objects
             try:
@@ -204,7 +205,7 @@ class ProjectTools:
                     else:
                         # Last resort: convert to string
                         result.append(str(field))
-                return json.dumps(result, indent=2)
+                return format_json_response(result)
             except Exception as e:
                 # If we can't iterate, return the raw string representation
                 logger.warning(f"Could not process custom fields response: {str(e)}")
@@ -251,7 +252,7 @@ class ProjectTools:
             else:
                 result = project  # Assume it's already a dict
                 
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception(f"Error creating project {name}")
             return json.dumps({"error": str(e)})
@@ -307,9 +308,9 @@ class ProjectTools:
                 if not data:
                     logger.info("No parameters to update, returning current project")
                     if hasattr(existing_project, 'model_dump'):
-                        return json.dumps(existing_project.model_dump(), indent=2)
+                        return format_json_response(existing_project.model_dump())
                     else:
-                        return json.dumps(existing_project, indent=2)
+                        return format_json_response(existing_project)
                 
                 # Log the data being sent
                 logger.info(f"Updating project with data: {data}")
@@ -329,9 +330,9 @@ class ProjectTools:
                     logger.info(f"Retrieved updated project: {updated_project.name}")
                     
                     if hasattr(updated_project, 'model_dump'):
-                        return json.dumps(updated_project.model_dump(), indent=2)
+                        return format_json_response(updated_project.model_dump())
                     else:
-                        return json.dumps(updated_project, indent=2)
+                        return format_json_response(updated_project)
                 except Exception as e:
                     logger.error(f"Error retrieving updated project: {str(e)}")
                     return json.dumps({"error": f"Project was updated but could not retrieve the result: {str(e)}"})

@@ -9,6 +9,7 @@ from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.issues import IssuesClient
 from youtrack_mcp.api.projects import ProjectsClient
 from youtrack_mcp.mcp_wrappers import sync_wrapper
+from youtrack_mcp.utils import format_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +44,8 @@ class IssueTools:
             if isinstance(raw_issue, dict) and raw_issue.get('$type') == 'Issue' and 'summary' not in raw_issue:
                 raw_issue['summary'] = f"Issue {issue_id}"  # Provide a default summary
             
-            # Return the raw issue data directly - avoid model validation issues
-            return json.dumps(raw_issue, indent=2)
+            # Return the raw issue data with ISO8601 timestamps
+            return format_json_response(raw_issue)
             
         except Exception as e:
             logger.exception(f"Error getting issue {issue_id}")
@@ -70,8 +71,8 @@ class IssueTools:
             params = {"query": query, "$top": limit, "fields": fields}
             raw_issues = self.client.get("issues", params=params)
             
-            # Return the raw issues data directly
-            return json.dumps(raw_issues, indent=2)
+            # Return the raw issues data with ISO8601 timestamps
+            return format_json_response(raw_issues)
             
         except Exception as e:
             logger.exception(f"Error searching issues with query: {query}")
@@ -147,18 +148,18 @@ class IssueTools:
                         detailed_issue = self.issues_api.get_issue(issue_id)
                         
                         if hasattr(detailed_issue, 'model_dump'):
-                            return json.dumps(detailed_issue.model_dump(), indent=2)
+                            return format_json_response(detailed_issue.model_dump())
                         else:
-                            return json.dumps(detailed_issue, indent=2)
+                            return format_json_response(detailed_issue)
                     except Exception as e:
                         logger.warning(f"Could not retrieve detailed issue: {str(e)}")
                         # Fall back to original issue
                 
                 # Original issue as fallback
                 if hasattr(issue, 'model_dump'):
-                    return json.dumps(issue.model_dump(), indent=2)
+                    return format_json_response(issue.model_dump())
                 else:
-                    return json.dumps(issue, indent=2)
+                    return format_json_response(issue)
             except Exception as e:
                 error_msg = str(e)
                 if hasattr(e, 'response') and e.response:
@@ -191,7 +192,7 @@ class IssueTools:
         """
         try:
             result = self.issues_api.add_comment(issue_id, text)
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception(f"Error adding comment to issue {issue_id}")
             return json.dumps({"error": str(e)})
@@ -302,7 +303,7 @@ class IssueTools:
         """
         try:
             raw_issue = self.client.get(f"issues/{issue_id}")
-            return json.dumps(raw_issue, indent=2)
+            return format_json_response(raw_issue)
         except Exception as e:
             logger.exception(f"Error getting raw issue {issue_id}")
             return json.dumps({"error": str(e)})
@@ -348,7 +349,7 @@ class IssueTools:
         """
         try:
             links = self.issues_api.get_issue_links(issue_id)
-            return json.dumps(links, indent=2)
+            return format_json_response(links)
         except Exception as e:
             logger.exception(f"Error getting links for issue {issue_id}")
             return json.dumps({"error": str(e)})
@@ -365,7 +366,7 @@ class IssueTools:
         """
         try:
             link_types = self.issues_api.get_available_link_types()
-            return json.dumps(link_types, indent=2)
+            return format_json_response(link_types)
         except Exception as e:
             logger.exception(f"Error getting available link types")
             return json.dumps({"error": str(e)})
