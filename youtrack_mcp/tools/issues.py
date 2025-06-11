@@ -259,6 +259,31 @@ class IssueTools:
             "get_available_link_types": {
                 "description": "Get the list of available issue link types that can be used when linking issues.",
                 "parameter_descriptions": {}
+            },
+            "update_issue": {
+                "description": "Update issue fields like assignee, priority, state, etc. using YouTrack commands.",
+                "parameter_descriptions": {
+                    "issue_id": "The issue ID or readable ID (e.g., DSO-45)",
+                    "assignee": "Username to assign to (optional, e.g., 'cventers', 'me', or 'Unassigned')",
+                    "priority": "Priority level (optional, e.g., 'Critical', 'High', 'Normal', 'Low')",
+                    "state": "Issue state (optional, e.g., 'Open', 'In Progress', 'Resolved', 'Closed')",
+                    "type": "Issue type (optional, varies by project)"
+                }
+            },
+            "create_dependency": {
+                "description": "Create a dependency relationship where one issue depends on another. This is a convenience method for the 'depends on' link type.",
+                "parameter_descriptions": {
+                    "dependent_issue_id": "The issue that depends on another (e.g., 'DSO-45')",
+                    "dependency_issue_id": "The issue that is required/depended upon (e.g., 'PAY-887')"
+                }
+            },
+            "remove_link": {
+                "description": "Remove an existing link/relationship between two issues.",
+                "parameter_descriptions": {
+                    "source_issue_id": "The issue that will have the link removed from it",
+                    "target_issue_id": "The issue to unlink from",
+                    "link_type": "The type of link to remove (optional, default: 'relates to')"
+                }
             }
         }
     
@@ -343,4 +368,86 @@ class IssueTools:
             return json.dumps(link_types, indent=2)
         except Exception as e:
             logger.exception(f"Error getting available link types")
-            return json.dumps({"error": str(e)}) 
+            return json.dumps({"error": str(e)})
+    
+    @sync_wrapper
+    def update_issue(self, issue_id: str, **fields) -> str:
+        """
+        Update issue fields using YouTrack commands.
+        
+        FORMAT: update_issue(issue_id="DSO-45", assignee="cventers", priority="Critical")
+        
+        Args:
+            issue_id: The issue ID or readable ID
+            **fields: Field updates as keyword arguments
+            
+        Common field names:
+            assignee: Username to assign to (use "cventers", "me", or "Unassigned")
+            priority: Priority level (e.g., "Critical", "High", "Normal", "Low")
+            state: Issue state (e.g., "Open", "In Progress", "Resolved", "Closed") 
+            type: Issue type (varies by project)
+            
+        Returns:
+            JSON string with the result of the update operation
+        """
+        try:
+            result = self.issues_api.update_issue(issue_id, **fields)
+            return json.dumps({
+                "status": "success",
+                "message": f"Successfully updated issue {issue_id}",
+                "result": result
+            }, indent=2)
+        except Exception as e:
+            logger.exception(f"Error updating issue {issue_id}")
+            return json.dumps({"error": str(e), "status": "error"})
+    
+    @sync_wrapper
+    def create_dependency(self, dependent_issue_id: str, dependency_issue_id: str) -> str:
+        """
+        Create a dependency relationship where one issue depends on another.
+        
+        FORMAT: create_dependency(dependent_issue_id="DSO-45", dependency_issue_id="PAY-887")
+        
+        Args:
+            dependent_issue_id: The issue that depends on another (e.g., "DSO-45") 
+            dependency_issue_id: The issue that is required (e.g., "PAY-887")
+            
+        Returns:
+            JSON string with the result of creating the dependency
+        """
+        try:
+            result = self.issues_api.create_dependency(dependent_issue_id, dependency_issue_id)
+            return json.dumps({
+                "status": "success",
+                "message": f"Successfully created dependency: {dependent_issue_id} depends on {dependency_issue_id}",
+                "result": result
+            }, indent=2)
+        except Exception as e:
+            logger.exception(f"Error creating dependency {dependent_issue_id} -> {dependency_issue_id}")
+            return json.dumps({"error": str(e), "status": "error"})
+    
+    @sync_wrapper
+    def remove_link(self, source_issue_id: str, target_issue_id: str, link_type: str = "relates to") -> str:
+        """
+        Remove a link between two issues.
+        
+        FORMAT: remove_link(source_issue_id="DSO-45", target_issue_id="PAY-887", link_type="relates to")
+        
+        Args:
+            source_issue_id: The issue that will have the link removed from it
+            target_issue_id: The issue to unlink from
+            link_type: The type of link to remove (optional, default: "relates to")
+            
+        Returns:
+            JSON string with the result of removing the link
+        """
+        try:
+            result = self.issues_api.remove_link(source_issue_id, target_issue_id, link_type)
+            return json.dumps({
+                "status": "success",
+                "message": f"Successfully removed {link_type} link from {source_issue_id} to {target_issue_id}",
+                "result": result
+            }, indent=2)
+        except Exception as e:
+            logger.exception(f"Error removing link {source_issue_id} -> {target_issue_id}")
+            return json.dumps({"error": str(e), "status": "error"}) 
