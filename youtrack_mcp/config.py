@@ -21,6 +21,7 @@ class Config:
     # YouTrack API configuration
     YOUTRACK_URL: str = os.getenv("YOUTRACK_URL", "")
     YOUTRACK_API_TOKEN: str = os.getenv("YOUTRACK_API_TOKEN", "")
+    YOUTRACK_TOKEN_FILE: str = os.getenv("YOUTRACK_TOKEN_FILE", "")
     VERIFY_SSL: bool = os.getenv("YOUTRACK_VERIFY_SSL", "true").lower() in ("true", "1", "yes")
     
     # Cloud instance configuration
@@ -56,9 +57,17 @@ class Config:
         Raises:
             ValueError: If required settings are missing or invalid
         """
+        # Try to read token from file if no token is set but file is specified
+        if not cls.YOUTRACK_API_TOKEN and cls.YOUTRACK_TOKEN_FILE:
+            try:
+                with open(cls.YOUTRACK_TOKEN_FILE, 'r') as f:
+                    cls.YOUTRACK_API_TOKEN = f.read().strip()
+            except Exception as e:
+                raise ValueError(f"Failed to read YouTrack API token from file {cls.YOUTRACK_TOKEN_FILE}: {e}")
+        
         # API token is always required
         if not cls.YOUTRACK_API_TOKEN:
-            raise ValueError("YouTrack API token is required. Provide it using YOUTRACK_API_TOKEN environment variable or in configuration.")
+            raise ValueError("YouTrack API token is required. Provide it using YOUTRACK_API_TOKEN environment variable, YOUTRACK_TOKEN_FILE, or in configuration.")
         
         # URL is only required for self-hosted instances (Cloud instances can use API token only)
         if not cls.YOUTRACK_CLOUD and not cls.YOUTRACK_URL:

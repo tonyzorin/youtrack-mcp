@@ -241,6 +241,24 @@ class IssueTools:
                 "parameter_descriptions": {
                     "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)"
                 }
+            },
+            "link_issues": {
+                "description": "Create a link/relationship between two issues in YouTrack.",
+                "parameter_descriptions": {
+                    "source_issue_id": "The issue ID that will have the link applied to it (e.g., 'PAY-893')",
+                    "target_issue_id": "The issue ID to link to (e.g., 'SP-8730')",
+                    "link_type": "The type of link relationship (optional, default: 'relates to'). Examples: 'relates to', 'depends on', 'blocks', 'duplicates'"
+                }
+            },
+            "get_issue_links": {
+                "description": "Get all existing links/relationships for a specific issue.",
+                "parameter_descriptions": {
+                    "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)"
+                }
+            },
+            "get_available_link_types": {
+                "description": "Get the list of available issue link types that can be used when linking issues.",
+                "parameter_descriptions": {}
             }
         }
     
@@ -262,4 +280,67 @@ class IssueTools:
             return json.dumps(raw_issue, indent=2)
         except Exception as e:
             logger.exception(f"Error getting raw issue {issue_id}")
+            return json.dumps({"error": str(e)})
+    
+    @sync_wrapper
+    def link_issues(self, source_issue_id: str, target_issue_id: str, link_type: str = "relates to") -> str:
+        """
+        Link two issues together using a specified link type.
+        
+        FORMAT: link_issues(source_issue_id="PAY-893", target_issue_id="SP-8730", link_type="relates to")
+        
+        Args:
+            source_issue_id: The ID of the issue that will have the link applied to it
+            target_issue_id: The ID of the issue to link to  
+            link_type: The type of link (optional, default: "relates to")
+            
+        Returns:
+            JSON string with the result of the linking operation
+        """
+        try:
+            result = self.issues_api.link_issues(source_issue_id, target_issue_id, link_type)
+            return json.dumps({
+                "status": "success",
+                "message": f"Successfully linked {source_issue_id} to {target_issue_id} with link type '{link_type}'",
+                "result": result
+            }, indent=2)
+        except Exception as e:
+            logger.exception(f"Error linking issues {source_issue_id} -> {target_issue_id}")
+            return json.dumps({"error": str(e), "status": "error"})
+    
+    @sync_wrapper
+    def get_issue_links(self, issue_id: str) -> str:
+        """
+        Get all links for a specific issue.
+        
+        FORMAT: get_issue_links(issue_id="PAY-893")
+        
+        Args:
+            issue_id: The issue ID or readable ID
+            
+        Returns:
+            JSON string containing all links for the issue
+        """
+        try:
+            links = self.issues_api.get_issue_links(issue_id)
+            return json.dumps(links, indent=2)
+        except Exception as e:
+            logger.exception(f"Error getting links for issue {issue_id}")
+            return json.dumps({"error": str(e)})
+    
+    @sync_wrapper
+    def get_available_link_types(self) -> str:
+        """
+        Get available issue link types from YouTrack.
+        
+        FORMAT: get_available_link_types()
+        
+        Returns:
+            JSON string containing available link types
+        """
+        try:
+            link_types = self.issues_api.get_available_link_types()
+            return json.dumps(link_types, indent=2)
+        except Exception as e:
+            logger.exception(f"Error getting available link types")
             return json.dumps({"error": str(e)}) 

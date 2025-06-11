@@ -161,7 +161,8 @@ def normalize_parameter_names(func_name: str, kwargs: Dict[str, Any]) -> Dict[st
     ]
     
     issue_tools_methods = [
-        'create_issue', 'issue_create_issue', 'get_issue', 'add_comment', 'get_issue_raw'
+        'create_issue', 'issue_create_issue', 'get_issue', 'add_comment', 'get_issue_raw',
+        'link_issues', 'get_issue_links', 'get_available_link_types'
     ]
     
     # Apply mappings based on the function being called

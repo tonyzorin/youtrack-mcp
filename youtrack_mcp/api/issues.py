@@ -217,4 +217,77 @@ class IssuesClient:
             The created comment data
         """
         data = {"text": text}
-        return self.client.post(f"issues/{issue_id}/comments", data=data) 
+        return self.client.post(f"issues/{issue_id}/comments", data=data)
+    
+    def link_issues(self, source_issue_id: str, target_issue_id: str, link_type: str = "relates to") -> Dict[str, Any]:
+        """
+        Link two issues together using YouTrack commands.
+        
+        This method uses the YouTrack commands API to create a link between issues.
+        The command approach is preferred over direct link creation as it's more reliable.
+        
+        Args:
+            source_issue_id: The ID of the issue that will have the link applied to it
+            target_issue_id: The ID of the issue to link to
+            link_type: The type of link (e.g., "relates to", "depends on", "blocks")
+            
+        Returns:
+            Command execution result
+        """
+        # Prepare the command data
+        command_data = {
+            "query": f"{link_type} {target_issue_id}",
+            "issues": [{"idReadable": source_issue_id}]
+        }
+        
+        logger.info(f"Linking issue {source_issue_id} to {target_issue_id} with link type '{link_type}'")
+        logger.debug(f"Command data: {json.dumps(command_data)}")
+        
+        try:
+            # Execute the command using the commands API
+            result = self.client.post("commands", data=command_data)
+            logger.info(f"Successfully linked {source_issue_id} to {target_issue_id}")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to link issues {source_issue_id} -> {target_issue_id}: {str(e)}")
+            raise
+    
+    def get_issue_links(self, issue_id: str) -> Dict[str, Any]:
+        """
+        Get all links for a specific issue.
+        
+        Args:
+            issue_id: The issue ID or readable ID
+            
+        Returns:
+            Dictionary containing issue link information
+        """
+        # Get links with comprehensive field information
+        fields = "id,direction,linkType(id,name,directed),issues(id,idReadable,summary,project(id,name,shortName))"
+        params = {"fields": fields}
+        
+        try:
+            links = self.client.get(f"issues/{issue_id}/links", params=params)
+            logger.debug(f"Retrieved {len(links) if isinstance(links, list) else 0} links for issue {issue_id}")
+            return links
+        except Exception as e:
+            logger.error(f"Failed to get links for issue {issue_id}: {str(e)}")
+            raise
+    
+    def get_available_link_types(self) -> Dict[str, Any]:
+        """
+        Get available issue link types from YouTrack.
+        
+        Returns:
+            Dictionary containing available link types
+        """
+        try:
+            # Get all issue link types with their names and directions
+            fields = "id,name,directed,sourceType,targetType"
+            params = {"fields": fields}
+            link_types = self.client.get("issueLinkTypes", params=params)
+            logger.debug(f"Retrieved {len(link_types) if isinstance(link_types, list) else 0} link types")
+            return link_types
+        except Exception as e:
+            logger.error(f"Failed to get available link types: {str(e)}")
+            raise 
