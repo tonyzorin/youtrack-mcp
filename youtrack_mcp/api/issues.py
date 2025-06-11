@@ -283,11 +283,114 @@ class IssuesClient:
         """
         try:
             # Get all issue link types with their names and directions
-            fields = "id,name,directed,sourceType,targetType"
+            fields = "id,name,directed,sourceToTarget,targetToSource,aggregation,readOnly"
             params = {"fields": fields}
             link_types = self.client.get("issueLinkTypes", params=params)
             logger.debug(f"Retrieved {len(link_types) if isinstance(link_types, list) else 0} link types")
             return link_types
         except Exception as e:
             logger.error(f"Failed to get available link types: {str(e)}")
+            raise
+    
+    def update_issue(self, issue_id: str, **fields) -> Dict[str, Any]:
+        """
+        Update issue fields using YouTrack commands.
+        
+        This method uses the YouTrack commands API to update issue fields like assignee,
+        priority, state, etc. Different projects may have different field names.
+        
+        Args:
+            issue_id: The issue ID or readable ID
+            **fields: Field updates as keyword arguments (e.g., assignee="cventers", priority="Critical")
+            
+        Returns:
+            Command execution result
+        """
+        # Build command query from field updates
+        command_parts = []
+        for field_name, field_value in fields.items():
+            if field_name.lower() == 'assignee':
+                if field_value and field_value.lower() not in ['unassigned', 'none', '']:
+                    command_parts.append(f"for {field_value}")
+                else:
+                    command_parts.append("for Unassigned")
+            elif field_name.lower() == 'priority':
+                command_parts.append(f"Priority {field_value}")
+            elif field_name.lower() == 'state':
+                command_parts.append(f"State {field_value}")
+            elif field_name.lower() == 'type':
+                command_parts.append(f"Type {field_value}")
+            else:
+                # Generic field update format
+                command_parts.append(f"{field_name} {field_value}")
+        
+        if not command_parts:
+            raise ValueError("No valid field updates provided")
+        
+        # Join multiple commands with spaces
+        query = " ".join(command_parts)
+        
+        command_data = {
+            "query": query,
+            "issues": [{"idReadable": issue_id}]
+        }
+        
+        logger.info(f"Updating issue {issue_id} with command: {query}")
+        logger.debug(f"Command data: {json.dumps(command_data)}")
+        
+        try:
+            # Execute the command using the commands API
+            result = self.client.post("commands", data=command_data)
+            logger.info(f"Successfully updated issue {issue_id}")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to update issue {issue_id}: {str(e)}")
+            raise
+    
+    def create_dependency(self, dependent_issue_id: str, dependency_issue_id: str) -> Dict[str, Any]:
+        """
+        Create a dependency relationship where one issue depends on another.
+        
+        This is a convenience method that uses the correct YouTrack syntax for dependencies.
+        For YouTrack's "Depend" link type:
+        - sourceToTarget: "is required for"
+        - targetToSource: "depends on"
+        
+        Args:
+            dependent_issue_id: The issue that depends on another (will have "depends on" applied to it)
+            dependency_issue_id: The issue that is required (the dependency)
+            
+        Returns:
+            Command execution result
+        """
+        return self.link_issues(dependent_issue_id, dependency_issue_id, "depends on")
+    
+    def remove_link(self, source_issue_id: str, target_issue_id: str, link_type: str = "relates to") -> Dict[str, Any]:
+        """
+        Remove a link between two issues using YouTrack commands.
+        
+        Args:
+            source_issue_id: The ID of the issue that will have the link removed from it
+            target_issue_id: The ID of the issue to unlink from
+            link_type: The type of link to remove
+            
+        Returns:
+            Command execution result
+        """
+        # Prepare the command data with remove prefix
+        command_data = {
+            "query": f"remove {link_type} {target_issue_id}",
+            "issues": [{"idReadable": source_issue_id}]
+        }
+        
+        logger.info(f"Removing link from {source_issue_id} to {target_issue_id} with link type '{link_type}'")
+        logger.debug(f"Command data: {json.dumps(command_data)}")
+        
+        try:
+            # Execute the command using the commands API
+            result = self.client.post("commands", data=command_data)
+            logger.info(f"Successfully removed link {source_issue_id} -> {target_issue_id}")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to remove link {source_issue_id} -> {target_issue_id}: {str(e)}")
             raise 
