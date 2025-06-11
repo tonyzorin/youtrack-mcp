@@ -58,7 +58,7 @@ class IssuesClient:
         # If the response doesn't have all needed fields, fetch more details
         if isinstance(response, dict) and response.get('$type') == 'Issue' and 'summary' not in response:
             # Get additional fields we need
-            fields = "summary,description,created,updated,project,reporter,assignee,customFields"
+            fields = "id,idReadable,summary,description,created,updated,project,reporter,assignee,customFields"
             detailed_response = self.client.get(f"issues/{issue_id}?fields={fields}")
             return Issue.model_validate(detailed_response)
         
@@ -190,7 +190,7 @@ class IssuesClient:
             List of matching issues
         """
         # Request additional fields to ensure we get summary
-        fields = "id,summary,description,created,updated,project,reporter,assignee,customFields"
+        fields = "id,idReadable,summary,description,created,updated,project,reporter,assignee,customFields"
         params = {"query": query, "$top": limit, "fields": fields}
         response = self.client.get("issues", params=params)
         

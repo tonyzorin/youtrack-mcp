@@ -48,7 +48,7 @@ class SearchTools:
                 logger.info(f"Sorting by: {sort_param}")
                 
             # Request with explicit fields to get complete data
-            fields = "id,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
             params = {"query": query, "$top": limit, "fields": fields}
             
             if sort_param:
