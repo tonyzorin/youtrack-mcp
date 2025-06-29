@@ -176,6 +176,27 @@ class IssueTools:
             return json.dumps({"error": str(e), "status": "error"})
     
     @sync_wrapper        
+    def get_issue_comments(self, issue_id: str, limit: int = 10) -> str:
+        """
+        Get comments for a specific issue.
+        
+        FORMAT: get_issue_comments(issue_id="DEMO-123", limit=10)
+        
+        Args:
+            issue_id: The issue ID or readable ID (e.g., PROJECT-123)
+            limit: Maximum number of comments to return (optional, default: 10)
+            
+        Returns:
+            JSON string with issue comments
+        """
+        try:
+            comments = self.issues_api.get_issue_comments(issue_id, limit)
+            return json.dumps(comments, indent=2)
+        except Exception as e:
+            logger.exception(f"Error getting comments for issue {issue_id}")
+            return json.dumps({"error": str(e)})
+    
+    @sync_wrapper        
     def add_comment(self, issue_id: str, text: str) -> str:
         """
         Add a comment to an issue.
@@ -227,6 +248,13 @@ class IssueTools:
                     "project": "The project ID or short name (e.g., 'DEMO' or '0-0')",
                     "summary": "The issue title/summary",
                     "description": "Detailed description of the issue (optional)"
+                }
+            },
+            "get_issue_comments": {
+                "description": "Get comments for a specific issue in YouTrack. Returns comment details including author and creation time.",
+                "parameter_descriptions": {
+                    "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)",
+                    "limit": "Maximum number of comments to return (optional, default: 10)"
                 }
             },
             "add_comment": {

@@ -205,6 +205,26 @@ class IssuesClient:
         
         return issues
     
+    def get_issue_comments(self, issue_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get comments for a specific issue.
+        
+        Args:
+            issue_id: The issue ID or readable ID (e.g., PROJECT-123)
+            limit: Maximum number of comments to return (optional)
+            
+        Returns:
+            List of comments for the issue
+        """
+        # Specify fields to retrieve for comments
+        fields = "id,text,author(id,login,name),created"
+        params = {"fields": fields}
+        
+        if limit is not None:
+            params["$top"] = limit
+            
+        return self.client.get(f"issues/{issue_id}/comments", params=params)
+    
     def add_comment(self, issue_id: str, text: str) -> Dict[str, Any]:
         """
         Add a comment to an issue.

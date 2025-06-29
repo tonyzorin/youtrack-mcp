@@ -339,12 +339,21 @@ class YouTrackMCPServer:
                     param_names.remove('self')
                 
                 # Special handling for specific tools
-                if name in ('get_issue', 'add_comment', 'create_issue'):
+                if name in ('get_issue', 'get_issue_comments', 'add_comment', 'create_issue'):
                     # For these tools, we need to ensure the right parameter format
                     # YouTrack expects specific positional parameters
                     if name == 'get_issue' and not processed_kwargs.get('issue_id') and processed_args:
                         # If issue_id is missing but we have a positional arg, use it as issue_id
                         processed_kwargs['issue_id'] = processed_args[0]
+                        processed_args = []
+                    
+                    elif name == 'get_issue_comments':
+                        # For get_issue_comments, we need issue_id and optional limit
+                        if len(processed_args) >= 1 and not processed_kwargs.get('issue_id'):
+                            processed_kwargs['issue_id'] = processed_args[0]
+                            processed_args = processed_args[1:]
+                        if len(processed_args) >= 1 and not processed_kwargs.get('limit'):
+                            processed_kwargs['limit'] = processed_args[0]
                         processed_args = []
                     
                     elif name == 'add_comment':
@@ -789,7 +798,7 @@ class YouTrackMCPServer:
             # Determine if this tool should use streaming
             # For now, assume all tools except Issue tools can stream
             should_stream = not name.startswith("issues_") and not name in [
-                "get_issue", "get_issue_raw", "search_issues", "create_issue", "add_comment"
+                "get_issue", "get_issue_raw", "get_issue_comments", "search_issues", "create_issue", "add_comment"
             ]
             
             # Update counts

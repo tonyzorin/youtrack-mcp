@@ -66,6 +66,33 @@ def get_issue(issue_id: str) -> Dict[str, Any]:
         logger.exception(f"Error getting issue {issue_id}")
         return {"error": str(e), "status": "error"}
 
+def get_issue_comments(issue_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Get comments for a specific issue.
+    
+    Args:
+        issue_id: The issue ID or readable ID (e.g., PROJECT-123)
+        limit: Maximum number of comments to return (default: 10)
+        
+    Returns:
+        List of comments for the issue
+        
+    Example:
+        >>> get_issue_comments(issue_id="DEMO-123", limit=5)
+    """
+    logger.info(f"MCP wrapper: get_issue_comments({issue_id}, limit={limit})")
+    
+    # Check if API client is available
+    if issues_api is None:
+        return [{"error": "YouTrack API client failed to initialize", "status": "error"}]
+        
+    try:
+        comments = issues_api.get_issue_comments(issue_id, limit)
+        return comments if isinstance(comments, list) else []
+    except Exception as e:
+        logger.exception(f"Error getting comments for issue {issue_id}")
+        return [{"error": str(e), "status": "error"}]
+
 def add_comment(issue_id: str, text: str) -> Dict[str, Any]:
     """
     Add a comment to an issue.
