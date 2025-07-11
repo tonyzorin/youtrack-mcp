@@ -24,6 +24,7 @@ class Issue(BaseModel):
     reporter: Optional[Dict[str, Any]] = None
     assignee: Optional[Dict[str, Any]] = None
     custom_fields: List[Dict[str, Any]] = Field(default_factory=list)
+    attachments: List[Dict[str, Any]] = Field(default_factory=list)
     
     model_config = {
         "extra": "allow",  # Allow extra fields from the API
@@ -58,7 +59,7 @@ class IssuesClient:
         # If the response doesn't have all needed fields, fetch more details
         if isinstance(response, dict) and response.get('$type') == 'Issue' and 'summary' not in response:
             # Get additional fields we need
-            fields = "summary,description,created,updated,project,reporter,assignee,customFields"
+            fields = "summary,description,created,updated,project,reporter,assignee,customFields,attachments(id,name,url,mimeType,size)"
             detailed_response = self.client.get(f"issues/{issue_id}?fields={fields}")
             return Issue.model_validate(detailed_response)
         
@@ -218,3 +219,50 @@ class IssuesClient:
         """
         data = {"text": text}
         return self.client.post(f"issues/{issue_id}/comments", data=data) 
+        
+    def get_attachment_content(self, issue_id: str, attachment_id: str) -> bytes:
+        """
+        Get the content of an attachment.
+        
+        Args:
+            issue_id: The issue ID or readable ID
+            attachment_id: The attachment ID
+            
+        Returns:
+            The attachment content as bytes
+        """
+        # First, get the attachment metadata to get the URL
+        issue_response = self.client.get(f"issues/{issue_id}?fields=attachments(id,url)")
+        
+        # Find the attachment with the matching ID
+        attachment_url = None
+        if 'attachments' in issue_response:
+            for attachment in issue_response['attachments']:
+                if attachment.get('id') == attachment_id:
+                    attachment_url = attachment.get('url')
+                    break
+        
+        if not attachment_url:
+            raise ValueError(f"Attachment {attachment_id} not found in issue {issue_id}")
+        
+        # The URL in the attachment data is relative to the base URL
+        if attachment_url.startswith('/'):
+            attachment_url = attachment_url[1:]  # Remove leading slash
+        
+        # Construct the full URL
+        base_url = self.client.base_url
+        if base_url.endswith('/api'):
+            base_url = base_url[:-4]  # Remove '/api' suffix
+        
+        full_url = f"{base_url}/{attachment_url}"
+        
+        # Make the request to get the attachment content
+        response = self.client.session.get(full_url)
+        
+        # Check for errors
+        if response.status_code >= 400:
+            error_msg = f"Error getting attachment content: {response.status_code}"
+            raise YouTrackAPIError(error_msg, response.status_code, response)
+            
+        # Return the binary content
+        return response.content

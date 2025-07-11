@@ -241,6 +241,13 @@ class IssueTools:
                 "parameter_descriptions": {
                     "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)"
                 }
+            },
+            "get_attachment_content": {
+                "description": "Get the content of an attachment as a base64-encoded string.",
+                "parameter_descriptions": {
+                    "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)",
+                    "attachment_id": "The attachment ID (e.g., '1-123')"
+                }
             }
         }
     
@@ -262,4 +269,31 @@ class IssueTools:
             return json.dumps(raw_issue, indent=2)
         except Exception as e:
             logger.exception(f"Error getting raw issue {issue_id}")
-            return json.dumps({"error": str(e)}) 
+            return json.dumps({"error": str(e)})
+            
+    @sync_wrapper
+    def get_attachment_content(self, issue_id: str, attachment_id: str) -> str:
+        """
+        Get the content of an attachment as a base64-encoded string.
+        
+        FORMAT: get_attachment_content(issue_id="DEMO-123", attachment_id="1-123")
+        
+        Args:
+            issue_id: The issue ID or readable ID
+            attachment_id: The attachment ID
+            
+        Returns:
+            JSON string with the attachment content encoded in base64
+        """
+        try:
+            import base64
+            content = self.issues_api.get_attachment_content(issue_id, attachment_id)
+            encoded_content = base64.b64encode(content).decode('utf-8')
+            
+            return json.dumps({
+                "content": encoded_content,
+                "status": "success"
+            })
+        except Exception as e:
+            logger.exception(f"Error getting attachment content for issue {issue_id}, attachment {attachment_id}")
+            return json.dumps({"error": str(e), "status": "error"})
