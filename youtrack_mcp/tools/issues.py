@@ -36,7 +36,7 @@ class IssueTools:
         """
         try:
             # First try to get the issue data with explicit fields
-            fields = "id,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
             raw_issue = self.client.get(f"issues/{issue_id}?fields={fields}")
             
             # If we got a minimal response, enhance it with default values
@@ -66,7 +66,7 @@ class IssueTools:
         """
         try:
             # Request with explicit fields to get complete data
-            fields = "id,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
             params = {"query": query, "$top": limit, "fields": fields}
             raw_issues = self.client.get("issues", params=params)
             
@@ -258,7 +258,8 @@ class IssueTools:
             Raw JSON string with the issue data
         """
         try:
-            raw_issue = self.client.get(f"issues/{issue_id}")
+            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+            raw_issue = self.client.get(f"issues/{issue_id}?fields={fields}")
             return json.dumps(raw_issue, indent=2)
         except Exception as e:
             logger.exception(f"Error getting raw issue {issue_id}")
