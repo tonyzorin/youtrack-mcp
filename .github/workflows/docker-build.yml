@@ -1,3 +1,5 @@
+# Docker Build and Push Workflow
+# Updated with comprehensive diagnostics and secret validation
 name: Docker Build and Push
 
 on:
