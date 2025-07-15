@@ -8,7 +8,7 @@ import json
 import random
 
 import requests
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 
 from youtrack_mcp.config import config
 
@@ -57,13 +57,12 @@ class ServerError(YouTrackAPIError):
 class YouTrackModel(BaseModel):
     """Base model for YouTrack API resources."""
     
-    id: str
+    model_config = ConfigDict(
+        extra='allow',  # Allow extra fields in the model
+        populate_by_name=True  # Allow population by field name
+    )
     
-    class Config:
-        """Pydantic configuration for YouTrack models."""
-        
-        extra = "allow"  # Allow extra fields in the model
-        populate_by_name = True  # Allow population by field name
+    id: str
 
 
 class YouTrackClient:

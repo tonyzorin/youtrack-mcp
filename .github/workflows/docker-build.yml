@@ -1,0 +1,152 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  DOCKER_REGISTRY: docker.io
+  DOCKER_REPOSITORY: tonyzorin/youtrack-mcp
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Extract version from version.py
+      id: get_version
+      run: |
+        VERSION=$(python -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Detected version: $VERSION"
+
+    - name: Generate Docker tags
+      id: docker_tags
+      run: |
+        BASE_TAG="${{ env.DOCKER_REPOSITORY }}"
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        COMMIT_SHA=${GITHUB_SHA::8}
+        TAGS=""
+        
+        if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+          # Main branch: development builds
+          TAGS="$BASE_TAG:v${VERSION}-dev"
+          TAGS="$TAGS,$BASE_TAG:v${VERSION}-dev-${COMMIT_SHA}"
+          TAGS="$TAGS,$BASE_TAG:latest-dev"
+          echo "BUILD_TYPE=development" >> $GITHUB_OUTPUT
+          echo "📦 Building development version: v${VERSION}-dev"
+        elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          # PR: testing builds
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          TAGS="$BASE_TAG:v${VERSION}-pr${PR_NUMBER}"
+          TAGS="$TAGS,$BASE_TAG:v${VERSION}-pr${PR_NUMBER}-${COMMIT_SHA}"
+          echo "BUILD_TYPE=pull-request" >> $GITHUB_OUTPUT
+          echo "🔄 Building PR version: v${VERSION}-pr${PR_NUMBER}"
+        elif [[ "${{ github.event_name }}" == "release" ]]; then
+          # Release: production builds
+          TAGS="$BASE_TAG:v${VERSION}"
+          TAGS="$TAGS,$BASE_TAG:v${VERSION}-stable"
+          TAGS="$TAGS,$BASE_TAG:latest"
+          TAGS="$TAGS,$BASE_TAG:stable"
+          echo "BUILD_TYPE=production" >> $GITHUB_OUTPUT
+          echo "🚀 Building production version: v${VERSION}"
+        else
+          # Fallback
+          TAGS="$BASE_TAG:v${VERSION}-experimental-${COMMIT_SHA}"
+          echo "BUILD_TYPE=experimental" >> $GITHUB_OUTPUT
+          echo "🧪 Building experimental version"
+        fi
+        
+        echo "TAGS=$TAGS" >> $GITHUB_OUTPUT
+        echo "Generated tags: $TAGS"
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.docker_tags.outputs.TAGS }}
+        build-args: |
+          APP_VERSION=${{ steps.get_version.outputs.VERSION }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Update Docker Hub description
+      if: github.event_name == 'release'
+      uses: peter-evans/dockerhub-description@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        repository: ${{ env.DOCKER_REPOSITORY }}
+        readme-filepath: ./README.md
+
+    - name: Comment on PR with Docker image info
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `🐳 **Docker Image Built for PR #${{ github.event.pull_request.number }}**
+            
+            **Main Image**: \`${{ env.DOCKER_REPOSITORY }}:v${{ steps.get_version.outputs.VERSION }}-pr${{ github.event.pull_request.number }}\`
+            
+            **Test this PR**:
+            \`\`\`bash
+            docker run --rm -i \\
+              -e YOUTRACK_URL="your-youtrack-url" \\
+              -e YOUTRACK_API_TOKEN="your-api-token" \\
+              ${{ env.DOCKER_REPOSITORY }}:v${{ steps.get_version.outputs.VERSION }}-pr${{ github.event.pull_request.number }}
+            \`\`\`
+            
+            **Available Tags**:
+            - \`v${{ steps.get_version.outputs.VERSION }}-pr${{ github.event.pull_request.number }}\` (main PR image)
+            - \`v${{ steps.get_version.outputs.VERSION }}-pr${{ github.event.pull_request.number }}-${GITHUB_SHA::8}\` (with commit hash)`
+          })
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run pre-build tests
+      run: |
+        chmod +x scripts/test-before-build.sh
+        ./scripts/test-before-build.sh
+
+    - name: Build test Docker image
+      run: |
+        docker build -t youtrack-mcp-test:ci .
+
+    - name: Run post-build tests
+      run: |
+        chmod +x scripts/test-after-build.sh
+        ./scripts/test-after-build.sh youtrack-mcp-test:ci 
