@@ -270,7 +270,30 @@ class YouTrackMCPServer:
                             # Split by space but respect quoted strings
                             import shlex
                             try:
-                                processed_args = shlex.split(args_value)
+                                split_args = shlex.split(args_value)
+                                
+                                # Check if these look like key=value pairs
+                                for arg in split_args:
+                                    if '=' in arg and not arg.startswith('{'):
+                                        # Parse as key=value pair
+                                        key, value = arg.split('=', 1)
+                                        # Remove quotes from value if present
+                                        if value.startswith('"') and value.endswith('"'):
+                                            value = value[1:-1]
+                                        elif value.startswith("'") and value.endswith("'"):
+                                            value = value[1:-1]
+                                        # Clean up any trailing commas
+                                        value = value.rstrip(',')
+                                        processed_kwargs[key] = value
+                                    else:
+                                        # Treat as positional argument
+                                        # Clean up any trailing commas and quotes
+                                        clean_arg = arg.rstrip(',')
+                                        if clean_arg.startswith('"') and clean_arg.endswith('"'):
+                                            clean_arg = clean_arg[1:-1]
+                                        elif clean_arg.startswith("'") and clean_arg.endswith("'"):
+                                            clean_arg = clean_arg[1:-1]
+                                        processed_args.append(clean_arg)
                             except Exception:
                                 # If parsing fails, treat as a single argument
                                 processed_args = [args_value]
@@ -321,7 +344,16 @@ class YouTrackMCPServer:
                             for part in parts:
                                 if '=' in part:
                                     k, v = part.split('=', 1)
-                                    processed_kwargs[k.strip()] = v.strip()
+                                    k = k.strip()
+                                    v = v.strip()
+                                    # Remove quotes from value if present
+                                    if v.startswith('"') and v.endswith('"'):
+                                        v = v[1:-1]
+                                    elif v.startswith("'") and v.endswith("'"):
+                                        v = v[1:-1]
+                                    # Clean up any trailing commas
+                                    v = v.rstrip(',')
+                                    processed_kwargs[k] = v
                     # If kwargs is already a dict
                     elif isinstance(kwargs_value, dict):
                         processed_kwargs.update(kwargs_value)
