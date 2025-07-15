@@ -66,12 +66,12 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python version_bump.py <bump_type|version>")
         print("  bump_type: major, minor, patch")
-        print("  version: specific version like 0.4.0")
+        print("  version: specific version like 1.0.0")
         print("Examples:")
-        print("  python version_bump.py patch    # 0.3.7 -> 0.3.8")
-        print("  python version_bump.py minor    # 0.3.7 -> 0.4.0")
-        print("  python version_bump.py major    # 0.3.7 -> 1.0.0")
-        print("  python version_bump.py 0.4.0    # Set to specific version")
+        print("  python version_bump.py patch    # 1.0.0 -> 1.0.1")
+        print("  python version_bump.py minor    # 1.0.0 -> 1.1.0")
+        print("  python version_bump.py major    # 1.0.0 -> 2.0.0")
+        print("  python version_bump.py 1.1.0    # Set to specific version")
         sys.exit(1)
     
     arg = sys.argv[1]

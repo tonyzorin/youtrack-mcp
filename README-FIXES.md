@@ -34,21 +34,21 @@
 ✅ **Step 1:** Local build generated successfully
 ✅ **Step 2:** All 209 tests passed
 ✅ **Step 3:** Changes committed with comprehensive message
-✅ **Step 4:** Version bumped from 0.3.7 → 0.4.0 (minor version)
+✅ **Step 4:** Version bumped from 0.3.7 → 1.0.0 (major version)
 ✅ **Step 5:** Git branch created and pushed to main
 ✅ **Step 6:** Docker images pushed to hub with tags:
-   - `tonyzorin/youtrack-mcp:0.4.0_wip` (automatic WIP build)
+   - `tonyzorin/youtrack-mcp:1.0.0_wip` (automatic WIP build)
    - `tonyzorin/youtrack-mcp:commit-hash` (automatic)
 
 #### Production Release Process
 📋 **To complete the full production release:**
 1. Go to GitHub → Releases → "Create a new release"
-2. Choose tag: `v0.4.0` 
+2. Choose tag: `v1.0.0` 
 3. Write release notes highlighting the test coverage improvements
 4. Publish release
 
 This will trigger the GitHub Actions to build final production images:
-- `tonyzorin/youtrack-mcp:0.4.0` 
+- `tonyzorin/youtrack-mcp:1.0.0` 
 - `tonyzorin/youtrack-mcp:latest`
 
 ### Files Created/Modified

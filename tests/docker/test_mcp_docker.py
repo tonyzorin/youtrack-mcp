@@ -17,7 +17,7 @@ def test_mcp_docker():
         "docker", "run", "--rm", "-i",
         "--env", "YOUTRACK_URL=https://prodcamp.youtrack.cloud/",
         "--env", "YOUTRACK_API_TOKEN=perm-YWRtaW4=.NDMtMg==.JgbpvnDbEu7RSWwAJT6Ab3iXgQyPwu",
-        "youtrack-mcp-local:0.3.7-wip"
+        "youtrack-mcp-local:1.0.0-wip"
     ]
     
     print(f"Running: {' '.join(docker_cmd)}")

@@ -10,7 +10,7 @@ Instead of confusing tags like `0.3.7_wip` and `pr-15`, we now use semantic, env
 |---------|---------------------------|----------------------|
 | **Push to main** | `tonyzorin/youtrack-mcp:0.3.7_wip`<br/>`tonyzorin/youtrack-mcp:a1b2c3d4` | `tonyzorin/youtrack-mcp:v0.3.7-dev`<br/>`tonyzorin/youtrack-mcp:v0.3.7-dev-a1b2c3d4`<br/>`tonyzorin/youtrack-mcp:latest-dev` |
 | **Pull Request #15** | `tonyzorin/youtrack-mcp:pr-15`<br/>`tonyzorin/youtrack-mcp:a1b2c3d4` | `tonyzorin/youtrack-mcp:v0.3.7-pr15`<br/>`tonyzorin/youtrack-mcp:v0.3.7-pr15-a1b2c3d4` |
-| **Release v0.4.0** | `tonyzorin/youtrack-mcp:0.4.0`<br/>`tonyzorin/youtrack-mcp:latest`<br/>`tonyzorin/youtrack-mcp:a1b2c3d4` | `tonyzorin/youtrack-mcp:v0.4.0`<br/>`tonyzorin/youtrack-mcp:v0.4.0-stable`<br/>`tonyzorin/youtrack-mcp:latest`<br/>`tonyzorin/youtrack-mcp:stable` |
+| **Release v1.0.0** | `tonyzorin/youtrack-mcp:1.0.0`<br/>`tonyzorin/youtrack-mcp:latest`<br/>`tonyzorin/youtrack-mcp:a1b2c3d4` | `tonyzorin/youtrack-mcp:v1.0.0`<br/>`tonyzorin/youtrack-mcp:v1.0.0-stable`<br/>`tonyzorin/youtrack-mcp:latest`<br/>`tonyzorin/youtrack-mcp:stable` |
 
 ## **🎯 Benefits of New System**
 
@@ -21,7 +21,7 @@ Instead of confusing tags like `0.3.7_wip` and `pr-15`, we now use semantic, env
 
 ### **2. Version Semantics**
 - **`v0.3.7-dev`**: Version 0.3.7 in development
-- **`v0.4.0-stable`**: Version 0.4.0 production release
+- **`v1.0.0-stable`**: Version 1.0.0 production release
 - **`latest-dev`**: Always the newest development build
 
 ### **3. Better Organization**
@@ -52,10 +52,10 @@ git push origin main
 
 ### **Release Workflow**
 ```bash
-# You create Release v0.4.0
+# You create Release v1.0.0
 # GitHub Actions automatically creates:
-# ✅ v0.4.0                  (version release)
-# ✅ v0.4.0-stable           (explicit stability)
+# ✅ v1.0.0                  (version release)
+# ✅ v1.0.0-stable           (explicit stability)
 # ✅ latest                  (latest production)
 # ✅ stable                  (latest stable)
 ```
@@ -91,10 +91,10 @@ docker pull tonyzorin/youtrack-mcp:latest
 docker pull tonyzorin/youtrack-mcp:stable
 
 # Use specific version
-docker pull tonyzorin/youtrack-mcp:v0.4.0
+docker pull tonyzorin/youtrack-mcp:v1.0.0
 
 # Use explicitly stable version
-docker pull tonyzorin/youtrack-mcp:v0.4.0-stable
+docker pull tonyzorin/youtrack-mcp:v1.0.0-stable
 ```
 
 ## **🛠️ Implementation**
@@ -116,6 +116,6 @@ The new tagging system is implemented in `.github/workflows/docker-build.yml` wi
 ### **New recommended usage:**
 - **Development**: `tonyzorin/youtrack-mcp:latest-dev`
 - **Production**: `tonyzorin/youtrack-mcp:stable`
-- **Specific version**: `tonyzorin/youtrack-mcp:v0.4.0-stable`
+- **Specific version**: `tonyzorin/youtrack-mcp:v1.0.0-stable`
 
 This tagging strategy follows Docker and Kubernetes best practices, making it much easier for teams to understand what each image contains and when to use it! 🚀 

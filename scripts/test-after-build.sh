@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="${1:-youtrack-mcp-local:0.3.7-wip}"
+DOCKER_IMAGE="${1:-youtrack-mcp-local:1.0.0-wip}"
 TEST_YOUTRACK_URL="${YOUTRACK_URL:-https://test.youtrack.cloud}"
 TEST_API_TOKEN="${YOUTRACK_API_TOKEN:-test-token}"
 
