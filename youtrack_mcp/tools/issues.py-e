@@ -238,13 +238,6 @@ class IssueTools:
                 "parameter_descriptions": {
                     "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)"
                 }
-            },
-            "get_attachment_content": {
-                "description": "Get the content of an attachment as a base64-encoded string. File size limit: 750KB original (1MB base64).",
-                "parameter_descriptions": {
-                    "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)",
-                    "attachment_id": "The attachment ID (e.g., '1-123')"
-                }
             }
         }
     
@@ -266,46 +259,4 @@ class IssueTools:
             return json.dumps(raw_issue, indent=2)
         except Exception as e:
             logger.exception(f"Error getting raw issue {issue_id}")
-            return json.dumps({"error": str(e)})
-            
-    @sync_wrapper
-    def get_attachment_content(self, issue_id: str, attachment_id: str) -> str:
-        """
-        Get the content of an attachment as a base64-encoded string.
-        
-        FORMAT: get_attachment_content(issue_id="DEMO-123", attachment_id="1-123")
-        
-        Args:
-            issue_id: The issue ID or readable ID
-            attachment_id: The attachment ID
-            
-        Returns:
-            JSON string with the attachment content encoded in base64
-        """
-        try:
-            import base64
-            content = self.issues_api.get_attachment_content(issue_id, attachment_id)
-            encoded_content = base64.b64encode(content).decode('utf-8')
-            
-            # Get attachment metadata for additional info
-            issue_response = self.client.get(f"issues/{issue_id}?fields=attachments(id,name,mimeType,size)")
-            attachment_metadata = None
-            
-            if 'attachments' in issue_response:
-                for attachment in issue_response['attachments']:
-                    if attachment.get('id') == attachment_id:
-                        attachment_metadata = attachment
-                        break
-            
-            return json.dumps({
-                "content": encoded_content,
-                "size_bytes_original": len(content),
-                "size_bytes_base64": len(encoded_content),
-                "filename": attachment_metadata.get('name') if attachment_metadata else None,
-                "mime_type": attachment_metadata.get('mimeType') if attachment_metadata else None,
-                "size_increase_percent": round((len(encoded_content) / len(content) - 1) * 100, 1),
-                "status": "success"
-            })
-        except Exception as e:
-            logger.exception(f"Error getting attachment content for issue {issue_id}, attachment {attachment_id}")
-            return json.dumps({"error": str(e), "status": "error"}) 
+            return json.dumps({"error": str(e)}) 

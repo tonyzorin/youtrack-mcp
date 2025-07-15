@@ -120,12 +120,12 @@ class ProjectTools:
         """
         Get issues for a specific project.
         
-        FORMAT: get_project_issues(project_id="0-0", limit=50)
+        FORMAT: get_project_issues(project_id="0-0", limit=10)
         
         Args:
-            project_id: The project ID
+            project_id: The project ID (e.g., '0-0')
             project: Alternative parameter name for project_id
-            limit: Maximum number of issues to return
+            limit: Maximum number of issues to return (default: 50)
             
         Returns:
             JSON string with the issues
@@ -140,7 +140,7 @@ class ProjectTools:
             try:
                 issues = self.projects_api.get_project_issues(project_identifier, limit)
                 if issues:
-                    return json.dumps(issues, indent=2)
+                return json.dumps(issues, indent=2)
             except Exception as e:
                 # If that fails, check if it was a non-ID format error
                 if not str(e).startswith("Project not found"):
@@ -153,7 +153,7 @@ class ProjectTools:
                 if project_obj:
                     issues = self.projects_api.get_project_issues(project_obj.id, limit)
                     return json.dumps(issues, indent=2)
-                else:
+                    else:
                     return json.dumps({"error": f"Project not found: {project_identifier}"})
             except Exception as e:
                 logger.exception(f"Error getting issues for project {project_identifier}")
@@ -201,7 +201,7 @@ class ProjectTools:
                         result.append(field.model_dump())
                     elif isinstance(field, dict):
                         result.append(field)
-                else:
+                    else:
                         # Last resort: convert to string
                         result.append(str(field))
                 return json.dumps(result, indent=2)
@@ -292,13 +292,13 @@ class ProjectTools:
                 data = {}
                 
                 # Only include parameters that were explicitly provided
-                if name is not None:
+            if name is not None:
                     data["name"] = name
-                if description is not None:
+            if description is not None:
                     data["description"] = description
-                if archived is not None:
+            if archived is not None:
                     data["archived"] = archived
-                if lead_id is not None:
+            if lead_id is not None:
                     data["leader"] = {"id": lead_id}
                 if short_name is not None:
                     data["shortName"] = short_name
@@ -328,19 +328,17 @@ class ProjectTools:
                     updated_project = self.projects_api.get_project(project_identifier)
                     logger.info(f"Retrieved updated project: {updated_project.name}")
                     
-                    # Return updated project data
                     if hasattr(updated_project, 'model_dump'):
                         return json.dumps(updated_project.model_dump(), indent=2)
                     else:
                         return json.dumps(updated_project, indent=2)
                 except Exception as e:
-                    logger.warning(f"Could not retrieve updated project: {str(e)}")
-                    return json.dumps({"id": project_identifier, "status": "updated", "warning": str(e)})
+                    logger.error(f"Error retrieving updated project: {str(e)}")
+                    return json.dumps({"error": f"Project was updated but could not retrieve the result: {str(e)}"})
             except Exception as e:
-                logger.exception(f"Error updating project {project_identifier}")
-                return json.dumps({"error": str(e)})
+                return json.dumps({"error": f"Could not update project: {str(e)}"})
         except Exception as e:
-            logger.exception(f"Error processing update_project request")
+            logger.exception(f"Error updating project {project_id or project}")
             return json.dumps({"error": str(e)})
     
     def close(self) -> None:
@@ -377,9 +375,9 @@ class ProjectTools:
             "get_project_issues": {
                 "description": "Get issues for a specific project.",
                 "parameter_descriptions": {
-                    "project_id": "The project ID",
+                    "project_id": "The project ID (e.g., '0-0')",
                     "project": "Alternative parameter name for project_id",
-                    "limit": "Maximum number of issues to return"
+                    "limit": "Maximum number of issues to return (optional, default: 50)"
                 }
             },
             "get_custom_fields": {

@@ -1,4 +1,4 @@
-FROM python:3.12-alpine
+FROM python:3.13-alpine
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY . .
 
 # Default environment variables (will be overridden at runtime)
-ENV APP_VERSION="0.3.7"
+ENV APP_VERSION="1.0.0"
 ENV MCP_SERVER_NAME="youtrack-mcp"
 ENV MCP_SERVER_DESCRIPTION="YouTrack MCP Server"
 ENV MCP_DEBUG="false"

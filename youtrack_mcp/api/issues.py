@@ -20,15 +20,48 @@ class Issue(BaseModel):
     description: Optional[str] = None
     created: Optional[int] = None
     updated: Optional[int] = None
-    project: Dict[str, Any] = Field(default_factory=dict)
+    project: Optional[Dict[str, Any]] = Field(default_factory=dict)
     reporter: Optional[Dict[str, Any]] = None
     assignee: Optional[Dict[str, Any]] = None
-    custom_fields: List[Dict[str, Any]] = Field(default_factory=list)
+    custom_fields: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    attachments: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     
     model_config = {
         "extra": "allow",  # Allow extra fields from the API
-        "populate_by_name": True  # Allow population by field name (helps with aliases)
+        "populate_by_name": True,  # Allow population by field name (helps with aliases)
+        "validate_assignment": False,  # Less strict validation for attribute assignment
+        "protected_namespaces": ()  # Don't protect any namespaces
     }
+    
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):
+        """Override model_validate to handle various input formats."""
+        try:
+            # Try standard validation
+            return super().model_validate(obj, *args, **kwargs)
+        except Exception as e:
+            # Fall back to more permissive validation
+            if isinstance(obj, dict):
+                # Ensure ID is present
+                if 'id' not in obj and obj.get('$type') == 'Issue':
+                    # Try to find an ID from other fields or generate placeholder
+                    obj['id'] = obj.get('idReadable', str(obj.get('created', 'unknown-id')))
+                
+                # Create issue with minimal validated data
+                return cls(
+                    id=obj.get('id', 'unknown'),
+                    summary=obj.get('summary', 'No summary'),
+                    description=obj.get('description', ''),
+                    created=obj.get('created'),
+                    updated=obj.get('updated'),
+                    project=obj.get('project', {}),
+                    reporter=obj.get('reporter'),
+                    assignee=obj.get('assignee'),
+                    custom_fields=obj.get('customFields', [])
+                )
+            
+            # If obj isn't even a dict, raise the original error
+            raise
 
 
 class IssuesClient:
@@ -53,16 +86,66 @@ class IssuesClient:
         Returns:
             The issue data
         """
-        response = self.client.get(f"issues/{issue_id}")
-        
-        # If the response doesn't have all needed fields, fetch more details
-        if isinstance(response, dict) and response.get('$type') == 'Issue' and 'summary' not in response:
-            # Get additional fields we need
-            fields = "summary,description,created,updated,project,reporter,assignee,customFields"
-            detailed_response = self.client.get(f"issues/{issue_id}?fields={fields}")
-            return Issue.model_validate(detailed_response)
-        
-        return Issue.model_validate(response)
+        try:
+            # Get issue data
+            response = self.client.get(f"issues/{issue_id}")
+            
+            # If the response doesn't have all needed fields, fetch more details
+            if isinstance(response, dict) and response.get('$type') == 'Issue' and 'summary' not in response:
+                # Get additional fields we need including attachments
+                fields = "summary,description,created,updated,project,reporter,assignee,customFields,attachments(id,name,url,mimeType,size)"
+                try:
+                    detailed_response = self.client.get(f"issues/{issue_id}?fields={fields}")
+                except Exception as e:
+                    logger.warning(f"Failed to get detailed issue data: {e}")
+                    detailed_response = response
+            else:
+                detailed_response = response
+                
+            # Ensure the ID field is present
+            if isinstance(detailed_response, dict) and 'id' not in detailed_response and detailed_response.get('$type') == 'Issue':
+                detailed_response['id'] = issue_id
+                
+            try:
+                # Try to validate the model
+                return Issue.model_validate(detailed_response)
+            except Exception as validation_error:
+                # If validation fails, create a more flexible issue object
+                logger.warning(f"Issue validation error: {validation_error}. Creating issue with minimal data.")
+                
+                if isinstance(detailed_response, dict):
+                    # Extract key fields if possible
+                    summary = detailed_response.get('summary', 'Unknown summary')
+                    description = detailed_response.get('description', '')
+                    
+                    # Create a basic issue with the available data
+                    issue = Issue(
+                        id=issue_id,
+                        summary=summary,
+                        description=description
+                    )
+                    
+                    # Add any other fields that might be useful
+                    for field in ['created', 'updated', 'project', 'reporter', 'assignee', 'attachments']:
+                        if field in detailed_response:
+                            setattr(issue, field, detailed_response[field])
+                    
+                    return issue
+                else:
+                    # If response is not even a dict, create a minimal issue
+                    return Issue(
+                        id=issue_id,
+                        summary=f"Issue {issue_id}"
+                    )
+                
+        except Exception as e:
+            # Log the full error with traceback
+            logger.exception(f"Error retrieving issue {issue_id}")
+            # Create minimal issue to avoid breaking calls
+            return Issue(
+                id=issue_id,
+                summary=f"Error: {str(e)[:100]}..."
+            )
     
     def create_issue(self, 
                      project_id: str, 
@@ -195,13 +278,18 @@ class IssuesClient:
         response = self.client.get("issues", params=params)
         
         issues = []
-        for item in response:
-            try:
-                issues.append(Issue.model_validate(item))
-            except Exception as e:
-                # Log the error but continue processing other issues
-                import logging
-                logging.getLogger(__name__).warning(f"Failed to validate issue: {str(e)}")
+        if isinstance(response, list):
+            for issue_data in response:
+                try:
+                    issues.append(Issue.model_validate(issue_data))
+                except Exception as e:
+                    logger.warning(f"Error validating issue: {e}")
+                    # Create a basic issue with id
+                    issue_id = issue_data.get('id', str(issue_data.get('created', 'unknown')))
+                    issues.append(Issue(
+                        id=issue_id,
+                        summary=issue_data.get('summary', f"Issue {issue_id}")
+                    ))
         
         return issues
     
@@ -217,4 +305,88 @@ class IssuesClient:
             The created comment data
         """
         data = {"text": text}
-        return self.client.post(f"issues/{issue_id}/comments", data=data) 
+        return self.client.post(f"issues/{issue_id}/comments", data=data)
+    
+    def get_attachment_content(self, issue_id: str, attachment_id: str) -> bytes:
+        """
+        Get the content of an attachment with file size validation.
+        
+        Args:
+            issue_id: The issue ID or readable ID
+            attachment_id: The attachment ID
+            
+        Returns:
+            The attachment content as bytes
+            
+        Raises:
+            ValueError: If attachment not found or file too large
+            YouTrackAPIError: If API request fails
+        """
+        # First, get the attachment metadata to get the URL and size
+        issue_response = self.client.get(f"issues/{issue_id}?fields=attachments(id,url,size,name,mimeType)")
+        
+        # Find the attachment with the matching ID
+        attachment_info = None
+        if 'attachments' in issue_response:
+            for attachment in issue_response['attachments']:
+                if attachment.get('id') == attachment_id:
+                    attachment_info = attachment
+                    break
+        
+        if not attachment_info:
+            raise ValueError(f"Attachment {attachment_id} not found in issue {issue_id}")
+        
+        # Check file size limit for base64 encoding
+        # Base64 encoding increases size by ~33%, so for 1MB base64 limit, max original size is ~750KB
+        MAX_ORIGINAL_SIZE = 750 * 1024  # 750KB original file
+        MAX_BASE64_SIZE = 1024 * 1024   # 1MB after base64 encoding (Claude Desktop limit)
+        
+        file_size = attachment_info.get('size', 0)
+        filename = attachment_info.get('name', attachment_id)
+        mime_type = attachment_info.get('mimeType', 'unknown')
+        
+        if file_size > MAX_ORIGINAL_SIZE:
+            # Calculate what the base64 size would be
+            estimated_base64_size = int(file_size * 1.33)
+            raise ValueError(
+                f"Attachment '{filename}' ({mime_type}) is too large "
+                f"({file_size:,} bytes → ~{estimated_base64_size:,} bytes after base64 encoding). "
+                f"Maximum allowed: {MAX_ORIGINAL_SIZE:,} bytes original (~{MAX_BASE64_SIZE:,} bytes base64)."
+            )
+        
+        attachment_url = attachment_info.get('url')
+        if not attachment_url:
+            raise ValueError(f"No download URL found for attachment {attachment_id}")
+        
+        # The URL in the attachment data is relative to the base URL
+        if attachment_url.startswith('/'):
+            attachment_url = attachment_url[1:]  # Remove leading slash
+        
+        # Construct the full URL
+        base_url = self.client.base_url
+        if base_url.endswith('/api'):
+            base_url = base_url[:-4]  # Remove '/api' suffix
+        
+        full_url = f"{base_url}/{attachment_url}"
+        
+        # Make the request to get the attachment content
+        from youtrack_mcp.api.client import YouTrackAPIError
+        response = self.client.session.get(full_url)
+        
+        # Check for errors
+        if response.status_code >= 400:
+            error_msg = f"Error getting attachment content: {response.status_code}"
+            raise YouTrackAPIError(error_msg, response.status_code, response)
+            
+        # Double-check the actual content size
+        content_length = len(response.content)
+        if content_length > MAX_ORIGINAL_SIZE:
+            estimated_base64_size = int(content_length * 1.33)
+            raise ValueError(
+                f"Downloaded content size ({content_length:,} bytes → ~{estimated_base64_size:,} bytes base64) "
+                f"exceeds maximum allowed size ({MAX_ORIGINAL_SIZE:,} bytes original). "
+                f"The file may have been modified since metadata was fetched."
+            )
+            
+        # Return the binary content
+        return response.content 

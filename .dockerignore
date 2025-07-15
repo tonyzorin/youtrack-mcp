@@ -58,5 +58,6 @@ docker-compose.yml
 *.md
 LICENSE
 
-# Tests
-tests/ 
+# Tests (exclude most test files to reduce container size)
+tests/
+!tests/docker/ 

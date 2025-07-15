@@ -25,6 +25,17 @@ TOOL_PRIORITY = {
     'SearchTools': {
         'get_custom_fields': 50,   # Lower priority in SearchTools
         'search_with_custom_fields': 100,  # High priority for search_with_custom_fields in SearchTools
+    },
+    'ResourcesTools': {
+        'get_issue': 200,           # Higher priority for resource-based tools
+        'get_project': 200,
+        'get_project_issues': 200,
+        'get_user': 200,
+        'get_all_issues': 200,
+        'get_all_projects': 200,
+        'get_all_users': 200,
+        'get_issue_comments': 200,
+        'search_issues': 200
     }
 }
 
@@ -53,13 +64,15 @@ def load_all_tools() -> Dict[str, Callable]:
     from youtrack_mcp.tools.projects import ProjectTools
     from youtrack_mcp.tools.users import UserTools
     from youtrack_mcp.tools.search import SearchTools
+    from youtrack_mcp.tools.resources import ResourcesTools
     
     # Initialize tool classes
     tool_classes = [
         IssueTools(),
         ProjectTools(),
         UserTools(),
-        SearchTools()
+        SearchTools(),
+        ResourcesTools()
     ]
     
     # Collect tool definitions from all classes
@@ -185,18 +198,21 @@ def load_all_tools() -> Dict[str, Callable]:
         tools['issue_create_issue'].tool_definition = all_tool_definitions['create_issue'].copy()
         tools['issue_create_issue'].tool_definition['name'] = 'issue_create_issue'
     
-    # Specifically log the create_issue registration
-    logger.info(f"Key tools registered: create_issue from {type(tools['create_issue']).__module__}")
+    # Specifically log the create_issue registration - only if it exists
+    if 'create_issue' in tools:
+        logger.info(f"Key tools registered: create_issue from {type(tools['create_issue']).__module__}")
     logger.info(f"Key tools registered: issue_create_issue from {type(issue_tools).__module__}")
     
     return tools
+
 
 def _get_tools_from_class(tool_class: Any) -> Dict[str, Callable]:
     """
     Get all tools from a tool class.
     
     This function extracts all public methods from a tool class,
-    excluding special methods (starting with '__') and internal methods.
+    excluding special methods (starting with '__'), internal methods,
+    and Mock-specific methods when testing.
     
     Args:
         tool_class: Tool class instance
@@ -206,10 +222,22 @@ def _get_tools_from_class(tool_class: Any) -> Dict[str, Callable]:
     """
     result = {}
     
+    # Mock-specific methods to exclude (for testing)
+    mock_methods = {
+        'assert_any_call', 'assert_called', 'assert_called_once', 'assert_called_once_with',
+        'assert_called_with', 'assert_has_calls', 'assert_not_called', 'attach_mock',
+        'configure_mock', 'mock_add_spec', 'reset_mock', 'return_value', 'side_effect',
+        'call_args', 'call_args_list', 'call_count', 'called', 'method_calls'
+    }
+    
     # Get all class methods
     for name in dir(tool_class):
         # Skip special and internal methods
         if name.startswith('__') or name in ['close', 'get_tool_definitions']:
+            continue
+            
+        # Skip Mock-specific methods when testing
+        if name in mock_methods:
             continue
             
         # Get the attribute

@@ -242,12 +242,12 @@ class ProjectsClient:
                 data["leader"] = {"id": lead_id}
             if archived is not None:
                 data["archived"] = archived
-            
+                
             # Make sure we have at least one parameter to update
             if not data:
                 logger.info("No parameters to update, returning current project data")
                 return self.get_project(project_id)
-            
+                
             logger.info(f"Updating project with data: {data}")
             response = self.client.post(f"admin/projects/{project_id}", data=data)
             logger.info(f"Update project response: {response}")
@@ -284,7 +284,7 @@ class ProjectsClient:
         except Exception as e:
             logger.error(f"Error updating project {project_id}: {str(e)}")
             raise
-    
+            
     def delete_project(self, project_id: str) -> None:
         """
         Delete a project.

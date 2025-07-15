@@ -505,3 +505,47 @@ class TestIntegrationScenarios:
             "field_id": "field789"    # custom_field_id -> field_id (general mapping)
         }
         assert result == expected 
+
+    @pytest.mark.unit
+    def test_json_parsing_error_in_kwargs(self):
+        """Test handling of invalid JSON in kwargs parameter."""
+        class TestTools:
+            def test_method(self, project="default"):
+                return {"project": project}
+        
+        instance = TestTools()
+        bound_tool = create_bound_tool(instance, "test_method")
+        
+        # Test invalid JSON in kwargs - should trigger line 129-130
+        with patch('youtrack_mcp.mcp_wrappers.logger') as mock_logger:
+            result = bound_tool(kwargs='{"invalid": json}')  # Invalid JSON syntax
+            
+            # Should log warning about JSON parsing failure
+            mock_logger.warning.assert_called()
+            warning_call = mock_logger.warning.call_args[0][0]
+            assert "Failed to parse kwargs as JSON" in warning_call
+            
+            # Should use default parameter since kwargs parsing failed
+            assert result == {"project": "default"}
+
+    @pytest.mark.unit
+    def test_non_json_kwargs_string_warning(self):
+        """Test warning for non-JSON string in kwargs parameter."""
+        class TestTools:
+            def test_method(self, project="default"):
+                return {"project": project}
+        
+        instance = TestTools()
+        bound_tool = create_bound_tool(instance, "test_method")
+        
+        # Test non-JSON string in kwargs - should trigger warning after line 130
+        with patch('youtrack_mcp.mcp_wrappers.logger') as mock_logger:
+            result = bound_tool(kwargs='not json at all')
+            
+            # Should log warning about non-JSON string
+            mock_logger.warning.assert_called()
+            warning_call = mock_logger.warning.call_args[0][0]
+            assert "Received kwargs as non-JSON string" in warning_call
+            
+            # Should use default parameter since kwargs was not processed
+            assert result == {"project": "default"} 
