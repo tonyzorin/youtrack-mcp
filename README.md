@@ -19,14 +19,14 @@ docker run --rm \
 docker run --rm \
   -e YOUTRACK_URL="https://your-instance.youtrack.cloud" \
   -e YOUTRACK_API_TOKEN="your-token" \
-  tonyzorin/youtrack-mcp:1.0.0_wip
+  tonyzorin/youtrack-mcp:1.0.1_wip
 ```
 
 ### Available Docker Tags
 
 - `latest` - Latest stable release
-- `1.0.0` - Specific version tags  
-- `1.0.0_wip` - Work-in-progress builds from main branch
+- `1.0.1` - Specific version tags  
+- `1.0.1_wip` - Work-in-progress builds from main branch
 - `pr-<number>` - Pull request builds for testing
 
 ## Features
