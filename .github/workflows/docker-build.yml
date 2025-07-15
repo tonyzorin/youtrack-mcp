@@ -1,5 +1,6 @@
 # Docker Build and Push Workflow
 # Updated with comprehensive diagnostics and secret validation
+# Fixed Docker Hub authentication token format
 name: Docker Build and Push
 
 on:
