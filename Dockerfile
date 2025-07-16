@@ -2,8 +2,14 @@ FROM python:3.13-alpine
 
 WORKDIR /app
 
-# Install git and build dependencies for Python packages
-RUN apk add --no-cache git gcc musl-dev python3-dev libffi-dev openssl-dev
+# Use edge repository to get latest git version with security fixes
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" > /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
+    apk update && \
+    apk upgrade && \
+    apk add --no-cache git gcc musl-dev python3-dev libffi-dev openssl-dev && \
+    git --version && \
+    apk info git
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
