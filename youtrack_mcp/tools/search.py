@@ -54,10 +54,8 @@ class SearchTools:
                 else:
                     sort_param = f"{sort_by} desc"  # Default to desc
 
-            # Perform the search
-            issues = self.issues_api.search_issues(
-                query=query, limit=limit, sort=sort_param
-            )
+            # Perform the search (note: sort parameter not supported by search_issues API)
+            issues = self.issues_api.search_issues(query=query, limit=limit)
 
             # Handle response format
             if isinstance(issues, dict):

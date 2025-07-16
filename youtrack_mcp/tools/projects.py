@@ -309,7 +309,7 @@ class ProjectTools:
                 if not data:
                     logger.info("No parameters to update, returning current project")
                     if hasattr(existing_project, "model_dump"):
-                        return format_json_response(existing_project.model_dump(), indent=2)
+                        return format_json_response(existing_project.model_dump())
                     else:
                         return format_json_response(existing_project)
 
@@ -332,7 +332,7 @@ class ProjectTools:
 
                     # Return updated project data
                     if hasattr(updated_project, "model_dump"):
-                        return format_json_response(updated_project.model_dump(), indent=2)
+                        return format_json_response(updated_project.model_dump())
                     else:
                         return format_json_response(updated_project)
                 except Exception as e:

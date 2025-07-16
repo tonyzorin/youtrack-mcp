@@ -157,13 +157,13 @@ class IssueTools:
                         detailed_issue = self.issues_api.get_issue(issue_id)
 
                         if hasattr(detailed_issue, "model_dump"):
-                            return format_json_response(detailed_issue.model_dump(), indent=2)
+                            return format_json_response(detailed_issue.model_dump())
                         else:
                             return format_json_response(detailed_issue)
                     except Exception as e:
                         logger.warning(f"Could not retrieve detailed issue: {str(e)}")
                 if hasattr(issue, "model_dump"):
-                    return format_json_response(issue.model_dump(), indent=2)
+                    return format_json_response(issue.model_dump())
                 else:
                     return format_json_response(issue)
             except Exception as e:
@@ -327,7 +327,9 @@ class IssueTools:
             Raw JSON string with the issue data
         """
         try:
-            raw_issue = self.client.get(f"issues/{issue_id}")
+            # Request comprehensive fields for raw issue data
+            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value(id,name)),attachments(id,name,size,url),comments(id,text,author(login,name),created)"
+            raw_issue = self.client.get(f"issues/{issue_id}?fields={fields}")
             return format_json_response(raw_issue)
         except Exception as e:
             logger.exception(f"Error getting raw issue {issue_id}")
