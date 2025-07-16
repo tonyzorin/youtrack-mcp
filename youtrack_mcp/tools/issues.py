@@ -276,6 +276,43 @@ class IssueTools:
                 "description": 'Get all available issue link types that can be used to connect issues. Example: get_available_link_types()',
                 "parameter_descriptions": {},
             },
+            "update_issue": {
+                "description": 'Update an existing YouTrack issue with new summary, description or custom fields. Example: update_issue(issue_id="DEMO-123", summary="New title", description="Updated description")',
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier like 'DEMO-123'",
+                    "summary": "New issue title/summary (optional)",
+                    "description": "New issue description (optional)",
+                    "additional_fields": "Dictionary of additional custom fields to update (optional)"
+                },
+            },
+            "add_dependency": {
+                "description": 'Create a dependency relationship where one issue depends on another. Example: add_dependency(dependent_issue_id="DEMO-123", dependency_issue_id="DEMO-456")',
+                "parameter_descriptions": {
+                    "dependent_issue_id": "Issue that depends on another (e.g. 'DEMO-123')",
+                    "dependency_issue_id": "Issue that is depended upon (e.g. 'DEMO-456')"
+                },
+            },
+            "remove_dependency": {
+                "description": 'Remove a dependency relationship between two issues. Example: remove_dependency(dependent_issue_id="DEMO-123", dependency_issue_id="DEMO-456")',
+                "parameter_descriptions": {
+                    "dependent_issue_id": "Issue that depends on another (e.g. 'DEMO-123')",
+                    "dependency_issue_id": "Issue that is depended upon (e.g. 'DEMO-456')"
+                },
+            },
+            "add_relates_link": {
+                "description": 'Add a general "Relates" relationship between two issues. Example: add_relates_link(source_issue_id="DEMO-123", target_issue_id="DEMO-456")',
+                "parameter_descriptions": {
+                    "source_issue_id": "Source issue identifier (e.g. 'DEMO-123')",
+                    "target_issue_id": "Target issue identifier (e.g. 'DEMO-456')"
+                },
+            },
+            "add_duplicate_link": {
+                "description": 'Mark one issue as a duplicate of another. Example: add_duplicate_link(duplicate_issue_id="DEMO-123", original_issue_id="DEMO-456")',
+                "parameter_descriptions": {
+                    "duplicate_issue_id": "Issue that is a duplicate (e.g. 'DEMO-123')",
+                    "original_issue_id": "Original issue (e.g. 'DEMO-456')"
+                },
+            },
         }
 
     @sync_wrapper
@@ -408,4 +445,145 @@ class IssueTools:
             return format_json_response(result)
         except Exception as e:
             logger.exception("Error getting available link types")
+            return format_json_response({"error": str(e), "status": "error"})
+
+    @sync_wrapper
+    def update_issue(
+        self,
+        issue_id: str,
+        summary: Optional[str] = None,
+        description: Optional[str] = None,
+        additional_fields: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """
+        Update an existing issue with new information.
+
+        FORMAT: update_issue(issue_id="DEMO-123", summary="New title", description="Updated description")
+
+        Args:
+            issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
+            summary: The new issue summary/title (optional)
+            description: The new issue description (optional)  
+            additional_fields: Additional fields to update as dict (optional)
+
+        Returns:
+            JSON string with the updated issue details
+        """
+        try:
+            result = self.issues_api.update_issue(
+                issue_id=issue_id,
+                summary=summary,
+                description=description,
+                additional_fields=additional_fields
+            )
+            # Convert Issue object to dict if needed
+            if hasattr(result, 'model_dump'):
+                result = result.model_dump()
+            elif hasattr(result, '__dict__'):
+                result = result.__dict__
+            return format_json_response(result)
+        except Exception as e:
+            logger.exception(f"Error updating issue {issue_id}")
+            return format_json_response({"error": str(e), "status": "error"})
+
+    @sync_wrapper
+    def add_dependency(self, dependent_issue_id: str, dependency_issue_id: str) -> str:
+        """
+        Add a dependency relationship where one issue depends on another.
+
+        FORMAT: add_dependency(dependent_issue_id="DEMO-123", dependency_issue_id="DEMO-456")
+
+        Args:
+            dependent_issue_id: The issue that depends on another (e.g., "DEMO-123")
+            dependency_issue_id: The issue that is depended upon (e.g., "DEMO-456")
+
+        Returns:
+            JSON string with the result of creating the dependency link
+        """
+        try:
+            result = self.link_issues(dependent_issue_id, dependency_issue_id, "Depends on")
+            return result
+        except Exception as e:
+            logger.exception(f"Error adding dependency between {dependent_issue_id} and {dependency_issue_id}")
+            return format_json_response({"error": str(e), "status": "error"})
+
+    @sync_wrapper
+    def remove_dependency(self, dependent_issue_id: str, dependency_issue_id: str) -> str:
+        """
+        Remove a dependency relationship between two issues.
+
+        FORMAT: remove_dependency(dependent_issue_id="DEMO-123", dependency_issue_id="DEMO-456")
+
+        Args:
+            dependent_issue_id: The issue that depends on another (e.g., "DEMO-123")
+            dependency_issue_id: The issue that is depended upon (e.g., "DEMO-456")
+
+        Returns:
+            JSON string with the result of removing the dependency link
+        """
+        try:
+            # For removing links, we need to use a different approach
+            # This would typically involve getting the link ID and deleting it
+            # For now, we'll use a command approach
+            command = f"unlink {dependency_issue_id} depends on"
+            
+            command_data = {
+                "query": command,
+                "issues": [{"id": dependent_issue_id}]
+            }
+            
+            response = self.client.post("commands", data=command_data)
+            
+            if isinstance(response, dict):
+                return format_json_response({
+                    "status": "success",
+                    "message": f"Successfully removed dependency between {dependent_issue_id} and {dependency_issue_id}",
+                    "command": command
+                })
+            
+            return format_json_response(response)
+        except Exception as e:
+            logger.exception(f"Error removing dependency between {dependent_issue_id} and {dependency_issue_id}")
+            return format_json_response({"error": str(e), "status": "error"})
+
+    @sync_wrapper
+    def add_relates_link(self, source_issue_id: str, target_issue_id: str) -> str:
+        """
+        Add a 'Relates' relationship between two issues.
+
+        FORMAT: add_relates_link(source_issue_id="DEMO-123", target_issue_id="DEMO-456")
+
+        Args:
+            source_issue_id: The source issue (e.g., "DEMO-123")
+            target_issue_id: The target issue (e.g., "DEMO-456")
+
+        Returns:
+            JSON string with the result of creating the relates link
+        """
+        try:
+            result = self.link_issues(source_issue_id, target_issue_id, "Relates")
+            return result
+        except Exception as e:
+            logger.exception(f"Error adding relates link between {source_issue_id} and {target_issue_id}")
+            return format_json_response({"error": str(e), "status": "error"})
+
+    @sync_wrapper
+    def add_duplicate_link(self, duplicate_issue_id: str, original_issue_id: str) -> str:
+        """
+        Mark one issue as a duplicate of another.
+
+        FORMAT: add_duplicate_link(duplicate_issue_id="DEMO-123", original_issue_id="DEMO-456")
+
+        Args:
+            duplicate_issue_id: The issue that is a duplicate (e.g., "DEMO-123")
+            original_issue_id: The original issue (e.g., "DEMO-456")
+
+        Returns:
+            JSON string with the result of creating the duplicate link
+        """
+        try:
+            result = self.link_issues(duplicate_issue_id, original_issue_id, "Duplicates")
+            return result
+        except Exception as e:
+            logger.exception(f"Error adding duplicate link between {duplicate_issue_id} and {original_issue_id}")
             return format_json_response({"error": str(e), "status": "error"})
