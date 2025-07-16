@@ -64,7 +64,7 @@ class TestYouTrackClient:
         """Test client initialization with default configuration."""
         with patch("youtrack_mcp.api.client.config") as mock_config:
             mock_config.get_base_url.return_value = "https://test.youtrack.cloud"
-            mock_config.YOUTRACK_API_TOKEN = "test-token"
+            mock_config.get_api_token.return_value = "test-token"
             mock_config.VERIFY_SSL = True
             mock_config.is_cloud_instance.return_value = True
 
@@ -98,7 +98,7 @@ class TestYouTrackClient:
         """Test that client raises error when no API token is provided."""
         with patch("youtrack_mcp.api.client.config") as mock_config:
             mock_config.get_base_url.return_value = "https://test.youtrack.cloud"
-            mock_config.YOUTRACK_API_TOKEN = None
+            mock_config.get_api_token.side_effect = ValueError("API token is required")
 
             with pytest.raises(ValueError, match="API token is required"):
                 YouTrackClient()

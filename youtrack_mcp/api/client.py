@@ -99,7 +99,7 @@ class YouTrackClient:
             retry_delay: Initial delay between retries in seconds (increases exponentially)
         """
         self.base_url = base_url or config.get_base_url()
-        self.api_token = api_token or config.YOUTRACK_API_TOKEN
+        self.api_token = api_token if api_token else config.get_api_token()
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.VERIFY_SSL
         self.max_retries = max_retries
         self.retry_delay = retry_delay

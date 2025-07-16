@@ -23,6 +23,7 @@ class Config:
     # YouTrack API configuration
     YOUTRACK_URL: str = os.getenv("YOUTRACK_URL", "")
     YOUTRACK_API_TOKEN: str = os.getenv("YOUTRACK_API_TOKEN", "")
+    YOUTRACK_TOKEN_FILE: str = os.getenv("YOUTRACK_TOKEN_FILE", "")
     VERIFY_SSL: bool = os.getenv("YOUTRACK_VERIFY_SSL", "true").lower() in (
         "true",
         "1",
@@ -61,6 +62,36 @@ class Config:
                 setattr(cls, key, value)
 
     @classmethod
+    def get_api_token(cls) -> str:
+        """
+        Get the API token from environment variable or token file.
+        
+        Returns:
+            str: The API token
+            
+        Raises:
+            ValueError: If no token is found
+        """
+        # First try environment variable
+        if cls.YOUTRACK_API_TOKEN:
+            return cls.YOUTRACK_API_TOKEN
+            
+        # Then try token file
+        if cls.YOUTRACK_TOKEN_FILE:
+            try:
+                with open(cls.YOUTRACK_TOKEN_FILE, 'r') as f:
+                    token = f.read().strip()
+                    if token:
+                        return token
+            except (FileNotFoundError, IOError) as e:
+                raise ValueError(f"Could not read token file {cls.YOUTRACK_TOKEN_FILE}: {e}")
+        
+        raise ValueError(
+            "YouTrack API token is required. Provide it using YOUTRACK_API_TOKEN environment variable, "
+            "YOUTRACK_TOKEN_FILE environment variable, or in configuration."
+        )
+
+    @classmethod
     def validate(cls) -> None:
         """
         Validate the configuration settings.
@@ -68,11 +99,11 @@ class Config:
         Raises:
             ValueError: If required settings are missing or invalid
         """
-        # API token is always required
-        if not cls.YOUTRACK_API_TOKEN:
-            raise ValueError(
-                "YouTrack API token is required. Provide it using YOUTRACK_API_TOKEN environment variable or in configuration."
-            )
+        # API token is always required (from env var or file)
+        try:
+            cls.get_api_token()
+        except ValueError as e:
+            raise e
 
         # URL is only required for self-hosted instances (Cloud instances can use API token only)
         if not cls.YOUTRACK_CLOUD and not cls.YOUTRACK_URL:

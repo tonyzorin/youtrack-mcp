@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Union
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.issues import IssuesClient
 from youtrack_mcp.mcp_wrappers import sync_wrapper
+from youtrack_mcp.utils import format_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class SearchTools:
 
             # Handle response format
             if isinstance(issues, dict):
-                return json.dumps(issues, indent=2)
+                return format_json_response(issues)
             else:
                 # Convert list of issues to JSON
                 result = []
@@ -69,11 +70,11 @@ class SearchTools:
                         result.append(issue.model_dump())
                     else:
                         result.append(issue)
-                return json.dumps(result, indent=2)
+                return format_json_response(result)
 
         except Exception as e:
             logger.exception(f"Error in advanced search with query: {query}")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     @sync_wrapper
     def search_with_custom_field_values(
@@ -114,7 +115,7 @@ class SearchTools:
 
             # Handle response format
             if isinstance(issues, dict):
-                return json.dumps(issues, indent=2)
+                return format_json_response(issues)
             else:
                 result = []
                 for issue in issues:
@@ -122,11 +123,11 @@ class SearchTools:
                         result.append(issue.model_dump())
                     else:
                         result.append(issue)
-                return json.dumps(result, indent=2)
+                return format_json_response(result)
 
         except Exception as e:
             logger.exception(f"Error in custom field search with query: {query}")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     @sync_wrapper
     def search_with_filter(
@@ -215,7 +216,7 @@ class SearchTools:
 
             # Handle response format
             if isinstance(issues, dict):
-                return json.dumps(issues, indent=2)
+                return format_json_response(issues)
             else:
                 result = []
                 for issue in issues:
@@ -223,11 +224,11 @@ class SearchTools:
                         result.append(issue.model_dump())
                     else:
                         result.append(issue)
-                return json.dumps(result, indent=2)
+                return format_json_response(result)
 
         except Exception as e:
             logger.exception("Error in filtered search")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     def close(self) -> None:
         """Close the search tools."""

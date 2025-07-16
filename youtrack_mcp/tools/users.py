@@ -5,6 +5,7 @@ from typing import Any, Dict
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.users import UsersClient
 from youtrack_mcp.mcp_wrappers import sync_wrapper
+from youtrack_mcp.utils import format_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,10 @@ class UserTools:
                 result = user.model_dump()
             else:
                 result = user  # Assume it's already a dict
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception("Error getting current user")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     @sync_wrapper
     def get_user_by_id(self, user_id: str) -> str:
@@ -59,17 +60,17 @@ class UserTools:
         """
         try:
             if not user_id:
-                return json.dumps({"error": "User ID is required"})
+                return format_json_response({"error": "User ID is required"})
 
             user_obj = self.users_api.get_user(user_id)
             if hasattr(user_obj, "model_dump"):
                 result = user_obj.model_dump()
             else:
                 result = user_obj  # Assume it's already a dict
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception(f"Error getting user {identifier}")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     @sync_wrapper
     def search_users(self, query: str = "", limit: int = 10) -> str:
@@ -96,10 +97,10 @@ class UserTools:
                 else:
                     result.append(user)  # Assume it's already a dict
 
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception(f"Error searching users with query: {query}")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     @sync_wrapper
     def get_user_permissions(self, user_id: str) -> str:
@@ -116,13 +117,13 @@ class UserTools:
         """
         try:
             if not user_id:
-                return json.dumps({"error": "User ID is required"})
+                return format_json_response({"error": "User ID is required"})
 
             permissions = self.users_api.get_user_permissions(user_id)
-            return json.dumps(permissions, indent=2)
+            return format_json_response(permissions)
         except Exception as e:
             logger.exception(f"Error getting permissions for user {user_id}")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     def get_tool_definitions(self) -> Dict[str, Dict[str, Any]]:
         """Get tool definitions with descriptions."""

@@ -10,6 +10,7 @@ from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.issues import IssuesClient
 from youtrack_mcp.api.projects import ProjectsClient
 from youtrack_mcp.mcp_wrappers import sync_wrapper
+from youtrack_mcp.utils import format_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +50,11 @@ class IssueTools:
                 raw_issue["summary"] = f"Issue {issue_id}"  # Provide a default summary
 
             # Return the raw issue data directly - avoid model validation issues
-            return json.dumps(raw_issue, indent=2)
+            return format_json_response(raw_issue)
 
         except Exception as e:
             logger.exception(f"Error getting issue {issue_id}")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     @sync_wrapper
     def search_issues(self, query: str, limit: int = 10) -> str:
@@ -76,11 +77,11 @@ class IssueTools:
             raw_issues = self.client.get("issues", params=params)
 
             # Return the raw issues data directly
-            return json.dumps(raw_issues, indent=2)
+            return format_json_response(raw_issues)
 
         except Exception as e:
             logger.exception(f"Error searching issues with query: {query}")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     @sync_wrapper
     def create_issue(
@@ -106,9 +107,9 @@ class IssueTools:
 
             # Validate required parameters
             if not project:
-                return json.dumps({"error": "Project is required", "status": "error"})
+                return format_json_response({"error": "Project is required", "status": "error"})
             if not summary:
-                return json.dumps({"error": "Summary is required", "status": "error"})
+                return format_json_response({"error": "Summary is required", "status": "error"})
 
             # Check if project is a project ID or short name
             project_id = project
@@ -146,7 +147,7 @@ class IssueTools:
                 # Check if we got an issue with an ID
                 if isinstance(issue, dict) and issue.get("error"):
                     # Handle error returned as a dict
-                    return json.dumps(issue)
+                    return format_json_response(issue)
 
                 # Try to get full issue details right after creation
                 if hasattr(issue, "id"):
@@ -156,15 +157,15 @@ class IssueTools:
                         detailed_issue = self.issues_api.get_issue(issue_id)
 
                         if hasattr(detailed_issue, "model_dump"):
-                            return json.dumps(detailed_issue.model_dump(), indent=2)
+                            return format_json_response(detailed_issue.model_dump(), indent=2)
                         else:
-                            return json.dumps(detailed_issue, indent=2)
+                            return format_json_response(detailed_issue)
                     except Exception as e:
                         logger.warning(f"Could not retrieve detailed issue: {str(e)}")
                 if hasattr(issue, "model_dump"):
-                    return json.dumps(issue.model_dump(), indent=2)
+                    return format_json_response(issue.model_dump(), indent=2)
                 else:
-                    return json.dumps(issue, indent=2)
+                    return format_json_response(issue)
             except Exception as e:
                 error_msg = str(e)
                 if hasattr(e, "response") and e.response:
@@ -177,11 +178,11 @@ class IssueTools:
                     except:
                         pass
                 logger.error(f"API error creating issue: {error_msg}")
-                return json.dumps({"error": error_msg, "status": "error"})
+                return format_json_response({"error": error_msg, "status": "error"})
 
         except Exception as e:
             logger.exception(f"Error creating issue in project {project}")
-            return json.dumps({"error": str(e), "status": "error"})
+            return format_json_response({"error": str(e), "status": "error"})
 
     @sync_wrapper
     def add_comment(self, issue_id: str, text: str) -> str:
@@ -199,10 +200,10 @@ class IssueTools:
         """
         try:
             result = self.issues_api.add_comment(issue_id, text)
-            return json.dumps(result, indent=2)
+            return format_json_response(result)
         except Exception as e:
             logger.exception(f"Error adding comment to issue {issue_id}")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     def close(self) -> None:
         """Close the API client."""
@@ -257,6 +258,24 @@ class IssueTools:
                     "attachment_id": "Attachment ID like '1-123'",
                 },
             },
+            "link_issues": {
+                "description": 'Link two YouTrack issues together with a specified relationship. Example: link_issues(source_issue_id="SP-123", target_issue_id="SP-456", link_type="Relates")',
+                "parameter_descriptions": {
+                    "source_issue_id": "Source issue ID like 'SP-123'",
+                    "target_issue_id": "Target issue ID like 'SP-456'", 
+                    "link_type": "Type of link like 'Relates', 'Duplicates', 'Depends on'"
+                },
+            },
+            "get_issue_links": {
+                "description": 'Get all links (relationships) for a YouTrack issue. Example: get_issue_links(issue_id="SP-123")',
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier like 'SP-123'"
+                },
+            },
+            "get_available_link_types": {
+                "description": 'Get all available issue link types that can be used to connect issues. Example: get_available_link_types()',
+                "parameter_descriptions": {},
+            },
         }
 
     @sync_wrapper
@@ -272,10 +291,10 @@ class IssueTools:
         """
         try:
             raw_issue = self.client.get(f"issues/{issue_id}")
-            return json.dumps(raw_issue, indent=2)
+            return format_json_response(raw_issue)
         except Exception as e:
             logger.exception(f"Error getting raw issue {issue_id}")
-            return json.dumps({"error": str(e)})
+            return format_json_response({"error": str(e)})
 
     @sync_wrapper
     def get_attachment_content(self, issue_id: str, attachment_id: str) -> str:
@@ -330,4 +349,63 @@ class IssueTools:
             logger.exception(
                 f"Error getting attachment content for issue {issue_id}, attachment {attachment_id}"
             )
-            return json.dumps({"error": str(e), "status": "error"})
+            return format_json_response({"error": str(e), "status": "error"})
+
+    @sync_wrapper
+    def link_issues(self, source_issue_id: str, target_issue_id: str, link_type: str) -> str:
+        """
+        Link two issues together.
+        
+        FORMAT: link_issues(source_issue_id="SP-123", target_issue_id="SP-456", link_type="Relates")
+        
+        Args:
+            source_issue_id: The ID of the source issue (e.g., 'SP-123')
+            target_issue_id: The ID of the target issue (e.g., 'SP-456')
+            link_type: The type of link (e.g., 'Relates', 'Duplicates', 'Depends on')
+            
+        Returns:
+            JSON string with the created link data
+        """
+        try:
+            result = self.issues_api.link_issues(source_issue_id, target_issue_id, link_type)
+            return format_json_response(result)
+        except Exception as e:
+            logger.exception(f"Error linking issues {source_issue_id} -> {target_issue_id}")
+            return format_json_response({"error": str(e), "status": "error"})
+
+    @sync_wrapper  
+    def get_issue_links(self, issue_id: str) -> str:
+        """
+        Get all links for an issue.
+        
+        FORMAT: get_issue_links(issue_id="SP-123")
+        
+        Args:
+            issue_id: The ID of the issue (e.g., 'SP-123')
+            
+        Returns:
+            JSON string containing inward and outward issue links
+        """
+        try:
+            result = self.issues_api.get_issue_links(issue_id)
+            return format_json_response(result)
+        except Exception as e:
+            logger.exception(f"Error getting links for issue {issue_id}")
+            return format_json_response({"error": str(e), "status": "error"})
+
+    @sync_wrapper
+    def get_available_link_types(self) -> str:
+        """
+        Get all available issue link types.
+        
+        FORMAT: get_available_link_types()
+        
+        Returns:
+            JSON string with list of available link types and their properties
+        """
+        try:
+            result = self.issues_api.get_available_link_types()
+            return format_json_response(result)
+        except Exception as e:
+            logger.exception("Error getting available link types")
+            return format_json_response({"error": str(e), "status": "error"})

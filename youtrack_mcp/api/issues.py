@@ -417,3 +417,48 @@ class IssuesClient:
 
         # Return the binary content
         return response.content
+
+    def link_issues(self, source_issue_id: str, target_issue_id: str, link_type: str) -> dict:
+        """
+        Link two issues together.
+
+        Args:
+            source_issue_id: The ID of the source issue
+            target_issue_id: The ID of the target issue  
+            link_type: The type of link (e.g., 'Relates', 'Duplicates', 'Depends on')
+
+        Returns:
+            The created link data
+        """
+        data = {
+            "linkType": {"name": link_type},
+            "issues": [{"id": target_issue_id}]
+        }
+        
+        response = self.client.post(f"issues/{source_issue_id}/links", json=data)
+        return response
+
+    def get_issue_links(self, issue_id: str) -> dict:
+        """
+        Get all links for an issue.
+
+        Args:
+            issue_id: The ID of the issue
+
+        Returns:
+            Dictionary containing inward and outward issue links
+        """
+        fields = "id,summary,linkType(name,localizedName),direction"
+        response = self.client.get(f"issues/{issue_id}/links?fields={fields}")
+        return response
+
+    def get_available_link_types(self) -> dict:
+        """
+        Get all available issue link types.
+
+        Returns:
+            List of available link types with their properties
+        """
+        fields = "name,localizedName,sourceToTarget,targetToSource"
+        response = self.client.get(f"issueLinkTypes?fields={fields}")
+        return response
