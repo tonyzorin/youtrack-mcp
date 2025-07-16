@@ -72,7 +72,7 @@ class UserTools:
                 result = user_obj  # Assume it's already a dict
             return format_json_response(result)
         except Exception as e:
-            logger.exception(f"Error getting user {user_login}")
+            logger.exception(f"Error getting user {user_id}")
             return format_json_response({"error": str(e)})
 
     @sync_wrapper
