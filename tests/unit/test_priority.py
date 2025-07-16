@@ -26,29 +26,33 @@ class TestToolPrioritization:
         }
         # Add a sample method to the mock
         mock_with_tools.sample_tool = Mock()
-        
+
         # Mock dir() to return the sample_tool method name
         def mock_dir(obj):
             if obj is mock_with_tools:
-                return ['sample_tool', 'get_tool_definitions', 'close']
+                return ["sample_tool", "get_tool_definitions", "close"]
             return []
-        
+
         # Create empty mock for other classes
         empty_mock = Mock()
         empty_mock.get_tool_definitions.return_value = {}
 
         with patch("builtins.dir", side_effect=mock_dir):
             with patch(
-                "youtrack_mcp.tools.issues.IssueTools", return_value=mock_with_tools
+                "youtrack_mcp.tools.issues.IssueTools",
+                return_value=mock_with_tools,
             ):
                 with patch(
-                    "youtrack_mcp.tools.projects.ProjectTools", return_value=empty_mock
+                    "youtrack_mcp.tools.projects.ProjectTools",
+                    return_value=empty_mock,
                 ):
                     with patch(
-                        "youtrack_mcp.tools.users.UserTools", return_value=empty_mock
+                        "youtrack_mcp.tools.users.UserTools",
+                        return_value=empty_mock,
                     ):
                         with patch(
-                            "youtrack_mcp.tools.search.SearchTools", return_value=empty_mock
+                            "youtrack_mcp.tools.search.SearchTools",
+                            return_value=empty_mock,
                         ):
                             with patch(
                                 "youtrack_mcp.tools.resources.ResourcesTools",
@@ -94,21 +98,27 @@ class TestToolPrioritization:
         # Mock dir() to return the method names
         def mock_dir(obj):
             if obj is issues_mock:
-                return ['get_issue', 'get_tool_definitions', 'close']
+                return ["get_issue", "get_tool_definitions", "close"]
             elif obj is projects_mock:
-                return ['get_project', 'get_tool_definitions', 'close']
+                return ["get_project", "get_tool_definitions", "close"]
             return []
 
         with patch("builtins.dir", side_effect=mock_dir):
-            with patch("youtrack_mcp.tools.issues.IssueTools", return_value=issues_mock):
+            with patch(
+                "youtrack_mcp.tools.issues.IssueTools",
+                return_value=issues_mock,
+            ):
                 with patch(
-                    "youtrack_mcp.tools.projects.ProjectTools", return_value=projects_mock
+                    "youtrack_mcp.tools.projects.ProjectTools",
+                    return_value=projects_mock,
                 ):
                     with patch(
-                        "youtrack_mcp.tools.users.UserTools", return_value=empty_mock
+                        "youtrack_mcp.tools.users.UserTools",
+                        return_value=empty_mock,
                     ):
                         with patch(
-                            "youtrack_mcp.tools.search.SearchTools", return_value=empty_mock
+                            "youtrack_mcp.tools.search.SearchTools",
+                            return_value=empty_mock,
                         ):
                             with patch(
                                 "youtrack_mcp.tools.resources.ResourcesTools",
@@ -142,19 +152,25 @@ class TestToolPrioritization:
         # Mock dir() to return the method names
         def mock_dir(obj):
             if obj is mock_instance:
-                return ['utility_tool', 'get_tool_definitions', 'close']
+                return ["utility_tool", "get_tool_definitions", "close"]
             return []
 
         with patch("builtins.dir", side_effect=mock_dir):
-            with patch("youtrack_mcp.tools.issues.IssueTools", return_value=mock_instance):
+            with patch(
+                "youtrack_mcp.tools.issues.IssueTools",
+                return_value=mock_instance,
+            ):
                 with patch(
-                    "youtrack_mcp.tools.projects.ProjectTools", return_value=empty_mock
+                    "youtrack_mcp.tools.projects.ProjectTools",
+                    return_value=empty_mock,
                 ):
                     with patch(
-                        "youtrack_mcp.tools.users.UserTools", return_value=empty_mock
+                        "youtrack_mcp.tools.users.UserTools",
+                        return_value=empty_mock,
                     ):
                         with patch(
-                            "youtrack_mcp.tools.search.SearchTools", return_value=empty_mock
+                            "youtrack_mcp.tools.search.SearchTools",
+                            return_value=empty_mock,
                         ):
                             with patch(
                                 "youtrack_mcp.tools.resources.ResourcesTools",

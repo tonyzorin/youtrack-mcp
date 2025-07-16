@@ -68,7 +68,9 @@ class TestMCPWrapperFunctions:
         mock_issues_api.create_issue.return_value = mock_issue
 
         result = mcp_wrappers.create_issue(
-            project="0-1", summary="New test issue", description="Test description"
+            project="0-1",
+            summary="New test issue",
+            description="Test description",
         )
 
         mock_issues_api.create_issue.assert_called_once_with(
@@ -85,7 +87,10 @@ class TestMCPWrapperFunctions:
     ):
         """Test issue creation with additional fields."""
         mock_issue = Mock()
-        mock_issue.model_dump.return_value = {"id": "TEST-124", "summary": "Test"}
+        mock_issue.model_dump.return_value = {
+            "id": "TEST-124",
+            "summary": "Test",
+        }
         mock_issues_api.create_issue.return_value = mock_issue
 
         additional_fields = {
@@ -94,7 +99,9 @@ class TestMCPWrapperFunctions:
 
         result = mcp_wrappers.create_issue(project="0-1", summary="Test issue")
 
-        mock_issues_api.create_issue.assert_called_once_with("0-1", "Test issue", None)
+        mock_issues_api.create_issue.assert_called_once_with(
+            "0-1", "Test issue", None
+        )
         assert result["id"] == "TEST-124"
 
     @pytest.mark.unit
@@ -113,14 +120,23 @@ class TestMCPWrapperFunctions:
     def test_search_issues_success(self, mock_issues_api):
         """Test successful issue search."""
         mock_issues = [
-            Mock(model_dump=lambda: {"id": "TEST-123", "summary": "First issue"}),
-            Mock(model_dump=lambda: {"id": "TEST-124", "summary": "Second issue"}),
+            Mock(
+                model_dump=lambda: {"id": "TEST-123", "summary": "First issue"}
+            ),
+            Mock(
+                model_dump=lambda: {
+                    "id": "TEST-124",
+                    "summary": "Second issue",
+                }
+            ),
         ]
         mock_issues_api.search_issues.return_value = mock_issues
 
         result = mcp_wrappers.search_issues("project: TEST", limit=10)
 
-        mock_issues_api.search_issues.assert_called_once_with("project: TEST", 10)
+        mock_issues_api.search_issues.assert_called_once_with(
+            "project: TEST", 10
+        )
         assert len(result) == 2
         assert result[0]["id"] == "TEST-123"
 
@@ -132,7 +148,9 @@ class TestMCPWrapperFunctions:
 
         result = mcp_wrappers.search_issues("project: TEST")
 
-        mock_issues_api.search_issues.assert_called_once_with("project: TEST", 10)
+        mock_issues_api.search_issues.assert_called_once_with(
+            "project: TEST", 10
+        )
         assert len(result) == 0
 
     @pytest.mark.unit
@@ -144,7 +162,9 @@ class TestMCPWrapperFunctions:
 
         result = mcp_wrappers.add_comment("TEST-123", "Test comment")
 
-        mock_issues_api.add_comment.assert_called_once_with("TEST-123", "Test comment")
+        mock_issues_api.add_comment.assert_called_once_with(
+            "TEST-123", "Test comment"
+        )
         assert result["id"] == "comment-123"
 
     @pytest.mark.unit
@@ -246,7 +266,9 @@ class TestMCPWrapperParameterHandling:
         # Test with minimal parameters
         result = mcp_wrappers.create_issue(project="0-1", summary="Test issue")
 
-        mock_issues_api.create_issue.assert_called_once_with("0-1", "Test issue", None)
+        mock_issues_api.create_issue.assert_called_once_with(
+            "0-1", "Test issue", None
+        )
         assert result["id"] == "TEST-123"
 
     @pytest.mark.unit
@@ -259,7 +281,9 @@ class TestMCPWrapperParameterHandling:
         # Test with default limit
         result = mcp_wrappers.search_issues("project: TEST")
 
-        mock_issues_api.search_issues.assert_called_once_with("project: TEST", 10)
+        mock_issues_api.search_issues.assert_called_once_with(
+            "project: TEST", 10
+        )
         assert len(result) == 0
 
     @pytest.mark.unit
@@ -312,7 +336,9 @@ class TestMCPWrapperIntegrationScenarios:
     @pytest.mark.unit
     @patch("youtrack_mcp.api.mcp_wrappers.issues_api")
     @patch("youtrack_mcp.api.mcp_wrappers.projects_api")
-    def test_project_lookup_in_create_issue(self, mock_projects_api, mock_issues_api):
+    def test_project_lookup_in_create_issue(
+        self, mock_projects_api, mock_issues_api
+    ):
         """Test project lookup when creating issue with project name."""
         # Mock project lookup by name
         mock_project = Mock()
@@ -322,7 +348,10 @@ class TestMCPWrapperIntegrationScenarios:
 
         # Mock issue creation
         mock_issue = Mock()
-        mock_issue.model_dump.return_value = {"id": "TEST-124", "summary": "Test"}
+        mock_issue.model_dump.return_value = {
+            "id": "TEST-124",
+            "summary": "Test",
+        }
         mock_issues_api.create_issue.return_value = mock_issue
 
         # Create issue with project short name
@@ -331,7 +360,9 @@ class TestMCPWrapperIntegrationScenarios:
         # Verify project lookup was attempted
         mock_projects_api.get_project_by_name.assert_called_once_with("DEMO")
         # Verify issue creation used project ID
-        mock_issues_api.create_issue.assert_called_once_with("0-1", "Test issue", None)
+        mock_issues_api.create_issue.assert_called_once_with(
+            "0-1", "Test issue", None
+        )
         assert result["id"] == "TEST-124"
 
     @pytest.mark.unit
@@ -346,12 +377,17 @@ class TestMCPWrapperIntegrationScenarios:
 
         # Mock issue creation
         mock_issue = Mock()
-        mock_issue.model_dump.return_value = {"id": "TEST-124", "summary": "Test"}
+        mock_issue.model_dump.return_value = {
+            "id": "TEST-124",
+            "summary": "Test",
+        }
         mock_issues_api.create_issue.return_value = mock_issue
 
         # Create issue - should proceed with original project string
         result = mcp_wrappers.create_issue("DEMO", "Test issue")
 
         # Verify issue creation proceeded with original project name
-        mock_issues_api.create_issue.assert_called_once_with("DEMO", "Test issue", None)
+        mock_issues_api.create_issue.assert_called_once_with(
+            "DEMO", "Test issue", None
+        )
         assert result["id"] == "TEST-124"

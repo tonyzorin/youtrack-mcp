@@ -25,7 +25,9 @@ class TestVersion:
 
         # Should match semantic versioning pattern (major.minor.patch)
         # Allow for optional pre-release and build metadata
-        semver_pattern = r"^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?$"
+        semver_pattern = (
+            r"^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?$"
+        )
         assert re.match(
             semver_pattern, version_str
         ), f"Version {version_str} doesn't follow semantic versioning"

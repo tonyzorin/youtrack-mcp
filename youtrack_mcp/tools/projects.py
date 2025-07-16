@@ -4,7 +4,7 @@ YouTrack Project MCP tools.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.issues import IssuesClient
@@ -38,7 +38,9 @@ class ProjectTools:
             JSON string with projects information
         """
         try:
-            projects = self.projects_api.get_projects(include_archived=include_archived)
+            projects = self.projects_api.get_projects(
+                include_archived=include_archived
+            )
 
             # Handle both Pydantic models and dictionaries in the response
             result = []
@@ -66,7 +68,9 @@ class ProjectTools:
         """
         try:
             if not project_id:
-                return format_json_response({"error": "Project ID is required"})
+                return format_json_response(
+                    {"error": "Project ID is required"}
+                )
 
             project_obj = self.projects_api.get_project(project_id)
 
@@ -103,7 +107,9 @@ class ProjectTools:
 
                 return format_json_response(result)
             else:
-                return format_json_response({"error": f"Project '{project_name}' not found"})
+                return format_json_response(
+                    {"error": f"Project '{project_name}' not found"}
+                )
         except Exception as e:
             logger.exception(f"Error finding project by name {project_name}")
             return format_json_response({"error": str(e)})
@@ -124,29 +130,41 @@ class ProjectTools:
         """
         try:
             if not project_id:
-                return format_json_response({"error": "Project ID is required"})
+                return format_json_response(
+                    {"error": "Project ID is required"}
+                )
 
             # First try with the direct project ID
             try:
-                issues = self.projects_api.get_project_issues(project_id, limit)
+                issues = self.projects_api.get_project_issues(
+                    project_id, limit
+                )
                 if issues:
                     return format_json_response(issues)
             except Exception as e:
                 # If that fails, check if it was a non-ID format error
                 if not str(e).startswith("Project not found"):
-                    logger.exception(f"Error getting issues for project {project_id}")
+                    logger.exception(
+                        f"Error getting issues for project {project_id}"
+                    )
                     return format_json_response({"error": str(e)})
 
             # If that failed, try to find project by name
             try:
                 project_obj = self.projects_api.get_project_by_name(project_id)
                 if project_obj:
-                    issues = self.projects_api.get_project_issues(project_obj.id, limit)
+                    issues = self.projects_api.get_project_issues(
+                        project_obj.id, limit
+                    )
                     return format_json_response(issues)
                 else:
-                    return format_json_response({"error": f"Project not found: {project_id}"})
+                    return format_json_response(
+                        {"error": f"Project not found: {project_id}"}
+                    )
             except Exception as e:
-                logger.exception(f"Error getting issues for project {project_id}")
+                logger.exception(
+                    f"Error getting issues for project {project_id}"
+                )
                 return format_json_response({"error": str(e)})
         except Exception as e:
             logger.exception(
@@ -169,7 +187,9 @@ class ProjectTools:
         """
         try:
             if not project_id:
-                return format_json_response({"error": "Project ID is required"})
+                return format_json_response(
+                    {"error": "Project ID is required"}
+                )
 
             fields = self.projects_api.get_custom_fields(project_id)
 
@@ -196,11 +216,13 @@ class ProjectTools:
                 return format_json_response(result)
             except Exception as e:
                 # If we can't iterate, return the raw string representation
-                logger.warning(f"Could not process custom fields response: {str(e)}")
+                logger.warning(
+                    f"Could not process custom fields response: {str(e)}"
+                )
                 return format_json_response({"custom_fields": str(fields)})
         except Exception as e:
             logger.exception(
-                f"Error getting custom fields for project {project_id or project}"
+                f"Error getting custom fields for project {project_id}"
             )
             return format_json_response({"error": str(e)})
 
@@ -229,11 +251,17 @@ class ProjectTools:
         try:
             # Check for missing required parameters
             if not name:
-                return format_json_response({"error": "Project name is required"})
+                return format_json_response(
+                    {"error": "Project name is required"}
+                )
             if not short_name:
-                return format_json_response({"error": "Project short name is required"})
+                return format_json_response(
+                    {"error": "Project short name is required"}
+                )
             if not lead_id:
-                return format_json_response({"error": "Project leader ID is required"})
+                return format_json_response(
+                    {"error": "Project leader ID is required"}
+                )
 
             project = self.projects_api.create_project(
                 name=name,
@@ -281,7 +309,9 @@ class ProjectTools:
         """
         try:
             if not project_id:
-                return format_json_response({"error": "Project ID is required"})
+                return format_json_response(
+                    {"error": "Project ID is required"}
+                )
 
             # First, get the existing project to maintain required fields
             try:
@@ -307,9 +337,13 @@ class ProjectTools:
 
                 # If no parameters were provided, return current project
                 if not data:
-                    logger.info("No parameters to update, returning current project")
+                    logger.info(
+                        "No parameters to update, returning current project"
+                    )
                     if hasattr(existing_project, "model_dump"):
-                        return format_json_response(existing_project.model_dump())
+                        return format_json_response(
+                            existing_project.model_dump()
+                        )
                     else:
                         return format_json_response(existing_project)
 
@@ -328,17 +362,27 @@ class ProjectTools:
                 # Get the updated project data
                 try:
                     updated_project = self.projects_api.get_project(project_id)
-                    logger.info(f"Retrieved updated project: {updated_project.name}")
+                    logger.info(
+                        f"Retrieved updated project: {updated_project.name}"
+                    )
 
                     # Return updated project data
                     if hasattr(updated_project, "model_dump"):
-                        return format_json_response(updated_project.model_dump())
+                        return format_json_response(
+                            updated_project.model_dump()
+                        )
                     else:
                         return format_json_response(updated_project)
                 except Exception as e:
-                    logger.warning(f"Could not retrieve updated project: {str(e)}")
+                    logger.warning(
+                        f"Could not retrieve updated project: {str(e)}"
+                    )
                     return json.dumps(
-                        {"id": project_id, "status": "updated", "warning": str(e)}
+                        {
+                            "id": project_id,
+                            "status": "updated",
+                            "warning": str(e),
+                        }
                     )
             except Exception as e:
                 logger.exception(f"Error updating project {project_id}")

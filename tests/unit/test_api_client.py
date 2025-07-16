@@ -44,7 +44,9 @@ class TestYouTrackClient:
     @pytest.fixture
     def mock_session(self):
         """Mock requests session."""
-        with patch("youtrack_mcp.api.client.requests.Session") as mock_session_class:
+        with patch(
+            "youtrack_mcp.api.client.requests.Session"
+        ) as mock_session_class:
             session = Mock()
             mock_session_class.return_value = session
             yield session
@@ -53,7 +55,9 @@ class TestYouTrackClient:
     def client(self, mock_session):
         """Create a test client with mocked session."""
         with patch("youtrack_mcp.api.client.config") as mock_config:
-            mock_config.get_base_url.return_value = "https://test.youtrack.cloud"
+            mock_config.get_base_url.return_value = (
+                "https://test.youtrack.cloud"
+            )
             mock_config.YOUTRACK_API_TOKEN = "test-token"
             mock_config.VERIFY_SSL = True
             mock_config.is_cloud_instance.return_value = True
@@ -63,7 +67,9 @@ class TestYouTrackClient:
     def test_client_initialization_default(self, mock_session):
         """Test client initialization with default configuration."""
         with patch("youtrack_mcp.api.client.config") as mock_config:
-            mock_config.get_base_url.return_value = "https://test.youtrack.cloud"
+            mock_config.get_base_url.return_value = (
+                "https://test.youtrack.cloud"
+            )
             mock_config.get_api_token.return_value = "test-token"
             mock_config.VERIFY_SSL = True
             mock_config.is_cloud_instance.return_value = True
@@ -97,8 +103,12 @@ class TestYouTrackClient:
     def test_client_initialization_no_token(self, mock_session):
         """Test that client raises error when no API token is provided."""
         with patch("youtrack_mcp.api.client.config") as mock_config:
-            mock_config.get_base_url.return_value = "https://test.youtrack.cloud"
-            mock_config.get_api_token.side_effect = ValueError("API token is required")
+            mock_config.get_base_url.return_value = (
+                "https://test.youtrack.cloud"
+            )
+            mock_config.get_api_token.side_effect = ValueError(
+                "API token is required"
+            )
 
             with pytest.raises(ValueError, match="API token is required"):
                 YouTrackClient()
@@ -157,7 +167,8 @@ class TestYouTrackClient:
         response.json.return_value = {"error": "Invalid request"}
 
         with pytest.raises(
-            ValidationError, match="API request failed with status 400: Invalid request"
+            ValidationError,
+            match="API request failed with status 400: Invalid request",
         ):
             client._handle_response(response)
 
@@ -235,7 +246,8 @@ class TestYouTrackClient:
         response.json.return_value = {"error": "Unknown error"}
 
         with pytest.raises(
-            YouTrackAPIError, match="API request failed with status 418: Unknown error"
+            YouTrackAPIError,
+            match="API request failed with status 418: Unknown error",
         ):
             client._handle_response(response)
 
@@ -314,7 +326,9 @@ class TestYouTrackClient:
         result = client.get("issues", params={"project": "TEST"})
 
         mock_session.request.assert_called_once_with(
-            "GET", "https://test.youtrack.cloud/api/issues", params={"project": "TEST"}
+            "GET",
+            "https://test.youtrack.cloud/api/issues",
+            params={"project": "TEST"},
         )
         assert result == {"test": "data"}
 
@@ -346,7 +360,10 @@ class TestYouTrackClient:
         result = client.post("issues", json_data=json_data)
 
         mock_session.request.assert_called_once_with(
-            "POST", "https://test.youtrack.cloud/api/issues", data=None, json=json_data
+            "POST",
+            "https://test.youtrack.cloud/api/issues",
+            data=None,
+            json=json_data,
         )
         assert result == {"id": "new-issue"}
 
@@ -402,7 +419,9 @@ class TestYouTrackClient:
     def test_ssl_verification_disabled(self, mock_session):
         """Test SSL verification disabled."""
         with patch("youtrack_mcp.api.client.config") as mock_config:
-            mock_config.get_base_url.return_value = "https://test.youtrack.cloud"
+            mock_config.get_base_url.return_value = (
+                "https://test.youtrack.cloud"
+            )
             mock_config.YOUTRACK_API_TOKEN = "test-token"
             mock_config.VERIFY_SSL = False
 
@@ -431,7 +450,9 @@ class TestExceptionClasses:
     def test_youtrack_api_error_with_details(self):
         """Test YouTrackAPIError with status code and response."""
         response = Mock()
-        error = YouTrackAPIError("Test error", status_code=500, response=response)
+        error = YouTrackAPIError(
+            "Test error", status_code=500, response=response
+        )
         assert str(error) == "Test error"
         assert error.status_code == 500
         assert error.response is response

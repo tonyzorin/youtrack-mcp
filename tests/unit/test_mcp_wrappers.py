@@ -100,7 +100,9 @@ class TestProcessParameters:
         args = ("test1", "test2")
         kwargs = {"param1": "value1", "param2": "value2"}
 
-        processed_args, processed_kwargs = process_parameters("test_func", args, kwargs)
+        processed_args, processed_kwargs = process_parameters(
+            "test_func", args, kwargs
+        )
 
         assert processed_args == ("test1", "test2")
         assert processed_kwargs == {"param1": "value1", "param2": "value2"}
@@ -111,7 +113,9 @@ class TestProcessParameters:
         args = ()
         kwargs = {"args": '{"project": "TEST", "issue_id": "123"}'}
 
-        processed_args, processed_kwargs = process_parameters("test_func", args, kwargs)
+        processed_args, processed_kwargs = process_parameters(
+            "test_func", args, kwargs
+        )
 
         assert processed_args == ()
         assert processed_kwargs["project"] == "TEST"
@@ -124,7 +128,9 @@ class TestProcessParameters:
         args = ()
         kwargs = {"args": "simple_value"}
 
-        processed_args, processed_kwargs = process_parameters("test_func", args, kwargs)
+        processed_args, processed_kwargs = process_parameters(
+            "test_func", args, kwargs
+        )
 
         assert processed_args == ("simple_value",)
         assert "args" not in processed_kwargs
@@ -135,7 +141,9 @@ class TestProcessParameters:
         args = ()
         kwargs = {"args": ""}
 
-        processed_args, processed_kwargs = process_parameters("test_func", args, kwargs)
+        processed_args, processed_kwargs = process_parameters(
+            "test_func", args, kwargs
+        )
 
         assert processed_args == ()
         assert "args" not in processed_kwargs
@@ -144,7 +152,9 @@ class TestProcessParameters:
     def test_process_parameters_with_invalid_json_args(self):
         """Test parameter processing with invalid JSON in args."""
         args = ()
-        kwargs = {"args": '{"invalid": json}'}  # Looks like JSON but is invalid
+        kwargs = {
+            "args": '{"invalid": json}'
+        }  # Looks like JSON but is invalid
 
         with patch("youtrack_mcp.mcp_wrappers.logger") as mock_logger:
             processed_args, processed_kwargs = process_parameters(
@@ -165,7 +175,9 @@ class TestProcessParameters:
         args = ()
         kwargs = {"kwargs": '{"param1": "value1", "param2": "value2"}'}
 
-        processed_args, processed_kwargs = process_parameters("test_func", args, kwargs)
+        processed_args, processed_kwargs = process_parameters(
+            "test_func", args, kwargs
+        )
 
         assert processed_args == ()
         assert processed_kwargs["param1"] == "value1"
@@ -178,7 +190,9 @@ class TestProcessParameters:
         args = ()
         kwargs = {"kwargs": {"param1": "value1", "param2": "value2"}}
 
-        processed_args, processed_kwargs = process_parameters("test_func", args, kwargs)
+        processed_args, processed_kwargs = process_parameters(
+            "test_func", args, kwargs
+        )
 
         assert processed_args == ()
         assert processed_kwargs["param1"] == "value1"
@@ -286,8 +300,8 @@ class TestNormalizeParameterNames:
 
         result = normalize_parameter_names("get_user", kwargs)
 
-        assert result == {"user": "user123", "login": "john.doe"}
-        assert "user_id" not in result
+        # After our fix, user functions keep user_id and convert user_login to login
+        assert result == {"user_id": "user123", "login": "john.doe"}
         assert "user_login" not in result
 
     @pytest.mark.unit
@@ -307,7 +321,10 @@ class TestNormalizeParameterNames:
 
         result = normalize_parameter_names("create_issue", kwargs)
 
-        assert result == {"summary": "Test issue", "description": "Test description"}
+        assert result == {
+            "summary": "Test issue",
+            "description": "Test description",
+        }
 
     @pytest.mark.unit
     def test_normalize_preserves_existing_preferred_names(self):
@@ -494,16 +511,26 @@ class TestIntegrationScenarios:
 
         class IssueTools:
             def create_issue(self, project, summary):
-                return {"project": project, "summary": summary, "id": f"{project}-1"}
+                return {
+                    "project": project,
+                    "summary": summary,
+                    "id": f"{project}-1",
+                }
 
         instance = IssueTools()
 
         # Test with JSON args
         bound_tool = create_bound_tool(instance, "create_issue")
-        result = bound_tool(args='{"project_id": "TEST", "summary": "New issue"}')
+        result = bound_tool(
+            args='{"project_id": "TEST", "summary": "New issue"}'
+        )
 
         # project_id should be normalized to project
-        assert result == {"project": "TEST", "summary": "New issue", "id": "TEST-1"}
+        assert result == {
+            "project": "TEST",
+            "summary": "New issue",
+            "id": "TEST-1",
+        }
 
     @pytest.mark.unit
     def test_complex_parameter_scenarios(self):
@@ -511,7 +538,11 @@ class TestIntegrationScenarios:
 
         class ComplexTools:
             def complex_method(self, project_id, user, field_id):
-                return {"project_id": project_id, "user": user, "field_id": field_id}
+                return {
+                    "project_id": project_id,
+                    "user": user,
+                    "field_id": field_id,
+                }
 
         instance = ComplexTools()
         bound_tool = create_bound_tool(instance, "complex_method")
@@ -545,7 +576,9 @@ class TestIntegrationScenarios:
 
         # Test invalid JSON in kwargs - should trigger line 129-130
         with patch("youtrack_mcp.mcp_wrappers.logger") as mock_logger:
-            result = bound_tool(kwargs='{"invalid": json}')  # Invalid JSON syntax
+            result = bound_tool(
+                kwargs='{"invalid": json}'
+            )  # Invalid JSON syntax
 
             # Should log warning about JSON parsing failure
             mock_logger.warning.assert_called()

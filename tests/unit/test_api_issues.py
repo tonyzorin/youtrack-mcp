@@ -136,7 +136,9 @@ class TestIssuesClient:
         mock_client.session.post.assert_called_once()
 
     @pytest.mark.unit
-    def test_create_issue_with_additional_fields(self, issues_client, mock_client):
+    def test_create_issue_with_additional_fields(
+        self, issues_client, mock_client
+    ):
         """Test issue creation with additional fields."""
         mock_response_obj = Mock()
         mock_response_obj.status_code = 201
@@ -150,7 +152,10 @@ class TestIssuesClient:
         additional_fields = {
             "customFields": [
                 {"name": "Priority", "value": {"name": "High"}},
-                {"name": "Component", "value": [{"name": "Backend"}, {"name": "API"}]},
+                {
+                    "name": "Component",
+                    "value": [{"name": "Backend"}, {"name": "API"}],
+                },
             ]
         }
 
@@ -185,14 +190,24 @@ class TestIssuesClient:
         mock_client.session.post.return_value = mock_response_obj
 
         with pytest.raises(YouTrackAPIError):
-            issues_client.create_issue(project_id="invalid", summary="Test issue")
+            issues_client.create_issue(
+                project_id="invalid", summary="Test issue"
+            )
 
     @pytest.mark.unit
     def test_search_issues_success(self, issues_client, mock_client):
         """Test successful issue search."""
         mock_response = [
-            {"id": "TEST-123", "summary": "First issue", "project": {"id": "0-1"}},
-            {"id": "TEST-124", "summary": "Second issue", "project": {"id": "0-1"}},
+            {
+                "id": "TEST-123",
+                "summary": "First issue",
+                "project": {"id": "0-1"},
+            },
+            {
+                "id": "TEST-124",
+                "summary": "Second issue",
+                "project": {"id": "0-1"},
+            },
         ]
         mock_client.get.return_value = mock_response
 
@@ -255,7 +270,9 @@ class TestIssuesClient:
         mock_client.get.return_value = mock_issue_response
         mock_client.session.get.return_value = mock_content_response
 
-        result = issues_client.get_attachment_content("TEST-123", "attachment-456")
+        result = issues_client.get_attachment_content(
+            "TEST-123", "attachment-456"
+        )
 
         assert result == b"PDF file content"
         assert mock_client.get.call_count == 1
@@ -264,7 +281,9 @@ class TestIssuesClient:
     @pytest.mark.unit
     def test_api_error_handling(self, issues_client, mock_client):
         """Test API error handling in various methods."""
-        mock_client.get.side_effect = YouTrackAPIError("API Error", status_code=500)
+        mock_client.get.side_effect = YouTrackAPIError(
+            "API Error", status_code=500
+        )
 
         # get_issue should return an Issue object with error info, not None
         result = issues_client.get_issue("TEST-123")

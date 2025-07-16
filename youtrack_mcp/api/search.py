@@ -1,8 +1,9 @@
 """
-YouTrack Search API client with advanced search capabilities.
+Search functionality for YouTrack API.
 """
 
-from typing import Any, Dict, List, Optional, Union
+import logging
+from typing import Any, Dict, List, Optional
 
 from youtrack_mcp.api.client import YouTrackClient
 

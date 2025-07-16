@@ -18,12 +18,16 @@ class TestToolLoading:
         mock_instance = Mock()
         mock_instance.get_tool_definitions.return_value = {}
 
-        with patch("youtrack_mcp.tools.issues.IssueTools", return_value=mock_instance):
+        with patch(
+            "youtrack_mcp.tools.issues.IssueTools", return_value=mock_instance
+        ):
             with patch(
-                "youtrack_mcp.tools.projects.ProjectTools", return_value=mock_instance
+                "youtrack_mcp.tools.projects.ProjectTools",
+                return_value=mock_instance,
             ):
                 with patch(
-                    "youtrack_mcp.tools.users.UserTools", return_value=mock_instance
+                    "youtrack_mcp.tools.users.UserTools",
+                    return_value=mock_instance,
                 ):
                     with patch(
                         "youtrack_mcp.tools.search.SearchTools",
@@ -52,18 +56,24 @@ class TestToolLoading:
         # Add a simple callable method to the mock
         mock_instance.test_tool = Mock()
 
-        with patch("youtrack_mcp.tools.issues.IssueTools", return_value=mock_instance):
+        with patch(
+            "youtrack_mcp.tools.issues.IssueTools", return_value=mock_instance
+        ):
             with patch(
                 "youtrack_mcp.tools.projects.ProjectTools",
                 return_value=Mock(get_tool_definitions=Mock(return_value={})),
             ):
                 with patch(
                     "youtrack_mcp.tools.users.UserTools",
-                    return_value=Mock(get_tool_definitions=Mock(return_value={})),
+                    return_value=Mock(
+                        get_tool_definitions=Mock(return_value={})
+                    ),
                 ):
                     with patch(
                         "youtrack_mcp.tools.search.SearchTools",
-                        return_value=Mock(get_tool_definitions=Mock(return_value={})),
+                        return_value=Mock(
+                            get_tool_definitions=Mock(return_value={})
+                        ),
                     ):
                         with patch(
                             "youtrack_mcp.tools.resources.ResourcesTools",
@@ -86,15 +96,20 @@ class TestToolLoading:
         empty_mock = Mock()
         empty_mock.get_tool_definitions.return_value = {}
 
-        with patch("youtrack_mcp.tools.issues.IssueTools", return_value=empty_mock):
+        with patch(
+            "youtrack_mcp.tools.issues.IssueTools", return_value=empty_mock
+        ):
             with patch(
-                "youtrack_mcp.tools.projects.ProjectTools", return_value=empty_mock
+                "youtrack_mcp.tools.projects.ProjectTools",
+                return_value=empty_mock,
             ):
                 with patch(
-                    "youtrack_mcp.tools.users.UserTools", return_value=empty_mock
+                    "youtrack_mcp.tools.users.UserTools",
+                    return_value=empty_mock,
                 ):
                     with patch(
-                        "youtrack_mcp.tools.search.SearchTools", return_value=empty_mock
+                        "youtrack_mcp.tools.search.SearchTools",
+                        return_value=empty_mock,
                     ):
                         with patch(
                             "youtrack_mcp.tools.resources.ResourcesTools",
@@ -104,7 +119,9 @@ class TestToolLoading:
 
                             # Should return empty dict when all tool classes are empty
                             assert isinstance(tools, dict)
-                            assert len(tools) == 0  # No tools when all classes are empty
+                            assert (
+                                len(tools) == 0
+                            )  # No tools when all classes are empty
 
     @pytest.mark.unit
     def test_loader_returns_dict(self, mock_youtrack_client):
@@ -114,12 +131,16 @@ class TestToolLoading:
         mock_instance = Mock()
         mock_instance.get_tool_definitions.return_value = {}
 
-        with patch("youtrack_mcp.tools.issues.IssueTools", return_value=mock_instance):
+        with patch(
+            "youtrack_mcp.tools.issues.IssueTools", return_value=mock_instance
+        ):
             with patch(
-                "youtrack_mcp.tools.projects.ProjectTools", return_value=mock_instance
+                "youtrack_mcp.tools.projects.ProjectTools",
+                return_value=mock_instance,
             ):
                 with patch(
-                    "youtrack_mcp.tools.users.UserTools", return_value=mock_instance
+                    "youtrack_mcp.tools.users.UserTools",
+                    return_value=mock_instance,
                 ):
                     with patch(
                         "youtrack_mcp.tools.search.SearchTools",

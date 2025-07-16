@@ -130,11 +130,15 @@ class IssuesClient:
 
                 if isinstance(detailed_response, dict):
                     # Extract key fields if possible
-                    summary = detailed_response.get("summary", "Unknown summary")
+                    summary = detailed_response.get(
+                        "summary", "Unknown summary"
+                    )
                     description = detailed_response.get("description", "")
 
                     # Create a basic issue with the available data
-                    issue = Issue(id=issue_id, summary=summary, description=description)
+                    issue = Issue(
+                        id=issue_id, summary=summary, description=description
+                    )
 
                     # Add any other fields that might be useful
                     for field in [
@@ -215,11 +219,13 @@ class IssuesClient:
                 try:
                     error_content = response.json()
                     error_msg += f" - {json.dumps(error_content)}"
-                except:
+                except Exception:
                     error_msg += f" - {response.text}"
 
                 logger.error(error_msg)
-                raise YouTrackAPIError(error_msg, response.status_code, response)
+                raise YouTrackAPIError(
+                    error_msg, response.status_code, response
+                )
 
             # Process successful response
             try:
@@ -229,7 +235,8 @@ class IssuesClient:
                 logger.error(f"Error parsing response: {str(e)}")
                 # Return raw response if we can't parse it
                 return Issue(
-                    id=str(response.status_code), summary="Created successfully"
+                    id=str(response.status_code),
+                    summary="Created successfully",
                 )
 
         except Exception as e:
@@ -307,7 +314,9 @@ class IssuesClient:
                     issues.append(
                         Issue(
                             id=issue_id,
-                            summary=issue_data.get("summary", f"Issue {issue_id}"),
+                            summary=issue_data.get(
+                                "summary", f"Issue {issue_id}"
+                            ),
                         )
                     )
 
@@ -327,7 +336,9 @@ class IssuesClient:
         data = {"text": text}
         return self.client.post(f"issues/{issue_id}/comments", data=data)
 
-    def get_attachment_content(self, issue_id: str, attachment_id: str) -> bytes:
+    def get_attachment_content(
+        self, issue_id: str, attachment_id: str
+    ) -> bytes:
         """
         Get the content of an attachment with file size validation.
 
@@ -382,7 +393,9 @@ class IssuesClient:
 
         attachment_url = attachment_info.get("url")
         if not attachment_url:
-            raise ValueError(f"No download URL found for attachment {attachment_id}")
+            raise ValueError(
+                f"No download URL found for attachment {attachment_id}"
+            )
 
         # The URL in the attachment data is relative to the base URL
         if attachment_url.startswith("/"):
@@ -402,7 +415,9 @@ class IssuesClient:
 
         # Check for errors
         if response.status_code >= 400:
-            error_msg = f"Error getting attachment content: {response.status_code}"
+            error_msg = (
+                f"Error getting attachment content: {response.status_code}"
+            )
             raise YouTrackAPIError(error_msg, response.status_code, response)
 
         # Double-check the actual content size
@@ -418,24 +433,101 @@ class IssuesClient:
         # Return the binary content
         return response.content
 
-    def link_issues(self, source_issue_id: str, target_issue_id: str, link_type: str) -> dict:
+    def _get_internal_id(self, issue_id: str) -> str:
+        """Convert issue ID to internal format if needed."""
+        try:
+            internal_id = self.client.get(f"issues/{issue_id}?fields=id")["id"]
+            return internal_id
+        except Exception:
+            # If that fails, assume the issue_id is already internal
+            return issue_id
+
+    def _get_readable_id(self, issue_id: str) -> str:
         """
-        Link two issues together.
+        Convert an internal issue ID (like 3-37) to readable ID (like DEMO-37).
+        If it's already a readable ID, return as-is.
+
+        Args:
+            issue_id: Issue ID (internal like '3-41' or readable like 'DEMO-123')
+
+        Returns:
+            Readable project ID (like 'DEMO-41')
+        """
+        try:
+            # If it doesn't look like an internal ID, return as-is
+            if not ("-" in issue_id and issue_id.replace("-", "").isdigit()):
+                return issue_id
+
+            # Fetch the issue to get its readable ID
+            issue = self.client.get(f"issues/{issue_id}?fields=idReadable")
+            return issue.get("idReadable", issue_id)
+        except Exception:
+            # If we can't get the readable ID, return the original
+            return issue_id
+
+    def link_issues(
+        self, source_issue_id: str, target_issue_id: str, link_type: str
+    ) -> dict:
+        """
+        Link two issues together using Commands API.
 
         Args:
             source_issue_id: The ID of the source issue
-            target_issue_id: The ID of the target issue  
+            target_issue_id: The ID of the target issue
             link_type: The type of link (e.g., 'Relates', 'Duplicates', 'Depends on')
 
         Returns:
             The created link data
         """
-        data = {
-            "linkType": {"name": link_type},
-            "issues": [{"id": target_issue_id}]
+        # Map link types to correct YouTrack command syntax
+        link_command_map = {
+            "relates": "relates to",
+            "depends on": "depends on",
+            "duplicates": "duplicates",
+            "is duplicated by": "is duplicated by",
+            "is required for": "is required for",
+            "parent for": "parent for",
+            "subtask": "subtask of",
+            "subtask of": "subtask of",
         }
+
+        # Get internal IDs for both issues (Commands API requires internal IDs in issues array)
+        source_internal_id = self._get_internal_id(source_issue_id)
+        target_internal_id = self._get_internal_id(target_issue_id)
         
-        response = self.client.post(f"issues/{source_issue_id}/links", json=data)
+        # Get readable IDs for command text (Commands API expects readable IDs in command)
+        target_readable_id = self._get_readable_id(target_issue_id)
+
+        # Normalize the link_type to lowercase and map to command
+        link_type_lower = link_type.lower()
+        command_phrase = link_command_map.get(link_type_lower, link_type_lower)
+
+        # Build the command using correct YouTrack syntax with readable target ID
+        # Commands expect readable IDs like "DEMO-37" in command text, but internal IDs in issues array
+        command = f"{command_phrase} {target_readable_id}"
+
+        command_data = {
+            "query": command,
+            "issues": [{"id": source_internal_id}],
+        }
+
+        response = self.client.post("commands", data=command_data)
+
+        # Return success response if the command executed
+        if isinstance(response, dict):
+            return {
+                "status": "success",
+                "message": f"Successfully linked {source_issue_id} to {target_issue_id} with relationship '{link_type}'",
+                "command": command,
+                "source_issue": source_issue_id,
+                "target_issue": target_issue_id,
+                "link_type": link_type,
+                "internal_ids": {
+                    "source": source_internal_id,
+                    "target": target_internal_id,
+                },
+            }
+
         return response
 
     def get_issue_links(self, issue_id: str) -> dict:

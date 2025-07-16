@@ -1,25 +1,16 @@
 """
-MCP wrapper functions for YouTrack API.
-
-These functions provide a clean interface for MCP tools to interact with the YouTrack API.
-All functions are designed to handle parameters in the format expected by MCP.
+Wrapper functions for MCP compatibility in the API layer.
+These provide parameter compatibility for MCP function calling.
 """
 
-import json
 import logging
-from typing import Dict, Any, Optional, List, Union
-import asyncio
-import nest_asyncio
+from typing import Any, Dict, Optional, Callable, List
 
+from youtrack_mcp.mcp_wrappers import sync_wrapper
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.issues import IssuesClient
 from youtrack_mcp.api.projects import ProjectsClient
 from youtrack_mcp.api.users import UsersClient
-
-try:
-    nest_asyncio.apply()  # Allow nested event loops
-except RuntimeError:
-    pass  # If already applied, ignore the error
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +50,10 @@ def get_issue(issue_id: str) -> Dict[str, Any]:
 
     # Check if API client is available
     if issues_api is None:
-        return {"error": "YouTrack API client failed to initialize", "status": "error"}
+        return {
+            "error": "YouTrack API client failed to initialize",
+            "status": "error",
+        }
 
     try:
         issue = issues_api.get_issue(issue_id)
@@ -87,7 +81,10 @@ def add_comment(issue_id: str, text: str) -> Dict[str, Any]:
 
     # Check if API client is available
     if issues_api is None:
-        return {"error": "YouTrack API client failed to initialize", "status": "error"}
+        return {
+            "error": "YouTrack API client failed to initialize",
+            "status": "error",
+        }
 
     try:
         result = issues_api.add_comment(issue_id, text)
@@ -120,7 +117,10 @@ def create_issue(
 
     # Check if API clients are available
     if issues_api is None or projects_api is None:
-        return {"error": "YouTrack API client failed to initialize", "status": "error"}
+        return {
+            "error": "YouTrack API client failed to initialize",
+            "status": "error",
+        }
 
     try:
         # Check if project is a project ID or short name
@@ -171,7 +171,10 @@ def search_issues(query: str, limit: int = 10) -> List[Dict[str, Any]]:
     # Check if API client is available
     if issues_api is None:
         return [
-            {"error": "YouTrack API client failed to initialize", "status": "error"}
+            {
+                "error": "YouTrack API client failed to initialize",
+                "status": "error",
+            }
         ]
 
     try:
@@ -206,12 +209,17 @@ def get_projects(include_archived: bool = False) -> List[Dict[str, Any]]:
     Example:
         >>> get_projects(include_archived=True)
     """
-    logger.info(f"MCP wrapper: get_projects(include_archived={include_archived})")
+    logger.info(
+        f"MCP wrapper: get_projects(include_archived={include_archived})"
+    )
 
     # Check if API client is available
     if projects_api is None:
         return [
-            {"error": "YouTrack API client failed to initialize", "status": "error"}
+            {
+                "error": "YouTrack API client failed to initialize",
+                "status": "error",
+            }
         ]
 
     try:
@@ -219,7 +227,11 @@ def get_projects(include_archived: bool = False) -> List[Dict[str, Any]]:
         # Convert to list of dictionaries
         if isinstance(projects, list):
             return [
-                project.model_dump() if hasattr(project, "model_dump") else project
+                (
+                    project.model_dump()
+                    if hasattr(project, "model_dump")
+                    else project
+                )
                 for project in projects
             ]
         return []
@@ -245,11 +257,16 @@ def get_project(project_id: str) -> Dict[str, Any]:
 
     # Check if API client is available
     if projects_api is None:
-        return {"error": "YouTrack API client failed to initialize", "status": "error"}
+        return {
+            "error": "YouTrack API client failed to initialize",
+            "status": "error",
+        }
 
     try:
         project = projects_api.get_project(project_id)
-        return project.model_dump() if hasattr(project, "model_dump") else project
+        return (
+            project.model_dump() if hasattr(project, "model_dump") else project
+        )
     except Exception as e:
         logger.exception(f"Error getting project {project_id}")
         return {"error": str(e), "status": "error"}
@@ -274,7 +291,10 @@ def get_current_user() -> Dict[str, Any]:
 
     # Check if API client is available
     if users_api is None:
-        return {"error": "YouTrack API client failed to initialize", "status": "error"}
+        return {
+            "error": "YouTrack API client failed to initialize",
+            "status": "error",
+        }
 
     try:
         user = users_api.get_current_user()

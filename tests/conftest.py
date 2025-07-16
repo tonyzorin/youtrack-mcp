@@ -37,7 +37,10 @@ def mock_youtrack_client():
                     client.verify_ssl = True
 
                     # Set up default mock responses
-                    mock_get.return_value = {"id": "test-123", "summary": "Test Issue"}
+                    mock_get.return_value = {
+                        "id": "test-123",
+                        "summary": "Test Issue",
+                    }
                     mock_post.return_value = {
                         "id": "created-123",
                         "summary": "Created Issue",
@@ -52,7 +55,9 @@ def mock_youtrack_client():
 
 
 @pytest.fixture(scope="function")
-def mock_environment(test_config: Dict[str, str]) -> Generator[None, None, None]:
+def mock_environment(
+    test_config: Dict[str, str],
+) -> Generator[None, None, None]:
     """Mock environment variables for testing."""
     with patch.dict(os.environ, test_config):
         yield
@@ -66,7 +71,11 @@ def sample_issue_data() -> Dict[str, Any]:
         "summary": "Test Issue Summary",
         "description": "Test issue description",
         "project": {"id": "0-0", "shortName": "TEST", "name": "Test Project"},
-        "reporter": {"id": "user-1", "login": "testuser", "fullName": "Test User"},
+        "reporter": {
+            "id": "user-1",
+            "login": "testuser",
+            "fullName": "Test User",
+        },
         "created": 1640995200000,  # 2022-01-01
         "updated": 1640995200000,
         "resolved": None,
@@ -104,7 +113,9 @@ def sample_user_data() -> Dict[str, Any]:
 def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line("markers", "unit: mark test as a unit test")
-    config.addinivalue_line("markers", "integration: mark test as an integration test")
+    config.addinivalue_line(
+        "markers", "integration: mark test as an integration test"
+    )
     config.addinivalue_line("markers", "e2e: mark test as an end-to-end test")
     config.addinivalue_line("markers", "docker: mark test as a docker test")
     config.addinivalue_line("markers", "slow: mark test as slow running")

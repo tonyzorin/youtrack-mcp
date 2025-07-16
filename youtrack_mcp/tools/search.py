@@ -2,10 +2,9 @@
 YouTrack Search MCP tools.
 """
 
-import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.issues import IssuesClient
@@ -92,6 +91,16 @@ class SearchTools:
             JSON string with search results
         """
         try:
+            # Handle custom_field_values parameter format
+            if isinstance(custom_field_values, str):
+                # Parse string format like "Priority: Normal" or "Priority: Normal, Status: Open"
+                parsed_fields = {}
+                for pair in custom_field_values.split(','):
+                    if ':' in pair:
+                        key, value = pair.split(':', 1)
+                        parsed_fields[key.strip()] = value.strip()
+                custom_field_values = parsed_fields
+            
             # Build extended query with custom field filters
             extended_query = query
 
@@ -100,7 +109,9 @@ class SearchTools:
                     if isinstance(field_value, str):
                         extended_query += f' "{field_name}": "{field_value}"'
                     elif isinstance(field_value, bool):
-                        extended_query += f' "{field_name}": {str(field_value).lower()}'
+                        extended_query += (
+                            f' "{field_name}": {str(field_value).lower()}'
+                        )
                     elif isinstance(field_value, (int, float)):
                         extended_query += f' "{field_name}": {field_value}'
                     elif isinstance(field_value, list):
@@ -109,7 +120,9 @@ class SearchTools:
                             extended_query += f' "{field_name}": "{value}"'
 
             # Perform the search
-            issues = self.issues_api.search_issues(query=extended_query, limit=limit)
+            issues = self.issues_api.search_issues(
+                query=extended_query, limit=limit
+            )
 
             # Handle response format
             if isinstance(issues, dict):
@@ -124,7 +137,9 @@ class SearchTools:
                 return format_json_response(result)
 
         except Exception as e:
-            logger.exception(f"Error in custom field search with query: {query}")
+            logger.exception(
+                f"Error in custom field search with query: {query}"
+            )
             return format_json_response({"error": str(e)})
 
     @sync_wrapper
@@ -162,29 +177,35 @@ class SearchTools:
             JSON string with search results
         """
         try:
+            # Handle different parameter formats
+            # If a 'query' parameter is passed, try to parse it
+            if 'query' in locals() and hasattr(self, '_parse_query_to_filters'):
+                # This would be handled in parameter normalization
+                pass
+                
             # Build query from filters
             query_parts = []
 
             if project:
-                query_parts.append(f'project: "{project}"')
+                query_parts.append(f'project: {project}')
 
             if assignee:
                 if assignee.lower() == "unassigned":
                     query_parts.append("#Unassigned")
                 else:
-                    query_parts.append(f'Assignee: "{assignee}"')
+                    query_parts.append(f'Assignee: {assignee}')
 
             if reporter:
-                query_parts.append(f'Reporter: "{reporter}"')
+                query_parts.append(f'Reporter: {reporter}')
 
             if state:
-                query_parts.append(f'State: "{state}"')
+                query_parts.append(f'State: {state}')
 
             if priority:
-                query_parts.append(f'Priority: "{priority}"')
+                query_parts.append(f'Priority: {priority}')
 
             if type_:
-                query_parts.append(f'Type: "{type_}"')
+                query_parts.append(f'Type: {type_}')
 
             if created_after:
                 # Validate and format date
@@ -204,13 +225,15 @@ class SearchTools:
             if custom_fields:
                 for field_name, field_value in custom_fields.items():
                     if field_value:
-                        query_parts.append(f'"{field_name}": "{field_value}"')
+                        query_parts.append(f'{field_name}: {field_value}')
 
             # Join all query parts
             final_query = " ".join(query_parts) if query_parts else "true"
 
             # Perform the search
-            issues = self.issues_api.search_issues(query=final_query, limit=limit)
+            issues = self.issues_api.search_issues(
+                query=final_query, limit=limit
+            )
 
             # Handle response format
             if isinstance(issues, dict):

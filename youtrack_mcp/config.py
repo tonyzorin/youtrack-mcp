@@ -46,7 +46,11 @@ class Config:
     MCP_SERVER_DESCRIPTION: str = os.getenv(
         "MCP_SERVER_DESCRIPTION", "YouTrack MCP Server"
     )
-    MCP_DEBUG: bool = os.getenv("MCP_DEBUG", "false").lower() in ("true", "1", "yes")
+    MCP_DEBUG: bool = os.getenv("MCP_DEBUG", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> None:
@@ -65,27 +69,29 @@ class Config:
     def get_api_token(cls) -> str:
         """
         Get the API token from environment variable or token file.
-        
+
         Returns:
             str: The API token
-            
+
         Raises:
             ValueError: If no token is found
         """
         # First try environment variable
         if cls.YOUTRACK_API_TOKEN:
             return cls.YOUTRACK_API_TOKEN
-            
+
         # Then try token file
         if cls.YOUTRACK_TOKEN_FILE:
             try:
-                with open(cls.YOUTRACK_TOKEN_FILE, 'r') as f:
+                with open(cls.YOUTRACK_TOKEN_FILE, "r") as f:
                     token = f.read().strip()
                     if token:
                         return token
             except (FileNotFoundError, IOError) as e:
-                raise ValueError(f"Could not read token file {cls.YOUTRACK_TOKEN_FILE}: {e}")
-        
+                raise ValueError(
+                    f"Could not read token file {cls.YOUTRACK_TOKEN_FILE}: {e}"
+                )
+
         raise ValueError(
             "YouTrack API token is required. Provide it using YOUTRACK_API_TOKEN environment variable, "
             "YOUTRACK_TOKEN_FILE environment variable, or in configuration."

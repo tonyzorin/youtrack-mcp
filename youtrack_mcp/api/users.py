@@ -2,9 +2,10 @@
 YouTrack Users API client.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from youtrack_mcp.api.client import YouTrackClient
 
@@ -87,8 +88,6 @@ class UsersClient:
                 users.append(User.model_validate(item))
             except Exception as e:
                 # Log the error but continue processing other users
-                import logging
-
                 logging.getLogger(__name__).warning(
                     f"Failed to validate user: {str(e)}"
                 )

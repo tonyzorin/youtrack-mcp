@@ -46,7 +46,10 @@ def test_mcp_docker():
             "method": "initialize",
             "params": {
                 "protocolVersion": "2024-11-05",
-                "capabilities": {"roots": {"listChanged": True}, "sampling": {}},
+                "capabilities": {
+                    "roots": {"listChanged": True},
+                    "sampling": {},
+                },
                 "clientInfo": {"name": "test-client", "version": "1.0.0"},
             },
         }
@@ -64,7 +67,10 @@ def test_mcp_docker():
                 print(json.dumps(response, indent=2))
 
                 # Check if our attachment tool is available
-                if "result" in response and "capabilities" in response["result"]:
+                if (
+                    "result" in response
+                    and "capabilities" in response["result"]
+                ):
                     capabilities = response["result"]["capabilities"]
                     if "tools" in capabilities:
                         print("✅ MCP server initialized successfully!")
@@ -98,7 +104,10 @@ def test_mcp_docker():
             print("📥 Tools response:")
             try:
                 tools_response = json.loads(tools_response_line.strip())
-                if "result" in tools_response and "tools" in tools_response["result"]:
+                if (
+                    "result" in tools_response
+                    and "tools" in tools_response["result"]
+                ):
                     tools = tools_response["result"]["tools"]
                     print(f"✅ Found {len(tools)} tools")
 
@@ -115,11 +124,16 @@ def test_mcp_docker():
                             f"   Description: {attachment_tool.get('description', 'N/A')}"
                         )
                         if "inputSchema" in attachment_tool:
-                            props = attachment_tool["inputSchema"].get("properties", {})
+                            props = attachment_tool["inputSchema"].get(
+                                "properties", {}
+                            )
                             print(f"   Parameters: {list(props.keys())}")
                     else:
                         print("❌ get_attachment_content tool not found")
-                        print("Available tools:", [t.get("name") for t in tools[:5]])
+                        print(
+                            "Available tools:",
+                            [t.get("name") for t in tools[:5]],
+                        )
                 else:
                     print("❌ No tools in response")
                     print(json.dumps(tools_response, indent=2))

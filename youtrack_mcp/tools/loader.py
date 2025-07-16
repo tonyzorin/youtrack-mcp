@@ -94,10 +94,12 @@ def load_all_tools() -> Dict[str, Callable]:
                     current_class = all_tool_definitions[tool_name].get(
                         "source_class", ""
                     )
-                    current_priority = TOOL_PRIORITY.get(current_class, {}).get(
+                    current_priority = TOOL_PRIORITY.get(
+                        current_class, {}
+                    ).get(tool_name, 10)
+                    new_priority = TOOL_PRIORITY.get(class_name, {}).get(
                         tool_name, 10
                     )
-                    new_priority = TOOL_PRIORITY.get(class_name, {}).get(tool_name, 10)
 
                     if new_priority > current_priority:
                         definition["source_class"] = class_name
@@ -144,7 +146,9 @@ def load_all_tools() -> Dict[str, Callable]:
                 f"Tool {name} exists in multiple classes: {', '.join(sources)}"
             )
             # Get the highest priority source
-            highest_priority_source = max(tool_priorities[name], key=lambda x: x[1])
+            highest_priority_source = max(
+                tool_priorities[name], key=lambda x: x[1]
+            )
             logger.info(
                 f"Will use {name} from {highest_priority_source[0]} (priority {highest_priority_source[1]})"
             )
@@ -156,7 +160,9 @@ def load_all_tools() -> Dict[str, Callable]:
     for name, priorities in tool_priorities.items():
         if len(priorities) > 1:
             # Sort by priority (highest first)
-            sorted_priorities = sorted(priorities, key=lambda x: x[1], reverse=True)
+            sorted_priorities = sorted(
+                priorities, key=lambda x: x[1], reverse=True
+            )
             highest_class_name = sorted_priorities[0][0]
 
             # Find the class instance with this name
@@ -185,7 +191,10 @@ def load_all_tools() -> Dict[str, Callable]:
 
         for name, method in class_tools.items():
             # Skip internal methods or already registered tools
-            if name in ["close", "get_tool_definitions"] or name in registered_tools:
+            if (
+                name in ["close", "get_tool_definitions"]
+                or name in registered_tools
+            ):
                 continue
 
             # Create a properly bound wrapper for the method

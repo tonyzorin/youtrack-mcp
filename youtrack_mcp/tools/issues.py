@@ -4,7 +4,7 @@ YouTrack Issue MCP tools.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.issues import IssuesClient
@@ -47,7 +47,9 @@ class IssueTools:
                 and raw_issue.get("$type") == "Issue"
                 and "summary" not in raw_issue
             ):
-                raw_issue["summary"] = f"Issue {issue_id}"  # Provide a default summary
+                raw_issue["summary"] = (
+                    f"Issue {issue_id}"  # Provide a default summary
+                )
 
             # Return the raw issue data directly - avoid model validation issues
             return format_json_response(raw_issue)
@@ -107,9 +109,13 @@ class IssueTools:
 
             # Validate required parameters
             if not project:
-                return format_json_response({"error": "Project is required", "status": "error"})
+                return format_json_response(
+                    {"error": "Project is required", "status": "error"}
+                )
             if not summary:
-                return format_json_response({"error": "Summary is required", "status": "error"})
+                return format_json_response(
+                    {"error": "Summary is required", "status": "error"}
+                )
 
             # Check if project is a project ID or short name
             project_id = project
@@ -135,14 +141,19 @@ class IssueTools:
                 except Exception as e:
                     logger.warning(f"Error finding project: {str(e)}")
                     return json.dumps(
-                        {"error": f"Error finding project: {str(e)}", "status": "error"}
+                        {
+                            "error": f"Error finding project: {str(e)}",
+                            "status": "error",
+                        }
                     )
 
             logger.info(f"Creating issue in project {project_id}: {summary}")
 
             # Call the API client to create the issue
             try:
-                issue = self.issues_api.create_issue(project_id, summary, description)
+                issue = self.issues_api.create_issue(
+                    project_id, summary, description
+                )
 
                 # Check if we got an issue with an ID
                 if isinstance(issue, dict) and issue.get("error"):
@@ -157,11 +168,15 @@ class IssueTools:
                         detailed_issue = self.issues_api.get_issue(issue_id)
 
                         if hasattr(detailed_issue, "model_dump"):
-                            return format_json_response(detailed_issue.model_dump())
+                            return format_json_response(
+                                detailed_issue.model_dump()
+                            )
                         else:
                             return format_json_response(detailed_issue)
                     except Exception as e:
-                        logger.warning(f"Could not retrieve detailed issue: {str(e)}")
+                        logger.warning(
+                            f"Could not retrieve detailed issue: {str(e)}"
+                        )
                 if hasattr(issue, "model_dump"):
                     return format_json_response(issue.model_dump())
                 else:
@@ -175,10 +190,12 @@ class IssueTools:
                             "utf-8", errors="replace"
                         )
                         error_msg = f"{error_msg} - {error_content}"
-                    except:
+                    except Exception:
                         pass
                 logger.error(f"API error creating issue: {error_msg}")
-                return format_json_response({"error": error_msg, "status": "error"})
+                return format_json_response(
+                    {"error": error_msg, "status": "error"}
+                )
 
         except Exception as e:
             logger.exception(f"Error creating issue in project {project}")
@@ -262,8 +279,8 @@ class IssueTools:
                 "description": 'Link two YouTrack issues together with a specified relationship. Example: link_issues(source_issue_id="SP-123", target_issue_id="SP-456", link_type="Relates")',
                 "parameter_descriptions": {
                     "source_issue_id": "Source issue ID like 'SP-123'",
-                    "target_issue_id": "Target issue ID like 'SP-456'", 
-                    "link_type": "Type of link like 'Relates', 'Duplicates', 'Depends on'"
+                    "target_issue_id": "Target issue ID like 'SP-456'",
+                    "link_type": "Type of link like 'Relates', 'Duplicates', 'Depends on'",
                 },
             },
             "get_issue_links": {
@@ -273,7 +290,7 @@ class IssueTools:
                 },
             },
             "get_available_link_types": {
-                "description": 'Get all available issue link types that can be used to connect issues. Example: get_available_link_types()',
+                "description": "Get all available issue link types that can be used to connect issues. Example: get_available_link_types()",
                 "parameter_descriptions": {},
             },
             "update_issue": {
@@ -282,35 +299,35 @@ class IssueTools:
                     "issue_id": "Issue identifier like 'DEMO-123'",
                     "summary": "New issue title/summary (optional)",
                     "description": "New issue description (optional)",
-                    "additional_fields": "Dictionary of additional custom fields to update (optional)"
+                    "additional_fields": "Dictionary of additional custom fields to update (optional)",
                 },
             },
             "add_dependency": {
                 "description": 'Create a dependency relationship where one issue depends on another. Example: add_dependency(dependent_issue_id="DEMO-123", dependency_issue_id="DEMO-456")',
                 "parameter_descriptions": {
                     "dependent_issue_id": "Issue that depends on another (e.g. 'DEMO-123')",
-                    "dependency_issue_id": "Issue that is depended upon (e.g. 'DEMO-456')"
+                    "dependency_issue_id": "Issue that is depended upon (e.g. 'DEMO-456')",
                 },
             },
             "remove_dependency": {
                 "description": 'Remove a dependency relationship between two issues. Example: remove_dependency(dependent_issue_id="DEMO-123", dependency_issue_id="DEMO-456")',
                 "parameter_descriptions": {
                     "dependent_issue_id": "Issue that depends on another (e.g. 'DEMO-123')",
-                    "dependency_issue_id": "Issue that is depended upon (e.g. 'DEMO-456')"
+                    "dependency_issue_id": "Issue that is depended upon (e.g. 'DEMO-456')",
                 },
             },
             "add_relates_link": {
                 "description": 'Add a general "Relates" relationship between two issues. Example: add_relates_link(source_issue_id="DEMO-123", target_issue_id="DEMO-456")',
                 "parameter_descriptions": {
                     "source_issue_id": "Source issue identifier (e.g. 'DEMO-123')",
-                    "target_issue_id": "Target issue identifier (e.g. 'DEMO-456')"
+                    "target_issue_id": "Target issue identifier (e.g. 'DEMO-456')",
                 },
             },
             "add_duplicate_link": {
                 "description": 'Mark one issue as a duplicate of another. Example: add_duplicate_link(duplicate_issue_id="DEMO-123", original_issue_id="DEMO-456")',
                 "parameter_descriptions": {
                     "duplicate_issue_id": "Issue that is a duplicate (e.g. 'DEMO-123')",
-                    "original_issue_id": "Original issue (e.g. 'DEMO-456')"
+                    "original_issue_id": "Original issue (e.g. 'DEMO-456')",
                 },
             },
         }
@@ -350,7 +367,9 @@ class IssueTools:
         try:
             import base64
 
-            content = self.issues_api.get_attachment_content(issue_id, attachment_id)
+            content = self.issues_api.get_attachment_content(
+                issue_id, attachment_id
+            )
             encoded_content = base64.b64encode(content).decode("utf-8")
 
             # Get attachment metadata for additional info
@@ -371,7 +390,9 @@ class IssueTools:
                     "size_bytes_original": len(content),
                     "size_bytes_base64": len(encoded_content),
                     "filename": (
-                        attachment_metadata.get("name") if attachment_metadata else None
+                        attachment_metadata.get("name")
+                        if attachment_metadata
+                        else None
                     ),
                     "mime_type": (
                         attachment_metadata.get("mimeType")
@@ -391,37 +412,43 @@ class IssueTools:
             return format_json_response({"error": str(e), "status": "error"})
 
     @sync_wrapper
-    def link_issues(self, source_issue_id: str, target_issue_id: str, link_type: str) -> str:
+    def link_issues(
+        self, source_issue_id: str, target_issue_id: str, link_type: str
+    ) -> str:
         """
         Link two issues together.
-        
+
         FORMAT: link_issues(source_issue_id="SP-123", target_issue_id="SP-456", link_type="Relates")
-        
+
         Args:
             source_issue_id: The ID of the source issue (e.g., 'SP-123')
             target_issue_id: The ID of the target issue (e.g., 'SP-456')
             link_type: The type of link (e.g., 'Relates', 'Duplicates', 'Depends on')
-            
+
         Returns:
             JSON string with the created link data
         """
         try:
-            result = self.issues_api.link_issues(source_issue_id, target_issue_id, link_type)
+            result = self.issues_api.link_issues(
+                source_issue_id, target_issue_id, link_type
+            )
             return format_json_response(result)
         except Exception as e:
-            logger.exception(f"Error linking issues {source_issue_id} -> {target_issue_id}")
+            logger.exception(
+                f"Error linking issues {source_issue_id} -> {target_issue_id}"
+            )
             return format_json_response({"error": str(e), "status": "error"})
 
-    @sync_wrapper  
+    @sync_wrapper
     def get_issue_links(self, issue_id: str) -> str:
         """
         Get all links for an issue.
-        
+
         FORMAT: get_issue_links(issue_id="SP-123")
-        
+
         Args:
             issue_id: The ID of the issue (e.g., 'SP-123')
-            
+
         Returns:
             JSON string containing inward and outward issue links
         """
@@ -436,9 +463,9 @@ class IssueTools:
     def get_available_link_types(self) -> str:
         """
         Get all available issue link types.
-        
+
         FORMAT: get_available_link_types()
-        
+
         Returns:
             JSON string with list of available link types and their properties
         """
@@ -465,7 +492,7 @@ class IssueTools:
         Args:
             issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
             summary: The new issue summary/title (optional)
-            description: The new issue description (optional)  
+            description: The new issue description (optional)
             additional_fields: Additional fields to update as dict (optional)
 
         Returns:
@@ -476,12 +503,12 @@ class IssueTools:
                 issue_id=issue_id,
                 summary=summary,
                 description=description,
-                additional_fields=additional_fields
+                additional_fields=additional_fields,
             )
             # Convert Issue object to dict if needed
-            if hasattr(result, 'model_dump'):
+            if hasattr(result, "model_dump"):
                 result = result.model_dump()
-            elif hasattr(result, '__dict__'):
+            elif hasattr(result, "__dict__"):
                 result = result.__dict__
             return format_json_response(result)
         except Exception as e:
@@ -489,7 +516,9 @@ class IssueTools:
             return format_json_response({"error": str(e), "status": "error"})
 
     @sync_wrapper
-    def add_dependency(self, dependent_issue_id: str, dependency_issue_id: str) -> str:
+    def add_dependency(
+        self, dependent_issue_id: str, dependency_issue_id: str
+    ) -> str:
         """
         Add a dependency relationship where one issue depends on another.
 
@@ -503,14 +532,20 @@ class IssueTools:
             JSON string with the result of creating the dependency link
         """
         try:
-            result = self.link_issues(dependent_issue_id, dependency_issue_id, "Depends on")
+            result = self.link_issues(
+                dependent_issue_id, dependency_issue_id, "Depends on"
+            )
             return result
         except Exception as e:
-            logger.exception(f"Error adding dependency between {dependent_issue_id} and {dependency_issue_id}")
+            logger.exception(
+                f"Error adding dependency between {dependent_issue_id} and {dependency_issue_id}"
+            )
             return format_json_response({"error": str(e), "status": "error"})
 
     @sync_wrapper
-    def remove_dependency(self, dependent_issue_id: str, dependency_issue_id: str) -> str:
+    def remove_dependency(
+        self, dependent_issue_id: str, dependency_issue_id: str
+    ) -> str:
         """
         Remove a dependency relationship between two issues.
 
@@ -527,29 +562,45 @@ class IssueTools:
             # For removing links, we need to use a different approach
             # This would typically involve getting the link ID and deleting it
             # For now, we'll use a command approach
-            command = f"unlink {dependency_issue_id} depends on"
+            # Get internal IDs for Commands API (same approach as link_issues)
+            dependent_internal_id = self.issues_api._get_internal_id(
+                dependent_issue_id
+            )
             
+            # Get readable ID for command text (Commands API expects readable IDs)
+            dependency_readable_id = self.issues_api._get_readable_id(
+                dependency_issue_id
+            )
+
+            command = f"remove depends on {dependency_readable_id}"
+
             command_data = {
                 "query": command,
-                "issues": [{"id": dependent_issue_id}]
+                "issues": [{"id": dependent_internal_id}],
             }
-            
+
             response = self.client.post("commands", data=command_data)
-            
+
             if isinstance(response, dict):
-                return format_json_response({
-                    "status": "success",
-                    "message": f"Successfully removed dependency between {dependent_issue_id} and {dependency_issue_id}",
-                    "command": command
-                })
-            
+                return format_json_response(
+                    {
+                        "status": "success",
+                        "message": f"Successfully removed dependency between {dependent_issue_id} and {dependency_issue_id}",
+                        "command": command,
+                    }
+                )
+
             return format_json_response(response)
         except Exception as e:
-            logger.exception(f"Error removing dependency between {dependent_issue_id} and {dependency_issue_id}")
+            logger.exception(
+                f"Error removing dependency between {dependent_issue_id} and {dependency_issue_id}"
+            )
             return format_json_response({"error": str(e), "status": "error"})
 
     @sync_wrapper
-    def add_relates_link(self, source_issue_id: str, target_issue_id: str) -> str:
+    def add_relates_link(
+        self, source_issue_id: str, target_issue_id: str
+    ) -> str:
         """
         Add a 'Relates' relationship between two issues.
 
@@ -563,14 +614,20 @@ class IssueTools:
             JSON string with the result of creating the relates link
         """
         try:
-            result = self.link_issues(source_issue_id, target_issue_id, "Relates")
+            result = self.link_issues(
+                source_issue_id, target_issue_id, "Relates"
+            )
             return result
         except Exception as e:
-            logger.exception(f"Error adding relates link between {source_issue_id} and {target_issue_id}")
+            logger.exception(
+                f"Error adding relates link between {source_issue_id} and {target_issue_id}"
+            )
             return format_json_response({"error": str(e), "status": "error"})
 
     @sync_wrapper
-    def add_duplicate_link(self, duplicate_issue_id: str, original_issue_id: str) -> str:
+    def add_duplicate_link(
+        self, duplicate_issue_id: str, original_issue_id: str
+    ) -> str:
         """
         Mark one issue as a duplicate of another.
 
@@ -584,8 +641,12 @@ class IssueTools:
             JSON string with the result of creating the duplicate link
         """
         try:
-            result = self.link_issues(duplicate_issue_id, original_issue_id, "Duplicates")
+            result = self.link_issues(
+                duplicate_issue_id, original_issue_id, "Duplicates"
+            )
             return result
         except Exception as e:
-            logger.exception(f"Error adding duplicate link between {duplicate_issue_id} and {original_issue_id}")
+            logger.exception(
+                f"Error adding duplicate link between {duplicate_issue_id} and {original_issue_id}"
+            )
             return format_json_response({"error": str(e), "status": "error"})

@@ -1,6 +1,9 @@
-import json
+"""
+YouTrack User MCP tools.
+"""
+
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.users import UsersClient
@@ -69,7 +72,7 @@ class UserTools:
                 result = user_obj  # Assume it's already a dict
             return format_json_response(result)
         except Exception as e:
-            logger.exception(f"Error getting user {identifier}")
+            logger.exception(f"Error getting user {user_login}")
             return format_json_response({"error": str(e)})
 
     @sync_wrapper
@@ -103,23 +106,47 @@ class UserTools:
             return format_json_response({"error": str(e)})
 
     @sync_wrapper
-    def get_user_permissions(self, user_id: str) -> str:
+    def get_user_permissions(self, user_id: str = None) -> str:
         """
         Get permissions for a specific user.
 
-        FORMAT: get_user_permissions(user_id="admin")
+        FORMAT: get_user_permissions(user_id="admin") or get_user_permissions() for current user
 
         Args:
-            user_id: The user identifier (ID like 'user-123' or login like 'admin')
+            user_id: The user identifier (ID like 'user-123' or login like 'admin'). 
+                    If not provided, gets permissions for current user.
 
         Returns:
             JSON string with user permissions
         """
         try:
+            # If no user_id provided, get current user
             if not user_id:
-                return format_json_response({"error": "User ID is required"})
+                current_user = self.users_api.get_current_user()
+                if hasattr(current_user, 'id'):
+                    user_id = current_user.id
+                elif hasattr(current_user, 'login'):
+                    user_id = current_user.login
+                else:
+                    user_id = str(current_user)
 
-            permissions = self.users_api.get_user_permissions(user_id)
+            # Get user details which may include permission info
+            user_details = self.users_api.get_user(user_id)
+            
+            # Convert User object to dictionary for JSON serialization
+            if hasattr(user_details, 'model_dump'):
+                user_details_dict = user_details.model_dump()
+            elif hasattr(user_details, '__dict__'):
+                user_details_dict = user_details.__dict__
+            else:
+                user_details_dict = str(user_details)
+            
+            # Try to get available permission info from user details
+            permissions = {
+                "user_id": user_id,
+                "user_details": user_details_dict,
+                "note": "User permissions shown through user details. Full group permissions API not available in YouTrack Cloud."
+            }
             return format_json_response(permissions)
         except Exception as e:
             logger.exception(f"Error getting permissions for user {user_id}")

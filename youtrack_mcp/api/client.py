@@ -4,12 +4,12 @@ Base client for YouTrack REST API.
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 import json
 import random
 
 import requests
-from pydantic import BaseModel, Field, model_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 from youtrack_mcp.config import config
 
@@ -100,7 +100,9 @@ class YouTrackClient:
         """
         self.base_url = base_url or config.get_base_url()
         self.api_token = api_token if api_token else config.get_api_token()
-        self.verify_ssl = verify_ssl if verify_ssl is not None else config.VERIFY_SSL
+        self.verify_ssl = (
+            verify_ssl if verify_ssl is not None else config.VERIFY_SSL
+        )
         self.max_retries = max_retries
         self.retry_delay = retry_delay
 
@@ -124,7 +126,9 @@ class YouTrackClient:
             # Use the custom SSL context
             self.session.verify = False
             # Suppress insecure request warnings
-            from requests.packages.urllib3.exceptions import InsecureRequestWarning
+            from requests.packages.urllib3.exceptions import (
+                InsecureRequestWarning,
+            )
 
             requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -176,7 +180,9 @@ class YouTrackClient:
                     f"Non-JSON response received from API: {response.content[:100]}"
                 )
                 return {
-                    "raw_content": response.content.decode("utf-8", errors="replace")
+                    "raw_content": response.content.decode(
+                        "utf-8", errors="replace"
+                    )
                 }
 
         # Handle error responses
@@ -207,7 +213,9 @@ class YouTrackClient:
         else:
             raise YouTrackAPIError(error_message, status_code, response)
 
-    def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+    def _make_request(
+        self, method: str, endpoint: str, **kwargs
+    ) -> Dict[str, Any]:
         """
         Make API request with retry logic for transient errors.
 
@@ -229,7 +237,9 @@ class YouTrackClient:
 
         # For debugging purposes, log essential request details
         if "json" in kwargs:
-            logger.debug(f"{method} {url} with JSON: {json.dumps(kwargs['json'])}")
+            logger.debug(
+                f"{method} {url} with JSON: {json.dumps(kwargs['json'])}"
+            )
         elif "data" in kwargs:
             logger.debug(f"{method} {url} with data: {kwargs['data']}")
         else:
@@ -250,7 +260,9 @@ class YouTrackClient:
 
                 # Calculate backoff delay (exponential with jitter)
                 backoff = delay * (2**retries) * (0.5 + 0.5 * random.random())
-                logger.warning(f"Transient error, retrying in {backoff:.2f}s: {str(e)}")
+                logger.warning(
+                    f"Transient error, retrying in {backoff:.2f}s: {str(e)}"
+                )
                 time.sleep(backoff)
             except YouTrackAPIError as e:
                 # Non-transient errors
@@ -261,12 +273,14 @@ class YouTrackClient:
                             "utf-8", errors="replace"
                         )
                         logger.error(f"Response content: {error_content}")
-                    except:
+                    except Exception:
                         pass
                 raise
             except Exception as e:
                 # Unexpected errors
-                logger.exception(f"Unexpected error for {method} {url}: {str(e)}")
+                logger.exception(
+                    f"Unexpected error for {method} {url}: {str(e)}"
+                )
                 raise YouTrackAPIError(f"Unexpected error: {str(e)}")
 
         # If we got here, we've exceeded retries
@@ -320,7 +334,9 @@ class YouTrackClient:
             # YouTrack API usually expects data as JSON
             return self._make_request("POST", endpoint, json=data, **kwargs)
 
-        return self._make_request("POST", endpoint, data=data, json=json_data, **kwargs)
+        return self._make_request(
+            "POST", endpoint, data=data, json=json_data, **kwargs
+        )
 
     def put(
         self,
@@ -341,7 +357,9 @@ class YouTrackClient:
         Returns:
             Parsed JSON response
         """
-        return self._make_request("PUT", endpoint, data=data, json=json_data, **kwargs)
+        return self._make_request(
+            "PUT", endpoint, data=data, json=json_data, **kwargs
+        )
 
     def delete(self, endpoint: str, **kwargs) -> Dict[str, Any]:
         """

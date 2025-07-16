@@ -31,7 +31,11 @@ def create_project_direct(
         client = YouTrackClient()
         projects_api = ProjectsClient(client)
 
-        data = {"name": name, "shortName": short_name, "leader": {"id": lead_id}}
+        data = {
+            "name": name,
+            "shortName": short_name,
+            "leader": {"id": lead_id},
+        }
 
         if description:
             data["description"] = description

@@ -1,14 +1,10 @@
 """
-YouTrack MCP Resources implementation.
-
-This module implements the Model Context Protocol (MCP) resources for YouTrack.
-Resources expose data and content from YouTrack to LLMs through a URI-based system.
+YouTrack Resources MCP tools for listing projects, users, and other resources.
 """
 
 import json
 import logging
-import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict
 from urllib.parse import parse_qs, urlparse
 
 from youtrack_mcp.api.client import YouTrackClient
@@ -123,7 +119,9 @@ class ResourcesTools:
                 projects = self.projects_api.get_projects()
                 for project in projects:
                     project_id = (
-                        project.id if hasattr(project, "id") else project.get("id")
+                        project.id
+                        if hasattr(project, "id")
+                        else project.get("id")
                     )
                     project_name = (
                         project.name
@@ -145,7 +143,9 @@ class ResourcesTools:
             except Exception as e:
                 logger.warning(f"Could not fetch projects for resources: {e}")
 
-            return json.dumps({"resources": resources, "resourceTemplates": templates})
+            return json.dumps(
+                {"resources": resources, "resourceTemplates": templates}
+            )
         except Exception as e:
             logger.exception("Error listing resources")
             return json.dumps({"error": str(e)})
@@ -173,15 +173,21 @@ class ResourcesTools:
                     }
                 )
 
-            # Extract path components
-            path = parsed.path.strip("/").split("/")
+            # Extract path components - handle netloc as path for youtrack://projects format
+            raw_path = parsed.path
+            if not parsed.path and parsed.netloc:
+                # For youtrack://projects, netloc contains the resource type
+                path = [parsed.netloc]
+            else:
+                # For youtrack://issues/3-41, path contains the full path
+                path = parsed.path.strip("/").split("/") if parsed.path.strip("/") else []
 
             # Process query parameters
             query_params = parse_qs(parsed.query)
 
             # Log the parsed URI components for debugging
-            logger.debug(
-                f"Parsed URI: scheme={parsed.scheme}, path={path}, query={query_params}"
+            logger.info(
+                f"Parsed URI: scheme={parsed.scheme}, raw_path='{raw_path}', path={path}, query={query_params}, path_length={len(path)}"
             )
 
             # Handle different resource types based on path
@@ -227,7 +233,9 @@ class ResourcesTools:
                         )
                         # Fall back to direct API call
                         try:
-                            comments = self.client.get(f"issues/{issue_id}/comments")
+                            comments = self.client.get(
+                                f"issues/{issue_id}/comments"
+                            )
                             return json.dumps(
                                 {
                                     "contents": [
@@ -251,7 +259,9 @@ class ResourcesTools:
             return json.dumps({"error": f"Unknown resource URI: {uri}"})
         except Exception as e:
             logger.exception(f"Error reading resource: {uri}")
-            return json.dumps({"error": f"Error processing resource {uri}: {str(e)}"})
+            return json.dumps(
+                {"error": f"Error processing resource {uri}: {str(e)}"}
+            )
 
     @sync_wrapper
     def subscribe_resource(self, uri: str) -> str:
@@ -299,6 +309,18 @@ class ResourcesTools:
         try:
             # Fetch projects using the API client
             result = self.projects_api.get_projects()
+            
+            # Convert Project objects to dictionaries for JSON serialization
+            if isinstance(result, list):
+                serializable_result = []
+                for project in result:
+                    if hasattr(project, 'model_dump'):
+                        serializable_result.append(project.model_dump())
+                    elif hasattr(project, '__dict__'):
+                        serializable_result.append(project.__dict__)
+                    else:
+                        serializable_result.append(str(project))
+                result = serializable_result
 
             return json.dumps(
                 {
@@ -399,7 +421,9 @@ class ResourcesTools:
                 else:
                     issue_data = issue
             except Exception as api_error:
-                logger.warning(f"Error retrieving issue with issues_api: {api_error}")
+                logger.warning(
+                    f"Error retrieving issue with issues_api: {api_error}"
+                )
 
                 # Fall back to direct API call
                 try:
@@ -422,7 +446,9 @@ class ResourcesTools:
                 {
                     "contents": [
                         {
-                            "uri": URI_TEMPLATES["issue"].format(issue_id=issue_id),
+                            "uri": URI_TEMPLATES["issue"].format(
+                                issue_id=issue_id
+                            ),
                             "mimeType": "application/json",
                             "text": json.dumps(issue_data),
                         }
@@ -436,7 +462,7 @@ class ResourcesTools:
     def get_issue_comments(self, issue_id: str) -> str:
         """
         Get comments for a specific issue as a resource.
-        
+
         FORMAT: get_issue_comments(issue_id="DEMO-123")
         """
         try:
@@ -517,7 +543,9 @@ class ResourcesTools:
                 {
                     "contents": [
                         {
-                            "uri": URI_TEMPLATES["user"].format(user_id=user_id),
+                            "uri": URI_TEMPLATES["user"].format(
+                                user_id=user_id
+                            ),
                             "mimeType": "application/json",
                             "text": json.dumps(user),
                         }
@@ -531,7 +559,9 @@ class ResourcesTools:
     def search_issues(self, query: str) -> str:
         """Search issues as a resource."""
         try:
-            results = self.client.get("issues", params={"query": query, "$top": 100})
+            results = self.client.get(
+                "issues", params={"query": query, "$top": 100}
+            )
 
             return json.dumps(
                 {
@@ -588,7 +618,7 @@ class ResourcesTools:
                 },
             },
             "get_issue_comments": {
-                "description": "Get all comments for a specific YouTrack issue with author information and timestamps. Example: get_issue_comments(issue_id=\"DEMO-123\")",
+                "description": 'Get all comments for a specific YouTrack issue with author information and timestamps. Example: get_issue_comments(issue_id="DEMO-123")',
                 "parameter_descriptions": {
                     "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'"
                 },
@@ -615,7 +645,9 @@ class ResourcesTools:
             },
             "get_user": {
                 "description": "Get a specific user as a resource.",
-                "parameter_descriptions": {"user_id": "The user ID (e.g., '1-1')"},
+                "parameter_descriptions": {
+                    "user_id": "The user ID (e.g., '1-1')"
+                },
             },
             "search_issues": {
                 "description": "Search issues as a resource.",

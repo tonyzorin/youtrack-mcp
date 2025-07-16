@@ -218,7 +218,9 @@ class TestCreateProjectTool:
     ):
         """Test error handling when client initialization fails."""
         # Mock client initialization error
-        mock_youtrack_client.side_effect = Exception("Failed to initialize client")
+        mock_youtrack_client.side_effect = Exception(
+            "Failed to initialize client"
+        )
 
         # This reveals a bug in the implementation - UnboundLocalError in finally block
         # when client initialization fails
@@ -284,7 +286,9 @@ class TestCreateProjectTool:
         assert parsed_result == complex_response
 
         # Verify it's nicely formatted (indented)
-        assert "\n" in result  # Should contain newlines from json.dumps(indent=2)
+        assert (
+            "\n" in result
+        )  # Should contain newlines from json.dumps(indent=2)
 
     @pytest.mark.unit
     @patch("youtrack_mcp.tools.create_project_tool.YouTrackClient")
@@ -318,7 +322,9 @@ class TestCreateProjectTool:
         for name, short_name, lead_id, description in test_cases:
             mock_client_instance.reset_mock()
 
-            result = create_project_direct(name, short_name, lead_id, description)
+            result = create_project_direct(
+                name, short_name, lead_id, description
+            )
 
             # Should not raise exceptions
             parsed_result = json.loads(result)

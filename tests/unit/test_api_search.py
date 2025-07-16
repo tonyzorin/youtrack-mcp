@@ -93,7 +93,9 @@ class TestSearchClient:
         assert "customFields" in fields
 
     @pytest.mark.unit
-    def test_search_issues_with_invalid_sort_order(self, search_client, mock_client):
+    def test_search_issues_with_invalid_sort_order(
+        self, search_client, mock_client
+    ):
         """Test issue search with invalid sort order."""
         mock_client.get.return_value = []
 
@@ -121,12 +123,20 @@ class TestSearchClient:
         fields = params["fields"]
 
         # Check that default fields are present
-        default_fields = ["id", "idReadable", "summary", "description", "created"]
+        default_fields = [
+            "id",
+            "idReadable",
+            "summary",
+            "description",
+            "created",
+        ]
         for field in default_fields:
             assert field in fields
 
     @pytest.mark.unit
-    def test_search_with_custom_field_values_string(self, search_client, mock_client):
+    def test_search_with_custom_field_values_string(
+        self, search_client, mock_client
+    ):
         """Test search with string custom field values."""
         mock_client.get.return_value = []
 
@@ -134,7 +144,10 @@ class TestSearchClient:
         with patch.object(search_client, "search_issues") as mock_search:
             search_client.search_with_custom_field_values(
                 query="project: TEST",
-                custom_field_values={"Sprint": "Sprint 1", "Component": "Backend"},
+                custom_field_values={
+                    "Sprint": "Sprint 1",
+                    "Component": "Backend",
+                },
                 limit=5,
             )
 
@@ -148,7 +161,9 @@ class TestSearchClient:
             assert call_args[1]["limit"] == 5
 
     @pytest.mark.unit
-    def test_search_with_custom_field_values_boolean(self, search_client, mock_client):
+    def test_search_with_custom_field_values_boolean(
+        self, search_client, mock_client
+    ):
         """Test search with boolean custom field values."""
         with patch.object(search_client, "search_issues") as mock_search:
             search_client.search_with_custom_field_values(
@@ -163,7 +178,9 @@ class TestSearchClient:
             assert "IsArchived: false" in enhanced_query
 
     @pytest.mark.unit
-    def test_search_with_custom_field_values_numeric(self, search_client, mock_client):
+    def test_search_with_custom_field_values_numeric(
+        self, search_client, mock_client
+    ):
         """Test search with numeric custom field values."""
         with patch.object(search_client, "search_issues") as mock_search:
             search_client.search_with_custom_field_values(
@@ -178,7 +195,9 @@ class TestSearchClient:
             assert "Priority: 1.5" in enhanced_query
 
     @pytest.mark.unit
-    def test_search_with_custom_field_values_list(self, search_client, mock_client):
+    def test_search_with_custom_field_values_list(
+        self, search_client, mock_client
+    ):
         """Test search with list custom field values."""
         with patch.object(search_client, "search_issues") as mock_search:
             search_client.search_with_custom_field_values(
@@ -214,7 +233,9 @@ class TestSearchClient:
             assert 'Labels in ("bug")' in enhanced_query
 
     @pytest.mark.unit
-    def test_search_with_filter_all_parameters(self, search_client, mock_client):
+    def test_search_with_filter_all_parameters(
+        self, search_client, mock_client
+    ):
         """Test structured filter search with all parameters."""
         with patch.object(search_client, "search_issues") as mock_search:
             search_client.search_with_filter(
@@ -260,7 +281,9 @@ class TestSearchClient:
             assert "assignee: Unassigned" in query
 
     @pytest.mark.unit
-    def test_search_with_filter_custom_fields(self, search_client, mock_client):
+    def test_search_with_filter_custom_fields(
+        self, search_client, mock_client
+    ):
         """Test filter search with custom fields."""
         with patch.object(
             search_client, "search_with_custom_field_values"

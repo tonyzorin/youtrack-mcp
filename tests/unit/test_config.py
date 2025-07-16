@@ -30,12 +30,16 @@ class TestConfig:
         # Reset to defaults
         Config.YOUTRACK_URL = os.getenv("YOUTRACK_URL", "")
         Config.YOUTRACK_API_TOKEN = os.getenv("YOUTRACK_API_TOKEN", "")
-        Config.YOUTRACK_CLOUD = os.getenv("YOUTRACK_CLOUD", "false").lower() in (
+        Config.YOUTRACK_CLOUD = os.getenv(
+            "YOUTRACK_CLOUD", "false"
+        ).lower() in (
             "true",
             "1",
             "yes",
         )
-        Config.VERIFY_SSL = os.getenv("YOUTRACK_VERIFY_SSL", "true").lower() in (
+        Config.VERIFY_SSL = os.getenv(
+            "YOUTRACK_VERIFY_SSL", "true"
+        ).lower() in (
             "true",
             "1",
             "yes",
@@ -117,7 +121,8 @@ class TestConfig:
         Config.YOUTRACK_CLOUD = False
 
         with pytest.raises(
-            ValueError, match="YouTrack URL is required for self-hosted instances"
+            ValueError,
+            match="YouTrack URL is required for self-hosted instances",
         ):
             Config.validate()
 
@@ -226,7 +231,8 @@ class TestConfig:
         Config.YOUTRACK_API_TOKEN = "perm-base64.base64.hash"
 
         with patch.dict(
-            os.environ, {"YOUTRACK_URL": "https://env-workspace.youtrack.cloud"}
+            os.environ,
+            {"YOUTRACK_URL": "https://env-workspace.youtrack.cloud"},
         ):
             result = Config.get_base_url()
 
@@ -239,7 +245,9 @@ class TestConfig:
         Config.YOUTRACK_CLOUD = True
         Config.YOUTRACK_API_TOKEN = "invalid-token-format"
 
-        with pytest.raises(ValueError, match="Could not determine YouTrack Cloud URL"):
+        with pytest.raises(
+            ValueError, match="Could not determine YouTrack Cloud URL"
+        ):
             Config.get_base_url()
 
     @pytest.mark.unit
@@ -342,7 +350,9 @@ class TestComplexScenarios:
         Config.YOUTRACK_CLOUD = True
         Config.YOUTRACK_API_TOKEN = "perm:invalid"
 
-        with pytest.raises(ValueError, match="Could not determine YouTrack Cloud URL"):
+        with pytest.raises(
+            ValueError, match="Could not determine YouTrack Cloud URL"
+        ):
             Config.get_base_url()
 
     @pytest.mark.unit
@@ -352,14 +362,18 @@ class TestComplexScenarios:
         Config.YOUTRACK_CLOUD = True
         Config.YOUTRACK_API_TOKEN = "regular.token.format"
 
-        with pytest.raises(ValueError, match="Could not determine YouTrack Cloud URL"):
+        with pytest.raises(
+            ValueError, match="Could not determine YouTrack Cloud URL"
+        ):
             Config.get_base_url()
 
     @pytest.mark.unit
     def test_url_takes_precedence_over_cloud_detection(self):
         """Test that explicit URL takes precedence over cloud auto-detection."""
         Config.YOUTRACK_URL = "https://my-server.com/youtrack"
-        Config.YOUTRACK_CLOUD = True  # Even with cloud=True, URL should be used
+        Config.YOUTRACK_CLOUD = (
+            True  # Even with cloud=True, URL should be used
+        )
         Config.YOUTRACK_API_TOKEN = "perm:user.workspace.12345"
 
         result = Config.get_base_url()
@@ -441,7 +455,9 @@ class TestSpecialEdgeCases:
 
         # Test with invalid attribute (should be ignored)
         original_url = Config.YOUTRACK_URL
-        Config.from_dict({"INVALID_ATTR": "ignored", "YOUTRACK_URL": "new-test"})
+        Config.from_dict(
+            {"INVALID_ATTR": "ignored", "YOUTRACK_URL": "new-test"}
+        )
         assert Config.YOUTRACK_URL == "new-test"
         assert not hasattr(Config, "INVALID_ATTR")
 
@@ -498,7 +514,9 @@ class TestSpecialEdgeCases:
             assert result == "https://testws.youtrack.cloud/api"
 
         # Test perm- format with URL env (lines 130-132)
-        with patch.dict(os.environ, {"YOUTRACK_URL": "https://urlenv.youtrack.cloud"}):
+        with patch.dict(
+            os.environ, {"YOUTRACK_URL": "https://urlenv.youtrack.cloud"}
+        ):
             result = Config.get_base_url()
             assert result == "https://urlenv.youtrack.cloud/api"
 

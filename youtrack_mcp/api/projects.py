@@ -135,7 +135,9 @@ class ProjectsClient:
             )
             return issues
         except Exception as e:
-            logger.error(f"Error getting issues for project {project_id}: {str(e)}")
+            logger.error(
+                f"Error getting issues for project {project_id}: {str(e)}"
+            )
             # Return empty list on error
             return []
 
@@ -175,7 +177,9 @@ class ProjectsClient:
         # Debug logging
         logger = logging.getLogger(__name__)
         logger.info(f"Creating project with data: {json.dumps(data)}")
-        logger.info(f"Base URL: {self.client.base_url}, API endpoint: admin/projects")
+        logger.info(
+            f"Base URL: {self.client.base_url}, API endpoint: admin/projects"
+        )
 
         try:
             response = self.client.post("admin/projects", data=data)
@@ -192,7 +196,9 @@ class ProjectsClient:
                     )
                     return created_project
                 except Exception as e:
-                    logger.warning(f"Could not retrieve full project details: {str(e)}")
+                    logger.warning(
+                        f"Could not retrieve full project details: {str(e)}"
+                    )
                     # Fall back to creating a model with the available data
                     # We need to ensure shortName is present
                     if "shortName" not in response and short_name:
@@ -258,11 +264,15 @@ class ProjectsClient:
 
             # Make sure we have at least one parameter to update
             if not data:
-                logger.info("No parameters to update, returning current project data")
+                logger.info(
+                    "No parameters to update, returning current project data"
+                )
                 return self.get_project(project_id)
 
             logger.info(f"Updating project with data: {data}")
-            response = self.client.post(f"admin/projects/{project_id}", data=data)
+            response = self.client.post(
+                f"admin/projects/{project_id}", data=data
+            )
             logger.info(f"Update project response: {response}")
 
             # The API response might not contain all required fields,
@@ -278,7 +288,9 @@ class ProjectsClient:
                 logger.error(f"Error getting updated project: {str(e)}")
                 # If we can't get the updated project, create a partial project with the data we have
                 if isinstance(response, dict) and "id" in response:
-                    logger.info(f"Creating partial project from response: {response}")
+                    logger.info(
+                        f"Creating partial project from response: {response}"
+                    )
                     # Try to get the original project to fill in missing fields
                     try:
                         original_project = self.get_project(project_id)
@@ -289,7 +301,7 @@ class ProjectsClient:
                             else:
                                 setattr(original_project, key, value)
                         return original_project
-                    except:
+                    except Exception:
                         # If we can't get the original project either, just return the response
                         logger.warning(
                             f"Unable to get original project, returning response: {response}"
@@ -324,7 +336,10 @@ class ProjectsClient:
         return self.client.get(f"admin/projects/{project_id}/customFields")
 
     def add_custom_field(
-        self, project_id: str, field_id: str, empty_field_text: Optional[str] = None
+        self,
+        project_id: str,
+        field_id: str,
+        empty_field_text: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Add a custom field to a project.
@@ -342,4 +357,6 @@ class ProjectsClient:
         if empty_field_text:
             data["emptyFieldText"] = empty_field_text
 
-        return self.client.post(f"admin/projects/{project_id}/customFields", data=data)
+        return self.client.post(
+            f"admin/projects/{project_id}/customFields", data=data
+        )
