@@ -19,7 +19,7 @@ class UserTools:
 
     def close(self) -> None:
         """Close the user tools."""
-        if hasattr(self.client, 'close'):
+        if hasattr(self.client, "close"):
             self.client.close()
 
     @sync_wrapper
@@ -35,7 +35,7 @@ class UserTools:
         try:
             # Using 'me' endpoint to get current user info
             user = self.users_api.get_current_user()
-            if hasattr(user, 'model_dump'):
+            if hasattr(user, "model_dump"):
                 result = user.model_dump()
             else:
                 result = user  # Assume it's already a dict
@@ -45,27 +45,24 @@ class UserTools:
             return json.dumps({"error": str(e)})
 
     @sync_wrapper
-    def get_user_by_id(self, user_id: str = None, user: str = None) -> str:
+    def get_user_by_id(self, user_id: str) -> str:
         """
         Get information about a specific user by ID or login.
 
-        FORMAT: get_user_by_id(user_id="user-123") or get_user_by_id(user="username")
+        FORMAT: get_user_by_id(user_id="admin")
 
         Args:
-            user_id: The user ID (optional)
-            user: The user login/username (optional)
+            user_id: The user identifier (ID like 'user-123' or login like 'admin')
 
         Returns:
             JSON string with user information
         """
         try:
-            # Determine which parameter to use
-            identifier = user_id or user
-            if not identifier:
-                return json.dumps({"error": "Either user_id or user parameter is required"})
+            if not user_id:
+                return json.dumps({"error": "User ID is required"})
 
-            user_obj = self.users_api.get_user(identifier)
-            if hasattr(user_obj, 'model_dump'):
+            user_obj = self.users_api.get_user(user_id)
+            if hasattr(user_obj, "model_dump"):
                 result = user_obj.model_dump()
             else:
                 result = user_obj  # Assume it's already a dict
@@ -94,7 +91,7 @@ class UserTools:
             # Handle both Pydantic models and dictionaries in the response
             result = []
             for user in users:
-                if hasattr(user, 'model_dump'):
+                if hasattr(user, "model_dump"):
                     result.append(user.model_dump())
                 else:
                     result.append(user)  # Assume it's already a dict
@@ -105,64 +102,56 @@ class UserTools:
             return json.dumps({"error": str(e)})
 
     @sync_wrapper
-    def get_user_permissions(self, user_id: str = None, user: str = None) -> str:
+    def get_user_permissions(self, user_id: str) -> str:
         """
         Get permissions for a specific user.
 
-        FORMAT: get_user_permissions(user_id="user-123") or get_user_permissions(user="username")
+        FORMAT: get_user_permissions(user_id="admin")
 
         Args:
-            user_id: The user ID (optional)
-            user: The user login/username (optional)
+            user_id: The user identifier (ID like 'user-123' or login like 'admin')
 
         Returns:
             JSON string with user permissions
         """
         try:
-            # Determine which parameter to use
-            identifier = user_id or user
-            if not identifier:
-                return json.dumps({"error": "Either user_id or user parameter is required"})
+            if not user_id:
+                return json.dumps({"error": "User ID is required"})
 
-            permissions = self.users_api.get_user_permissions(identifier)
+            permissions = self.users_api.get_user_permissions(user_id)
             return json.dumps(permissions, indent=2)
         except Exception as e:
-            logger.exception(f"Error getting permissions for user {identifier}")
+            logger.exception(f"Error getting permissions for user {user_id}")
             return json.dumps({"error": str(e)})
 
     def get_tool_definitions(self) -> Dict[str, Dict[str, Any]]:
         """Get tool definitions with descriptions."""
         return {
             "get_current_user": {
-                "description": "Get information about the current user",
+                "description": "Get information about the currently authenticated user. Example: get_current_user()",
                 "function": self.get_current_user,
-                "parameter_descriptions": {}
+                "parameter_descriptions": {},
             },
-
             "get_user_by_id": {
-                "description": "Get information about a specific user by ID or login",
+                "description": 'Get information about a specific user by their ID or login name. Example: get_user_by_id(user_id="admin")',
                 "function": self.get_user_by_id,
                 "parameter_descriptions": {
-                    "user_id": "The user ID (e.g., 'user-123')",
-                    "user": "The user login/username (alternative to user_id)"
-                }
+                    "user_id": "User identifier (ID like 'user-123' or login like 'admin')"
+                },
             },
-
             "search_users": {
-                "description": "Search for users by name or login",
+                "description": 'Search for users by name or login with a search term. Example: search_users(query="admin", limit=5)',
                 "function": self.search_users,
                 "parameter_descriptions": {
-                    "query": "Search query for user name or login",
-                    "limit": "Maximum number of results (default: 10)"
-                }
+                    "query": "Search term to match user names or logins",
+                    "limit": "Maximum number of users to return (default: 10)",
+                },
             },
-
             "get_user_permissions": {
-                "description": "Get permissions for a specific user",
+                "description": 'Get permissions for a specific user in the system. Example: get_user_permissions(user_id="admin")',
                 "function": self.get_user_permissions,
                 "parameter_descriptions": {
-                    "user_id": "The user ID (e.g., 'user-123')",
-                    "user": "The user login/username (alternative to user_id)"
-                }
-            }
-        } 
+                    "user_id": "User identifier (ID like 'user-123' or login like 'admin')"
+                },
+            },
+        }

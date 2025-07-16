@@ -1,6 +1,7 @@
 """
 Comprehensive unit tests for YouTrack API issues module.
 """
+
 import pytest
 import json
 from unittest.mock import Mock, patch, MagicMock
@@ -19,11 +20,11 @@ class TestIssue:
         issue_data = {
             "id": "TEST-123",
             "summary": "Test issue",
-            "project": {"id": "0-1", "name": "Test Project"}
+            "project": {"id": "0-1", "name": "Test Project"},
         }
-        
+
         issue = Issue.model_validate(issue_data)
-        
+
         assert issue.id == "TEST-123"
         assert issue.summary == "Test issue"
         assert issue.project is not None
@@ -39,12 +40,12 @@ class TestIssue:
             "reporter": {"login": "testuser", "fullName": "Test User"},
             "customFields": [
                 {"name": "Priority", "value": {"name": "High"}},
-                {"name": "Component", "value": [{"name": "Backend"}]}
-            ]
+                {"name": "Component", "value": [{"name": "Backend"}]},
+            ],
         }
-        
+
         issue = Issue.model_validate(issue_data)
-        
+
         assert issue.id == "TEST-123"
         assert issue.summary == "Test issue with all fields"
         assert issue.description == "This is a test issue"
@@ -58,9 +59,9 @@ class TestIssue:
         incomplete_data = {
             "id": "TEST-123",
             # Missing summary and project
-            "unexpected_field": "should be ignored"
+            "unexpected_field": "should be ignored",
         }
-        
+
         # Should create issue even with incomplete data due to flexible validation
         issue = Issue.model_validate(incomplete_data)
         assert issue.id == "TEST-123"
@@ -89,7 +90,7 @@ class TestIssuesClient:
         mock_response = {
             "id": "TEST-123",
             "summary": "Test issue",
-            "project": {"id": "0-1", "name": "Test Project"}
+            "project": {"id": "0-1", "name": "Test Project"},
         }
         mock_client.get.return_value = mock_response
 
@@ -102,7 +103,9 @@ class TestIssuesClient:
     @pytest.mark.unit
     def test_get_issue_not_found(self, issues_client, mock_client):
         """Test issue retrieval when issue not found."""
-        mock_client.get.side_effect = YouTrackAPIError("Issue not found", status_code=404)
+        mock_client.get.side_effect = YouTrackAPIError(
+            "Issue not found", status_code=404
+        )
 
         # The method catches the exception and creates an Issue object with error info
         result = issues_client.get_issue("NOTFOUND-123")
@@ -118,14 +121,14 @@ class TestIssuesClient:
         mock_response_obj.json.return_value = {
             "id": "TEST-124",
             "summary": "New test issue",
-            "project": {"id": "0-1"}
+            "project": {"id": "0-1"},
         }
         mock_client.session.post.return_value = mock_response_obj
 
         result = issues_client.create_issue(
             project_id="0-1",
             summary="New test issue",
-            description="New test description"
+            description="New test description",
         )
 
         assert result.id == "TEST-124"
@@ -140,21 +143,21 @@ class TestIssuesClient:
         mock_response_obj.json.return_value = {
             "id": "TEST-124",
             "summary": "New test issue",
-            "project": {"id": "0-1"}
+            "project": {"id": "0-1"},
         }
         mock_client.session.post.return_value = mock_response_obj
 
         additional_fields = {
             "customFields": [
                 {"name": "Priority", "value": {"name": "High"}},
-                {"name": "Component", "value": [{"name": "Backend"}, {"name": "API"}]}
+                {"name": "Component", "value": [{"name": "Backend"}, {"name": "API"}]},
             ]
         }
 
         result = issues_client.create_issue(
             project_id="0-1",
             summary="New test issue",
-            additional_fields=additional_fields
+            additional_fields=additional_fields,
         )
 
         assert result.id == "TEST-124"
@@ -182,25 +185,14 @@ class TestIssuesClient:
         mock_client.session.post.return_value = mock_response_obj
 
         with pytest.raises(YouTrackAPIError):
-            issues_client.create_issue(
-                project_id="invalid",
-                summary="Test issue"
-            )
+            issues_client.create_issue(project_id="invalid", summary="Test issue")
 
     @pytest.mark.unit
     def test_search_issues_success(self, issues_client, mock_client):
         """Test successful issue search."""
         mock_response = [
-            {
-                "id": "TEST-123",
-                "summary": "First issue",
-                "project": {"id": "0-1"}
-            },
-            {
-                "id": "TEST-124", 
-                "summary": "Second issue",
-                "project": {"id": "0-1"}
-            }
+            {"id": "TEST-123", "summary": "First issue", "project": {"id": "0-1"}},
+            {"id": "TEST-124", "summary": "Second issue", "project": {"id": "0-1"}},
         ]
         mock_client.get.return_value = mock_response
 
@@ -227,7 +219,7 @@ class TestIssuesClient:
         mock_response = {
             "id": "comment-123",
             "text": "Test comment",
-            "author": {"login": "testuser"}
+            "author": {"login": "testuser"},
         }
         mock_client.post.return_value = mock_response
 
@@ -235,7 +227,9 @@ class TestIssuesClient:
 
         assert result["id"] == "comment-123"
         assert result["text"] == "Test comment"
-        mock_client.post.assert_called_once_with("issues/TEST-123/comments", data={"text": "Test comment"})
+        mock_client.post.assert_called_once_with(
+            "issues/TEST-123/comments", data={"text": "Test comment"}
+        )
 
     @pytest.mark.unit
     def test_get_attachment_content_success(self, issues_client, mock_client):
@@ -248,16 +242,16 @@ class TestIssuesClient:
                     "url": "/api/files/attachment-456",
                     "size": 1024,
                     "name": "test.pdf",
-                    "mimeType": "application/pdf"
+                    "mimeType": "application/pdf",
                 }
             ]
         }
-        
+
         # Mock attachment content response
         mock_content_response = Mock()
         mock_content_response.status_code = 200
         mock_content_response.content = b"PDF file content"
-        
+
         mock_client.get.return_value = mock_issue_response
         mock_client.session.get.return_value = mock_content_response
 
@@ -296,13 +290,13 @@ class TestIssueIntegrationScenarios:
         create_response_obj.json.return_value = {
             "id": "TEST-125",
             "summary": "Lifecycle test issue",
-            "project": {"id": "0-1"}
+            "project": {"id": "0-1"},
         }
 
         comment_response = {
             "id": "comment-125",
             "text": "Test comment for lifecycle",
-            "author": {"login": "testuser"}
+            "author": {"login": "testuser"},
         }
 
         # Configure mock responses
@@ -311,13 +305,14 @@ class TestIssueIntegrationScenarios:
 
         # 1. Create issue
         created_issue = issues_client.create_issue(
-            project_id="0-1",
-            summary="Lifecycle test issue"
+            project_id="0-1", summary="Lifecycle test issue"
         )
         assert created_issue.id == "TEST-125"
 
         # 2. Add comment
-        comment_result = issues_client.add_comment("TEST-125", "Test comment for lifecycle")
+        comment_result = issues_client.add_comment(
+            "TEST-125", "Test comment for lifecycle"
+        )
         assert comment_result["id"] == "comment-125"
 
         # Verify all operations were called
@@ -342,4 +337,4 @@ class TestIssueIntegrationScenarios:
         # so it should raise the exception
         mock_client.get.side_effect = YouTrackAPIError("Search failed", 500)
         with pytest.raises(YouTrackAPIError):
-            issues_client.search_issues("invalid query") 
+            issues_client.search_issues("invalid query")

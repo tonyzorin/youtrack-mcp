@@ -1,1 +1,1 @@
-"""Unit tests for YouTrack MCP components.""" 
+"""Unit tests for YouTrack MCP components."""

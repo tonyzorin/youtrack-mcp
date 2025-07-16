@@ -1,1 +1,1 @@
-"""Integration tests for YouTrack MCP with mocked external services.""" 
+"""Integration tests for YouTrack MCP with mocked external services."""

@@ -1,3 +1,3 @@
 """
 YouTrack API client modules.
-""" 
+"""

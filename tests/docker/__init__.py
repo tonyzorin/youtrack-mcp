@@ -1,1 +1,1 @@
-"""Docker container and build tests for YouTrack MCP.""" 
+"""Docker container and build tests for YouTrack MCP."""
