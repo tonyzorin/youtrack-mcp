@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict
 
 from youtrack_mcp.api.client import YouTrackClient
 from youtrack_mcp.api.users import UsersClient
@@ -8,218 +8,150 @@ from youtrack_mcp.mcp_wrappers import sync_wrapper
 
 logger = logging.getLogger(__name__)
 
+
 class UserTools:
     """User-related MCP tools."""
-    
+
     def __init__(self):
         """Initialize the user tools."""
         self.client = YouTrackClient()
         self.users_api = UsersClient(self.client)
-    
+
+    def close(self) -> None:
+        """Close the user tools."""
+        if hasattr(self.client, "close"):
+            self.client.close()
+
     @sync_wrapper
     def get_current_user(self) -> str:
         """
-        Get information about the currently authenticated user.
-        
+        Get information about the current user.
+
         FORMAT: get_current_user()
-        
+
         Returns:
             JSON string with current user information
         """
         try:
+            # Using 'me' endpoint to get current user info
             user = self.users_api.get_current_user()
-            return json.dumps(user.model_dump(), indent=2)
-        except Exception as e:
-            logger.exception("Error getting current user")
-            return json.dumps({"error": str(e)})
-    
-    @sync_wrapper
-    def get_user(self, user_id: str = None, user: str = None) -> str:
-        """
-        Get information about a specific user.
-        
-        FORMAT: get_user(user_id="1-1")
-        
-        Args:
-            user_id: The user ID
-            user: Alternative parameter name for user_id
-            
-        Returns:
-            JSON string with user information
-        """
-        try:
-            # Use either user_id or user parameter
-            user_identifier = user_id or user
-            if not user_identifier:
-                return json.dumps({"error": "User ID is required"})
-                
-            user_obj = self.users_api.get_user(user_identifier)
-            
-            # Handle both Pydantic models and dictionaries in the response
-            if user_obj is None:
-                return json.dumps({"error": "User not found"})
-            
-            if hasattr(user_obj, 'model_dump'):
-                result = user_obj.model_dump()
-            else:
-                result = user_obj  # Assume it's already a dict
-                
-            return json.dumps(result, indent=2)
-        except Exception as e:
-            logger.exception(f"Error getting user {user_id or user}")
-            return json.dumps({"error": str(e)})
-    
-    @sync_wrapper
-    def get_user_by_login(self, login: str) -> str:
-        """
-        Get a user by their login name.
-        
-        FORMAT: get_user_by_login(login="johndoe")
-        
-        Args:
-            login: The user's login name
-            
-        Returns:
-            JSON string with user information
-        """
-        try:
-            if not login:
-                return json.dumps({"error": "Login is required"})
-                
-            user = self.users_api.get_user_by_login(login)
-            
-            # Handle both Pydantic models and dictionaries in the response
-            if user is None:
-                return json.dumps({"error": "User not found"})
-            
-            if hasattr(user, 'model_dump'):
+            if hasattr(user, "model_dump"):
                 result = user.model_dump()
             else:
                 result = user  # Assume it's already a dict
-                
             return json.dumps(result, indent=2)
         except Exception as e:
-            logger.exception(f"Error getting user with login {login}")
+            logger.exception("Error getting current user")
             return json.dumps({"error": str(e)})
-    
+
     @sync_wrapper
-    def get_user_groups(self, user_id: str = None, user: str = None) -> str:
+    def get_user_by_id(self, user_id: str) -> str:
         """
-        Get groups for a user.
-        
-        FORMAT: get_user_groups(user_id="1-1")
-        
+        Get information about a specific user by ID or login.
+
+        FORMAT: get_user_by_id(user_id="admin")
+
         Args:
-            user_id: The user ID
-            user: Alternative parameter name for user_id
-            
+            user_id: The user identifier (ID like 'user-123' or login like 'admin')
+
         Returns:
-            JSON string with user groups
+            JSON string with user information
         """
         try:
-            # Use either user_id or user parameter
-            user_identifier = user_id or user
-            if not user_identifier:
+            if not user_id:
                 return json.dumps({"error": "User ID is required"})
-                
-            groups = self.users_api.get_user_groups(user_identifier)
-            
-            # Handle various response formats safely
-            if groups is None:
-                return json.dumps([])
-            
-            # If it's a dictionary (direct API response)
-            if isinstance(groups, dict):
-                return json.dumps(groups, indent=2)
-            
-            # If it's a list of objects
-            try:
-                result = []
-                # Try to iterate, but handle errors safely
-                for group in groups:
-                    if hasattr(group, 'model_dump'):
-                        result.append(group.model_dump())
-                    elif isinstance(group, dict):
-                        result.append(group)
-                    else:
-                        # Last resort: convert to string
-                        result.append(str(group))
-                return json.dumps(result, indent=2)
-            except Exception as e:
-                # If we can't iterate, return the raw string representation
-                logger.warning(f"Could not process groups response: {str(e)}")
-                return json.dumps({"groups": str(groups)})
+
+            user_obj = self.users_api.get_user(user_id)
+            if hasattr(user_obj, "model_dump"):
+                result = user_obj.model_dump()
+            else:
+                result = user_obj  # Assume it's already a dict
+            return json.dumps(result, indent=2)
         except Exception as e:
-            logger.exception(f"Error getting groups for user {user_id or user}")
+            logger.exception(f"Error getting user {identifier}")
             return json.dumps({"error": str(e)})
-    
+
     @sync_wrapper
-    def search_users(self, query: str, limit: int = 10) -> str:
+    def search_users(self, query: str = "", limit: int = 10) -> str:
         """
-        Search for users using YouTrack query.
-        
-        FORMAT: search_users(query="John", limit=10)
-        
+        Search for users by name or login.
+
+        FORMAT: search_users(query="john", limit=10)
+
         Args:
-            query: The search query
-            limit: Maximum number of users to return (default: 10)
-            
+            query: Search query for user name or login
+            limit: Maximum number of results to return
+
         Returns:
-            JSON string with matching users
+            JSON string with list of matching users
         """
         try:
-            users = self.users_api.search_users(query, limit=limit)
-            return json.dumps([u.model_dump() for u in users], indent=2)
+            users = self.users_api.search_users(query, limit)
+
+            # Handle both Pydantic models and dictionaries in the response
+            result = []
+            for user in users:
+                if hasattr(user, "model_dump"):
+                    result.append(user.model_dump())
+                else:
+                    result.append(user)  # Assume it's already a dict
+
+            return json.dumps(result, indent=2)
         except Exception as e:
-            logger.exception(f"Error searching users with query {query}")
+            logger.exception(f"Error searching users with query: {query}")
             return json.dumps({"error": str(e)})
-    
-    def close(self) -> None:
-        """Close the API client."""
-        self.client.close()
-    
-    def get_tool_definitions(self) -> Dict[str, Dict[str, Any]]:
+
+    @sync_wrapper
+    def get_user_permissions(self, user_id: str) -> str:
         """
-        Get the definitions of all user tools.
-        
+        Get permissions for a specific user.
+
+        FORMAT: get_user_permissions(user_id="admin")
+
+        Args:
+            user_id: The user identifier (ID like 'user-123' or login like 'admin')
+
         Returns:
-            Dictionary mapping tool names to their configuration
+            JSON string with user permissions
         """
+        try:
+            if not user_id:
+                return json.dumps({"error": "User ID is required"})
+
+            permissions = self.users_api.get_user_permissions(user_id)
+            return json.dumps(permissions, indent=2)
+        except Exception as e:
+            logger.exception(f"Error getting permissions for user {user_id}")
+            return json.dumps({"error": str(e)})
+
+    def get_tool_definitions(self) -> Dict[str, Dict[str, Any]]:
+        """Get tool definitions with descriptions."""
         return {
             "get_current_user": {
+                "description": "Get information about the currently authenticated user. Example: get_current_user()",
                 "function": self.get_current_user,
-                "description": "Get information about the currently authenticated user. FORMAT: get_current_user()",
-                "parameters": {}
+                "parameter_descriptions": {},
             },
-            "get_user": {
-                "function": self.get_user,
-                "description": "Get information about a specific user. FORMAT: get_user(user_id=\"1-1\")",
-                "parameters": {
-                    "user_id": "The user ID",
-                    "user": "Alternative parameter name for user_id"
-                }
-            },
-            "get_user_by_login": {
-                "function": self.get_user_by_login,
-                "description": "Get a user by their login name. FORMAT: get_user_by_login(login=\"johndoe\")",
-                "parameters": {
-                    "login": "The user's login name"
-                }
-            },
-            "get_user_groups": {
-                "function": self.get_user_groups,
-                "description": "Get groups for a user. FORMAT: get_user_groups(user_id=\"1-1\")",
-                "parameters": {
-                    "user_id": "The user ID",
-                    "user": "Alternative parameter name for user_id"
-                }
+            "get_user_by_id": {
+                "description": 'Get information about a specific user by their ID or login name. Example: get_user_by_id(user_id="admin")',
+                "function": self.get_user_by_id,
+                "parameter_descriptions": {
+                    "user_id": "User identifier (ID like 'user-123' or login like 'admin')"
+                },
             },
             "search_users": {
+                "description": 'Search for users by name or login with a search term. Example: search_users(query="admin", limit=5)',
                 "function": self.search_users,
-                "description": "Search for users using YouTrack query. FORMAT: search_users(query=\"John\", limit=10)",
-                "parameters": {
-                    "query": "The search query",
-                    "limit": "Maximum number of users to return (optional, default: 10)"
-                }
-            }
-        } 
+                "parameter_descriptions": {
+                    "query": "Search term to match user names or logins",
+                    "limit": "Maximum number of users to return (default: 10)",
+                },
+            },
+            "get_user_permissions": {
+                "description": 'Get permissions for a specific user in the system. Example: get_user_permissions(user_id="admin")',
+                "function": self.get_user_permissions,
+                "parameter_descriptions": {
+                    "user_id": "User identifier (ID like 'user-123' or login like 'admin')"
+                },
+            },
+        }

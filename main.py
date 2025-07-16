@@ -22,7 +22,7 @@ except ImportError:
     logger.warning("nest_asyncio not available, event loop nesting may cause issues")
 
 # App version - easy to find and update
-APP_VERSION = os.getenv("APP_VERSION", "0.3.7")
+APP_VERSION = os.getenv("APP_VERSION", "1.0.1")
 
 
 from fastapi import FastAPI, Request
