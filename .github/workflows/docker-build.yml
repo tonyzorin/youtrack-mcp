@@ -132,7 +132,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64  # Single platform for reliability
+        platforms: linux/amd64,linux/arm64  # Multi-platform support for both Intel and ARM
         push: true
         tags: ${{ steps.meta.outputs.TAGS }}
         labels: |
