@@ -19,14 +19,14 @@ docker run --rm \
 docker run --rm \
   -e YOUTRACK_URL="https://your-instance.youtrack.cloud" \
   -e YOUTRACK_API_TOKEN="your-token" \
-  tonyzorin/youtrack-mcp:1.0.1_wip
+  tonyzorin/youtrack-mcp:1.1.2_wip
 ```
 
 ### Available Docker Tags
 
-- `latest` - Latest stable release
-- `1.0.1` - Specific version tags  
-- `1.0.1_wip` - Work-in-progress builds from main branch
+- `latest` - Latest stable release (currently 1.1.2)
+- `1.1.2` - Specific version tags  
+- `1.1.2_wip` - Work-in-progress builds from main branch
 - `pr-<number>` - Pull request builds for testing
 
 ## Features
@@ -36,6 +36,7 @@ docker run --rm \
 - **Search Capabilities**: Advanced search with filters and custom fields
 - **User Management**: Retrieve user information and permissions
 - **Attachment Support**: Download and process issue attachments (up to 10MB)
+- **Multi-Platform Support**: ARM64/Apple Silicon and AMD64 architecture support
 - **Comprehensive API**: Full YouTrack REST API integration
 
 ## Development
@@ -79,4 +80,11 @@ For issues and questions:
 
 ---
 
-*Latest update: Enhanced Docker build diagnostics and GitHub Actions reliability improvements.*# Version 1.0.1 Released
+*Latest update: Added ARM64/Apple Silicon support for multi-platform compatibility.*
+
+## Version 1.1.2 Released
+
+🔧 **CRITICAL FIX** - ARM64/Apple Silicon Support
+- Added multi-platform Docker builds (AMD64 + ARM64)
+- Enhanced LLM tool descriptions with FORMAT examples  
+- Simplified architecture and improved maintainability
