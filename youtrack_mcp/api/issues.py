@@ -100,7 +100,7 @@ class IssuesClient:
                 and "summary" not in response
             ):
                 # Get additional fields we need including attachments
-                fields = "summary,description,created,updated,project,reporter,assignee,customFields,attachments(id,name,url,mimeType,size)"
+                fields = "id,idReadable,summary,description,created,updated,project,reporter,assignee,customFields,attachments(id,name,url,mimeType,size)"
                 try:
                     detailed_response = self.client.get(
                         f"issues/{issue_id}?fields={fields}"
@@ -289,7 +289,7 @@ class IssuesClient:
             List of matching issues
         """
         # Request additional fields to ensure we get summary
-        fields = "id,summary,description,created,updated,project,reporter,assignee,customFields"
+        fields = "id,idReadable,summary,description,created,updated,project,reporter,assignee,customFields"
         params = {"query": query, "$top": limit, "fields": fields}
         response = self.client.get("issues", params=params)
 
