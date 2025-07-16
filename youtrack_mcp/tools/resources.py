@@ -434,7 +434,11 @@ class ResourcesTools:
             return json.dumps({"error": str(e)})
 
     def get_issue_comments(self, issue_id: str) -> str:
-        """Get comments for a specific issue as a resource."""
+        """
+        Get comments for a specific issue as a resource.
+        
+        FORMAT: get_issue_comments(issue_id="DEMO-123")
+        """
         try:
             # First try to get detailed comments
             try:
@@ -584,9 +588,9 @@ class ResourcesTools:
                 },
             },
             "get_issue_comments": {
-                "description": "Get comments for a specific issue as a resource.",
+                "description": "Get all comments for a specific YouTrack issue with author information and timestamps. Example: get_issue_comments(issue_id=\"DEMO-123\")",
                 "parameter_descriptions": {
-                    "issue_id": "The issue ID or readable ID (e.g., PROJECT-123)"
+                    "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'"
                 },
             },
             "get_all_projects": {
