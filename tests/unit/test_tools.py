@@ -102,11 +102,9 @@ class TestToolLoading:
                         ):
                             tools = load_all_tools()
 
-                            # Should have tools loaded (at least issue_create_issue)
+                            # Should return empty dict when all tool classes are empty
                             assert isinstance(tools, dict)
-                            assert (
-                                len(tools) >= 1
-                            )  # At least the issue_create_issue tool
+                            assert len(tools) == 0  # No tools when all classes are empty
 
     @pytest.mark.unit
     def test_loader_returns_dict(self, mock_youtrack_client):

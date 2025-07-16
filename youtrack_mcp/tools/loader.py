@@ -205,27 +205,6 @@ def load_all_tools() -> Dict[str, Callable]:
     # Log total number of tools loaded
     logger.info(f"Loader registered {len(tools)} tools from all tool classes")
 
-    # Add specific tool prefixes to avoid conflicts
-    # This ensures create_issue is properly distinguished from other methods
-    issue_tools = IssueTools()
-    tools["issue_create_issue"] = create_bound_tool(issue_tools, "create_issue")
-
-    # Add tool definition to issue_create_issue if available
-    if "create_issue" in all_tool_definitions:
-        tools["issue_create_issue"].tool_definition = all_tool_definitions[
-            "create_issue"
-        ].copy()
-        tools["issue_create_issue"].tool_definition["name"] = "issue_create_issue"
-
-    # Specifically log the create_issue registration - only if it exists
-    if "create_issue" in tools:
-        logger.info(
-            f"Key tools registered: create_issue from {type(tools['create_issue']).__module__}"
-        )
-    logger.info(
-        f"Key tools registered: issue_create_issue from {type(issue_tools).__module__}"
-    )
-
     return tools
 
 
