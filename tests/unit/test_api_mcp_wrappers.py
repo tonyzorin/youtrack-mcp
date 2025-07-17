@@ -391,3 +391,211 @@ class TestMCPWrapperIntegrationScenarios:
             "DEMO", "Test issue", None
         )
         assert result["id"] == "TEST-124"
+
+
+class TestMCPWrapperClientInitializationFailure:
+    """Test scenarios where API client initialization fails."""
+
+    @patch('youtrack_mcp.api.mcp_wrappers.YouTrackClient')
+    @patch('youtrack_mcp.api.mcp_wrappers.IssuesClient')
+    @patch('youtrack_mcp.api.mcp_wrappers.ProjectsClient')
+    @patch('youtrack_mcp.api.mcp_wrappers.UsersClient')
+    def test_api_client_initialization_failure(self, mock_users_client, mock_projects_client, 
+                                             mock_issues_client, mock_youtrack_client):
+        """Test behavior when API client initialization fails."""
+        # Mock the initialization to raise an exception
+        mock_youtrack_client.side_effect = Exception("Connection failed")
+        
+        # Reload the module to trigger the initialization error
+        import importlib
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        importlib.reload(mcp_wrappers)
+        
+        # Test that functions return appropriate error responses
+        result = mcp_wrappers.get_issue("TEST-123")
+        assert result["status"] == "error"
+        assert "YouTrack API client failed to initialize" in result["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api', None)
+    def test_get_issue_with_none_api_client(self):
+        """Test get_issue when API client is None."""
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        # When issues_api is None, should return error
+        result = mcp_wrappers.get_issue("TEST-123")
+        
+        assert result["status"] == "error"
+        assert "YouTrack API client failed to initialize" in result["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api', None)
+    def test_create_issue_with_none_api_client(self):
+        """Test create_issue when API client is None."""
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.create_issue("DEMO", "Test issue")
+        
+        assert result["status"] == "error"
+        assert "YouTrack API client failed to initialize" in result["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api', None)
+    def test_search_issues_with_none_api_client(self):
+        """Test search_issues when API client is None."""
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.search_issues("test query")
+        
+        # search_issues returns a list with error dict as first element
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["status"] == "error"
+        assert "YouTrack API client failed to initialize" in result[0]["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api', None)
+    def test_add_comment_with_none_api_client(self):
+        """Test add_comment when API client is None."""
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.add_comment("TEST-123", "Test comment")
+        
+        assert result["status"] == "error"
+        assert "YouTrack API client failed to initialize" in result["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.projects_api', None)
+    def test_get_projects_with_none_api_client(self):
+        """Test get_projects when API client is None."""
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.get_projects()
+        
+        # get_projects returns a list with error dict as first element
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["status"] == "error"
+        assert "YouTrack API client failed to initialize" in result[0]["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.projects_api', None)
+    def test_get_project_with_none_api_client(self):
+        """Test get_project when API client is None."""
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.get_project("DEMO")
+        
+        assert result["status"] == "error"
+        assert "YouTrack API client failed to initialize" in result["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.users_api', None)
+    def test_get_current_user_with_none_api_client(self):
+        """Test get_current_user when API client is None."""
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.get_current_user()
+        
+        assert result["status"] == "error"
+        assert "YouTrack API client failed to initialize" in result["error"]
+
+
+class TestMCPWrapperFunctionReturnTypes:
+    """Test that functions handle different return types correctly."""
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api')
+    def test_add_comment_non_dict_return(self, mock_issues_api):
+        """Test add_comment when API returns non-dict value."""
+        # Mock add_comment to return a non-dict value
+        mock_issues_api.add_comment.return_value = "Success"
+        
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.add_comment("TEST-123", "Test comment")
+        
+        # Should convert non-dict return to success dict
+        assert result["status"] == "success"
+        mock_issues_api.add_comment.assert_called_once_with("TEST-123", "Test comment")
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api')
+    def test_add_comment_dict_return(self, mock_issues_api):
+        """Test add_comment when API returns dict value."""
+        # Mock add_comment to return a dict
+        mock_issues_api.add_comment.return_value = {"id": "comment-123", "text": "Test comment"}
+        
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.add_comment("TEST-123", "Test comment")
+        
+        # Should return the dict as-is
+        assert result["id"] == "comment-123"
+        assert result["text"] == "Test comment"
+
+
+class TestMCPWrapperLoggingScenarios:
+    """Test specific logging scenarios in error handling."""
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api')
+    @patch('youtrack_mcp.api.mcp_wrappers.logger')
+    def test_get_issue_exception_logging(self, mock_logger, mock_issues_api):
+        """Test that exceptions in get_issue are properly logged."""
+        mock_issues_api.get_issue.side_effect = Exception("Database error")
+        
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.get_issue("TEST-123")
+        
+        # Should log the exception with traceback
+        mock_logger.exception.assert_called_once_with("Error getting issue TEST-123")
+        assert result["status"] == "error"
+        assert "Database error" in result["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api')
+    @patch('youtrack_mcp.api.mcp_wrappers.projects_api')
+    @patch('youtrack_mcp.api.mcp_wrappers.logger')
+    def test_create_issue_exception_logging(self, mock_logger, mock_projects_api, mock_issues_api):
+        """Test that exceptions in create_issue are properly logged."""
+        # Mock project lookup to return a project with ID
+        mock_project = Mock()
+        mock_project.id = "0-1"  # Mock project ID
+        mock_project.name = "DEMO"
+        mock_projects_api.get_project_by_name.return_value = mock_project
+        
+        # Make create_issue fail
+        mock_issues_api.create_issue.side_effect = Exception("Validation error")
+        
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.create_issue("DEMO", "Test issue")
+        
+        # Should log the exception with the project ID (after lookup)
+        mock_logger.exception.assert_called_once_with("Error creating issue in project 0-1")
+        assert result["status"] == "error"
+        assert "Validation error" in result["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api')
+    @patch('youtrack_mcp.api.mcp_wrappers.logger')
+    def test_search_issues_exception_logging(self, mock_logger, mock_issues_api):
+        """Test that exceptions in search_issues are properly logged."""
+        mock_issues_api.search_issues.side_effect = Exception("Search error")
+        
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.search_issues("test query")
+        
+        # Should log the exception with traceback
+        mock_logger.exception.assert_called_once_with("Error searching for issues with query: test query")
+        # search_issues returns a list with error dict
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["status"] == "error"
+        assert "Search error" in result[0]["error"]
+
+    @patch('youtrack_mcp.api.mcp_wrappers.issues_api')
+    @patch('youtrack_mcp.api.mcp_wrappers.logger')
+    def test_add_comment_exception_logging(self, mock_logger, mock_issues_api):
+        """Test that exceptions in add_comment are properly logged."""
+        mock_issues_api.add_comment.side_effect = Exception("Comment error")
+        
+        import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
+        
+        result = mcp_wrappers.add_comment("TEST-123", "Test comment")
+        
+        # Should log the exception with traceback
+        mock_logger.exception.assert_called_once_with("Error adding comment to issue TEST-123")
+        assert result["status"] == "error"
+        assert "Comment error" in result["error"]
