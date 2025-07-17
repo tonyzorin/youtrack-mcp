@@ -1,0 +1,57 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-coverage:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install coverage
+    
+    - name: Run tests with coverage
+      env:
+        YOUTRACK_URL: https://test.youtrack.cloud
+        YOUTRACK_API_TOKEN: test-token
+      run: |
+        python -m coverage run -m pytest tests/unit/ -v
+        python -m coverage report --show-missing
+        python -m coverage html
+    
+    - name: Check coverage threshold
+      env:
+        YOUTRACK_URL: https://test.youtrack.cloud
+        YOUTRACK_API_TOKEN: test-token
+      run: |
+        # Enforce minimum 75% coverage
+        python -m coverage report --fail-under=75
+    
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-report
+        path: htmlcov/
+    
+    - name: Coverage comment
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        python -m coverage report >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY 
