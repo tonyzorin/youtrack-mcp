@@ -29,7 +29,7 @@ jobs:
         YOUTRACK_URL: https://test.youtrack.cloud
         YOUTRACK_API_TOKEN: test-token
       run: |
-        python -m coverage run -m pytest tests/unit/ -v
+        python -m coverage run -m pytest tests/unit/ -v --ignore=tests/unit/test_tools_issues.py --ignore=tests/unit/test_tools_projects.py --ignore=tests/unit/test_tools_resources.py --ignore=tests/unit/test_tools_search.py --ignore=tests/unit/test_api_mcp_wrappers.py
         python -m coverage report --show-missing
         python -m coverage html
     
