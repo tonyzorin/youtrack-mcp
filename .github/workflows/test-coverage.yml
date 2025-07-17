@@ -42,7 +42,7 @@ jobs:
         python -m coverage report --fail-under=75
     
     - name: Upload coverage reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: coverage-report

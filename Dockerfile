@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
+RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt && \
     python -c "import mcp; print(dir(mcp))"
 
 # Copy the rest of the application
