@@ -12,11 +12,17 @@ from youtrack_mcp.api.client import YouTrackAPIError
 class TestProjectToolsInitialization:
     """Test ProjectTools initialization."""
     
-    def test_project_tools_initialization(self):
+    @patch('youtrack_mcp.tools.projects.YouTrackClient')
+    def test_project_tools_initialization(self, mock_client_class):
         """Test that ProjectTools initializes correctly."""
+        # Mock the client instance
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
         tools = ProjectTools()
         assert tools.client is not None
         assert tools.projects_api is not None
+        mock_client_class.assert_called_once()
         assert tools.issues_api is not None
 
 
@@ -522,8 +528,13 @@ class TestProjectToolsClose:
 class TestProjectToolsDefinitions:
     """Test tool definitions."""
     
-    def test_get_tool_definitions(self):
+    @patch('youtrack_mcp.tools.projects.YouTrackClient')
+    def test_get_tool_definitions(self, mock_client_class):
         """Test that tool definitions are properly structured."""
+        # Mock the client instance
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
         tools = ProjectTools()
         definitions = tools.get_tool_definitions()
         

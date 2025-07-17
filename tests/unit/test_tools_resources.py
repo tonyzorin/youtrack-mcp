@@ -12,13 +12,19 @@ from youtrack_mcp.api.client import YouTrackAPIError
 class TestResourcesToolsInitialization:
     """Test ResourcesTools initialization."""
     
-    def test_resources_tools_initialization(self):
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_resources_tools_initialization(self, mock_client_class):
         """Test that ResourcesTools initializes correctly."""
+        # Mock the client instance
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
         tools = ResourcesTools()
         assert tools.client is not None
         assert tools.issues_api is not None
         assert tools.projects_api is not None
         assert tools.subscriptions == set()
+        mock_client_class.assert_called_once()
 
 
 class TestResourcesToolsConstants:
@@ -537,8 +543,13 @@ class TestResourcesToolsClose:
 class TestResourcesToolsDefinitions:
     """Test tool definitions."""
     
-    def test_get_tool_definitions(self):
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_get_tool_definitions(self, mock_client_class):
         """Test that tool definitions are properly structured."""
+        # Mock the client instance
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
         tools = ResourcesTools()
         definitions = tools.get_tool_definitions()
         
