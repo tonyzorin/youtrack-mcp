@@ -49,6 +49,8 @@ Both registries provide identical tags:
 - `1.1.2_wip` - Work-in-progress builds from main branch
 - `pr-<number>` - Pull request builds for testing
 
+*Note: Images are now published to both Docker Hub and GitHub Container Registry simultaneously.*
+
 ### Using npm Package
 
 Choose from multiple registries:
