@@ -5,8 +5,9 @@ This module provides test coverage for the IssuesClient class and Issue model,
 focusing on easily testable components without complex mocking.
 """
 
+import unittest
 import pytest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from typing import List, Dict, Any
 
 from youtrack_mcp.api.issues import IssuesClient, Issue
@@ -417,3 +418,370 @@ class TestIssuesClientErrorHandling:
             except Exception:
                 # Exceptions are also acceptable for malformed data
                 pass
+
+
+class TestIssuesCustomFields(unittest.TestCase):
+    """Test custom field management methods in Issues API."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_client = Mock()
+        self.issues_client = IssuesClient(self.mock_client)
+
+    def test_update_issue_custom_fields_success(self):
+        """Test successful custom field update."""
+        # Mock get_issue response
+        mock_issue = Mock()
+        mock_issue.project = {"id": "0-0"}
+        self.mock_client.get.return_value = mock_issue
+
+        # Mock post response
+        mock_updated_issue = Mock()
+        mock_updated_issue.model_validate.return_value = {"id": "DEMO-123", "summary": "Test"}
+        self.mock_client.post.return_value = {"id": "DEMO-123", "summary": "Test"}
+
+        # Mock Issue.model_validate
+        with patch('youtrack_mcp.api.issues.Issue') as mock_issue_class:
+            mock_issue_class.model_validate.return_value = mock_updated_issue
+
+            # Test the method
+            result = self.issues_client.update_issue_custom_fields(
+                issue_id="DEMO-123",
+                custom_fields={"Priority": "High", "Assignee": "john.doe"},
+                validate=False  # Skip validation for this test
+            )
+
+            # Verify the API call
+            self.mock_client.post.assert_called_once()
+            call_args = self.mock_client.post.call_args
+            self.assertEqual(call_args[0][0], "issues/DEMO-123")
+            
+            # Check custom fields data structure
+            posted_data = call_args[1]["data"]
+            self.assertIn("customFields", posted_data)
+            self.assertEqual(len(posted_data["customFields"]), 2)
+
+    def test_update_issue_custom_fields_empty_fields(self):
+        """Test update with empty custom fields returns current issue."""
+        mock_issue = Mock()
+        self.issues_client.get_issue = Mock(return_value=mock_issue)
+
+        result = self.issues_client.update_issue_custom_fields(
+            issue_id="DEMO-123",
+            custom_fields={},
+            validate=False
+        )
+
+        self.assertEqual(result, mock_issue)
+        self.mock_client.post.assert_not_called()
+
+    def test_update_issue_custom_fields_validation_error(self):
+        """Test validation error handling."""
+        # Mock get_issue response
+        mock_issue = Mock()
+        mock_issue.project = {"id": "0-0"}
+        self.issues_client.get_issue = Mock(return_value=mock_issue)
+
+        # Mock validation to fail
+        self.issues_client._validate_custom_field_value = Mock(return_value=False)
+
+        with self.assertRaises(Exception) as context:
+            self.issues_client.update_issue_custom_fields(
+                issue_id="DEMO-123",
+                custom_fields={"Priority": "InvalidValue"},
+                validate=True
+            )
+
+        self.assertIn("Custom field validation failed", str(context.exception))
+
+    def test_get_issue_custom_fields_success(self):
+        """Test getting custom fields for an issue."""
+        mock_response = {
+            "customFields": [
+                {
+                    "name": "Priority",
+                    "value": {"name": "High"}
+                },
+                {
+                    "name": "Assignee", 
+                    "value": {"login": "john.doe", "name": "John Doe"}
+                }
+            ]
+        }
+        self.mock_client.get.return_value = mock_response
+
+        result = self.issues_client.get_issue_custom_fields("DEMO-123")
+
+        self.assertEqual(result["Priority"], "High")
+        self.assertEqual(result["Assignee"], "John Doe")  # name has priority over login
+        self.mock_client.get.assert_called_once()
+
+    def test_get_issue_custom_fields_no_custom_fields(self):
+        """Test getting custom fields when none exist."""
+        mock_response = {}
+        self.mock_client.get.return_value = mock_response
+
+        result = self.issues_client.get_issue_custom_fields("DEMO-123")
+
+        self.assertEqual(result, {})
+
+    def test_validate_custom_field_value_valid(self):
+        """Test custom field validation with valid value."""
+        self.issues_client._validate_custom_field_value = Mock(return_value=True)
+
+        result = self.issues_client.validate_custom_field_value(
+            project_id="0-0",
+            field_name="Priority",
+            field_value="High"
+        )
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["field"], "Priority")
+        self.assertEqual(result["value"], "High")
+
+    def test_validate_custom_field_value_invalid(self):
+        """Test custom field validation with invalid value."""
+        self.issues_client._validate_custom_field_value = Mock(return_value=False)
+        self.issues_client._get_custom_field_allowed_values = Mock(return_value=["Low", "Medium", "High"])
+
+        result = self.issues_client.validate_custom_field_value(
+            project_id="0-0",
+            field_name="Priority", 
+            field_value="VeryHigh"
+        )
+
+        self.assertFalse(result["valid"])
+        self.assertIn("Invalid value", result["error"])
+        self.assertIn("Available values", result["suggestion"])
+
+    def test_batch_update_custom_fields_success(self):
+        """Test batch update of custom fields."""
+        updates = [
+            {"issue_id": "DEMO-123", "fields": {"Priority": "High"}},
+            {"issue_id": "DEMO-124", "fields": {"Assignee": "jane.doe"}}
+        ]
+
+        mock_updated_issue = Mock()
+        mock_updated_issue.model_dump.return_value = {"id": "DEMO-123"}
+        self.issues_client.update_issue_custom_fields = Mock(return_value=mock_updated_issue)
+
+        result = self.issues_client.batch_update_custom_fields(updates)
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["status"], "success")
+        self.assertEqual(result[1]["status"], "success")
+
+    def test_batch_update_custom_fields_with_errors(self):
+        """Test batch update with some failures."""
+        updates = [
+            {"issue_id": "DEMO-123", "fields": {"Priority": "High"}},
+            {"issue_id": "", "fields": {"Priority": "Low"}},  # Empty issue ID - will cause error
+            {"fields": {"Priority": "Medium"}}  # Missing issue_id key
+        ]
+
+        mock_updated_issue = Mock()
+        mock_updated_issue.model_dump.return_value = {"id": "DEMO-123"}
+        
+        # Mock the first call to succeed, second to fail due to empty issue_id
+        def mock_update_side_effect(issue_id, custom_fields, validate=True):
+            if issue_id == "DEMO-123":
+                return mock_updated_issue
+            else:
+                raise Exception("Invalid issue ID")
+        
+        self.issues_client.update_issue_custom_fields = Mock(side_effect=mock_update_side_effect)
+
+        result = self.issues_client.batch_update_custom_fields(updates)
+
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0]["status"], "success")
+        self.assertEqual(result[1]["status"], "error")    # Empty issue_id causes error
+        self.assertEqual(result[2]["status"], "error")    # Missing issue_id
+
+    def test_format_custom_field_value_string(self):
+        """Test formatting string values for API."""
+        result = self.issues_client._format_custom_field_value("Priority", "High")
+        
+        expected = {
+            "name": "Priority",
+            "value": {"name": "High"}
+        }
+        self.assertEqual(result, expected)
+
+    def test_format_custom_field_value_dict(self):
+        """Test formatting dict values for API."""
+        value = {"login": "john.doe", "name": "John Doe"}
+        result = self.issues_client._format_custom_field_value("Assignee", value)
+        
+        expected = {
+            "name": "Assignee", 
+            "value": value
+        }
+        self.assertEqual(result, expected)
+
+    def test_format_custom_field_value_numeric(self):
+        """Test formatting numeric values for API."""
+        result = self.issues_client._format_custom_field_value("Story Points", 8)
+        
+        expected = {
+            "name": "Story Points",
+            "value": 8
+        }
+        self.assertEqual(result, expected)
+
+    def test_extract_custom_field_value_name(self):
+        """Test extracting value from field data with name."""
+        field_data = {"name": "High", "id": "123"}
+        result = self.issues_client._extract_custom_field_value(field_data)
+        self.assertEqual(result, "High")
+
+    def test_extract_custom_field_value_login(self):
+        """Test extracting value from field data with login only."""
+        field_data = {"login": "john.doe"}  # Only login, no name
+        result = self.issues_client._extract_custom_field_value(field_data)
+        self.assertEqual(result, "john.doe")
+
+    def test_extract_custom_field_value_name_priority(self):
+        """Test extracting value prioritizes name over login."""
+        field_data = {"login": "john.doe", "name": "John Doe"}
+        result = self.issues_client._extract_custom_field_value(field_data)
+        self.assertEqual(result, "John Doe")  # name has priority
+
+    def test_extract_custom_field_value_text(self):
+        """Test extracting value from field data with text."""
+        field_data = {"text": "Some description"}
+        result = self.issues_client._extract_custom_field_value(field_data)
+        self.assertEqual(result, "Some description")
+
+    def test_extract_custom_field_value_none(self):
+        """Test extracting value from None."""
+        result = self.issues_client._extract_custom_field_value(None)
+        self.assertIsNone(result)
+
+
+class TestIssuesCustomFieldValidation(unittest.TestCase):
+    """Test custom field validation framework."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_client = Mock()
+        self.issues_client = IssuesClient(self.mock_client)
+
+    def test_validate_state_field_valid(self):
+        """Test state field validation with valid value."""
+        mock_schema = {"type": "StateMachineBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+        self.issues_client._get_custom_field_allowed_values = Mock(return_value=["Open", "In Progress", "Closed"])
+
+        result = self.issues_client._validate_custom_field_value("0-0", "State", "Open")
+        self.assertTrue(result)
+
+    def test_validate_state_field_invalid(self):
+        """Test state field validation with invalid value."""
+        mock_schema = {"type": "StateMachineBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+        self.issues_client._get_custom_field_allowed_values = Mock(return_value=["Open", "In Progress", "Closed"])
+
+        result = self.issues_client._validate_custom_field_value("0-0", "State", "InvalidState")
+        self.assertFalse(result)
+
+    def test_validate_enum_field_valid(self):
+        """Test enum field validation with valid value."""
+        mock_schema = {"type": "EnumBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+        self.issues_client._get_custom_field_allowed_values = Mock(return_value=["Low", "Medium", "High"])
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Priority", "High")
+        self.assertTrue(result)
+
+    def test_validate_user_field_valid(self):
+        """Test user field validation with valid user."""
+        mock_schema = {"type": "UserBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+        self.issues_client._validate_user_exists = Mock(return_value=True)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Assignee", "john.doe")
+        self.assertTrue(result)
+
+    def test_validate_user_field_invalid(self):
+        """Test user field validation with invalid user."""
+        mock_schema = {"type": "UserBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+        self.issues_client._validate_user_exists = Mock(return_value=False)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Assignee", "nonexistent")
+        self.assertFalse(result)
+
+    def test_validate_date_field_valid_timestamp(self):
+        """Test date field validation with valid timestamp."""
+        mock_schema = {"type": "DateTimeBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Due Date", 1640995200000)
+        self.assertTrue(result)
+
+    def test_validate_date_field_valid_iso_string(self):
+        """Test date field validation with valid ISO string."""
+        mock_schema = {"type": "DateTimeBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Due Date", "2022-01-01T00:00:00Z")
+        self.assertTrue(result)
+
+    def test_validate_date_field_invalid(self):
+        """Test date field validation with invalid date."""
+        mock_schema = {"type": "DateTimeBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Due Date", "invalid-date")
+        self.assertFalse(result)
+
+    def test_validate_integer_field_valid(self):
+        """Test integer field validation with valid value."""
+        mock_schema = {"type": "IntegerBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Story Points", "8")
+        self.assertTrue(result)
+
+    def test_validate_integer_field_invalid(self):
+        """Test integer field validation with invalid value."""
+        mock_schema = {"type": "IntegerBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Story Points", "not-a-number")
+        self.assertFalse(result)
+
+    def test_validate_float_field_valid(self):
+        """Test float field validation with valid value."""
+        mock_schema = {"type": "FloatBundle"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Estimated Hours", "2.5")
+        self.assertTrue(result)
+
+    def test_validate_unknown_field_type(self):
+        """Test validation with unknown field type defaults to valid."""
+        mock_schema = {"type": "UnknownType"}
+        self.issues_client._get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Custom Field", "any-value")
+        self.assertTrue(result)
+
+    def test_validate_no_schema_defaults_to_valid(self):
+        """Test validation when schema is not found defaults to valid."""
+        self.issues_client._get_custom_field_schema = Mock(return_value=None)
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Unknown Field", "any-value")
+        self.assertTrue(result)
+
+    def test_validate_with_api_error_defaults_to_valid(self):
+        """Test validation with API error defaults to valid (graceful fallback)."""
+        self.issues_client._get_custom_field_schema = Mock(side_effect=Exception("API Error"))
+
+        result = self.issues_client._validate_custom_field_value("0-0", "Field", "value")
+        self.assertTrue(result)
+
+
+if __name__ == "__main__":
+    unittest.main()

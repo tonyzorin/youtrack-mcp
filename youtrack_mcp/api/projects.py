@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 from youtrack_mcp.api.client import YouTrackClient
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 class Project(BaseModel):
     """Model for a YouTrack project."""
@@ -116,7 +118,6 @@ class ProjectsClient:
         Returns:
             List of issues in the project
         """
-        logger = logging.getLogger(__name__)
         logger.info(f"Getting issues for project {project_id}, limit {limit}")
 
         # Request more fields to get complete issue information
@@ -175,7 +176,6 @@ class ProjectsClient:
             data["leader"] = {"id": lead_id}
 
         # Debug logging
-        logger = logging.getLogger(__name__)
         logger.info(f"Creating project with data: {json.dumps(data)}")
         logger.info(
             f"Base URL: {self.client.base_url}, API endpoint: admin/projects"
@@ -245,7 +245,6 @@ class ProjectsClient:
             The updated project data
         """
         # First get the existing project data
-        logger = logging.getLogger(__name__)
         logger.info(f"Getting existing project data for {project_id}")
 
         try:

@@ -5,6 +5,7 @@ This module provides comprehensive test coverage for the ProjectsClient class
 and Project model to improve coverage from 20% to high coverage.
 """
 
+import unittest
 import pytest
 from unittest.mock import Mock, patch
 from typing import List, Dict, Any
@@ -351,3 +352,387 @@ class TestProjectsClientDeleteProject:
             projects_client.delete_project("1-1")
         
         assert "Delete failed" in str(exc_info.value) 
+
+
+class TestProjectsCustomFields(unittest.TestCase):
+    """Test custom field schema management methods in Projects API."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.mock_client = Mock()
+        self.projects_client = ProjectsClient(self.mock_client)
+
+    def test_get_custom_field_schema_success(self):
+        """Test getting custom field schema successfully."""
+        mock_fields = [
+            {
+                "field": {
+                    "name": "Priority",
+                    "id": "field-123",
+                    "isMultiValue": False,
+                    "fieldType": {
+                        "valueType": "enum",
+                        "$type": "EnumFieldType",
+                        "id": "bundle-456"
+                    }
+                },
+                "canBeEmpty": False,
+                "autoAttached": True
+            }
+        ]
+        
+        self.projects_client.get_custom_fields = Mock(return_value=mock_fields)
+        self.projects_client.get_custom_field_allowed_values = Mock(return_value=[
+            {"name": "High", "id": "val-1"},
+            {"name": "Medium", "id": "val-2"}
+        ])
+
+        result = self.projects_client.get_custom_field_schema("0-0", "Priority")
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "Priority")
+        self.assertEqual(result["type"], "enum")
+        self.assertEqual(result["bundle_type"], "EnumFieldType")
+        self.assertTrue(result["required"])
+        self.assertFalse(result["multi_value"])
+        self.assertTrue(result["auto_attach"])
+        self.assertIn("allowed_values", result)
+
+    def test_get_custom_field_schema_not_found(self):
+        """Test getting schema for non-existent field."""
+        mock_fields = [
+            {"field": {"name": "OtherField"}}
+        ]
+        
+        self.projects_client.get_custom_fields = Mock(return_value=mock_fields)
+
+        result = self.projects_client.get_custom_field_schema("0-0", "NonExistentField")
+
+        self.assertIsNone(result)
+
+    def test_get_custom_field_schema_api_error(self):
+        """Test schema retrieval with API error."""
+        self.projects_client.get_custom_fields = Mock(side_effect=Exception("API Error"))
+
+        result = self.projects_client.get_custom_field_schema("0-0", "Priority")
+
+        self.assertIsNone(result)
+
+    def test_get_custom_field_allowed_values_enum_field(self):
+        """Test getting allowed values for enum field."""
+        mock_schema = {
+            "bundle_type": "EnumBundle",
+            "bundle_id": "bundle-123"
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        
+        mock_bundle_data = {
+            "values": [
+                {"name": "High", "description": "High priority", "id": "val-1", "color": {"bg": "#ff0000"}},
+                {"name": "Medium", "description": "Medium priority", "id": "val-2", "color": {"bg": "#ffff00"}},
+                {"name": "Low", "description": "Low priority", "id": "val-3", "color": {"bg": "#00ff00"}}
+            ]
+        }
+        self.mock_client.get.return_value = mock_bundle_data
+
+        result = self.projects_client.get_custom_field_allowed_values("0-0", "Priority")
+
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0]["name"], "High")
+        self.assertEqual(result[0]["description"], "High priority")
+        self.assertIn("color", result[0])
+
+    def test_get_custom_field_allowed_values_state_field(self):
+        """Test getting allowed values for state field."""
+        mock_schema = {
+            "bundle_type": "StateBundle",
+            "bundle_id": "bundle-456"
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        
+        mock_bundle_data = {
+            "values": [
+                {"name": "Open", "description": "Open state", "id": "state-1", "isResolved": False},
+                {"name": "In Progress", "description": "In progress", "id": "state-2", "isResolved": False},
+                {"name": "Closed", "description": "Closed state", "id": "state-3", "isResolved": True}
+            ]
+        }
+        self.mock_client.get.return_value = mock_bundle_data
+
+        result = self.projects_client.get_custom_field_allowed_values("0-0", "State")
+
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0]["name"], "Open")
+        self.assertFalse(result[0]["resolved"])
+        self.assertTrue(result[2]["resolved"])
+
+    def test_get_custom_field_allowed_values_user_field(self):
+        """Test getting allowed values for user field."""
+        mock_schema = {
+            "bundle_type": "UserBundle",
+            "bundle_id": "bundle-789"
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        
+        mock_users_data = [
+            {"id": "user-1", "login": "john.doe", "name": "John Doe", "email": "john@example.com"},
+            {"id": "user-2", "login": "jane.smith", "name": "Jane Smith", "email": "jane@example.com"}
+        ]
+        self.mock_client.get.return_value = mock_users_data
+
+        result = self.projects_client.get_custom_field_allowed_values("0-0", "Assignee")
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["login"], "john.doe")
+        self.assertEqual(result[0]["name"], "John Doe")
+        self.assertEqual(result[0]["email"], "john@example.com")
+
+    def test_get_custom_field_allowed_values_no_schema(self):
+        """Test getting allowed values when schema not found."""
+        self.projects_client.get_custom_field_schema = Mock(return_value=None)
+
+        result = self.projects_client.get_custom_field_allowed_values("0-0", "UnknownField")
+
+        self.assertEqual(result, [])
+
+    def test_get_custom_field_allowed_values_no_bundle_id(self):
+        """Test getting allowed values when bundle ID is missing."""
+        mock_schema = {
+            "bundle_type": "EnumBundle",
+            "bundle_id": None
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.projects_client.get_custom_field_allowed_values("0-0", "Priority")
+
+        self.assertEqual(result, [])
+
+    def test_get_custom_field_allowed_values_api_error(self):
+        """Test allowed values retrieval with API error."""
+        mock_schema = {
+            "bundle_type": "EnumBundle",
+            "bundle_id": "bundle-123"
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        self.mock_client.get.side_effect = Exception("API Error")
+
+        result = self.projects_client.get_custom_field_allowed_values("0-0", "Priority")
+
+        self.assertEqual(result, [])
+
+    def test_get_all_custom_fields_schemas_success(self):
+        """Test getting all custom field schemas for a project."""
+        mock_fields = [
+            {"field": {"name": "Priority"}},
+            {"field": {"name": "Assignee"}},
+            {"field": {"name": "State"}}
+        ]
+        
+        self.projects_client.get_custom_fields = Mock(return_value=mock_fields)
+        
+        # Mock individual schema calls
+        mock_schemas = {
+            "Priority": {"name": "Priority", "type": "enum"},
+            "Assignee": {"name": "Assignee", "type": "user"},
+            "State": {"name": "State", "type": "state"}
+        }
+        
+        def mock_get_schema(project_id, field_name):
+            return mock_schemas.get(field_name)
+        
+        self.projects_client.get_custom_field_schema = Mock(side_effect=mock_get_schema)
+
+        result = self.projects_client.get_all_custom_fields_schemas("0-0")
+
+        self.assertEqual(len(result), 3)
+        self.assertIn("Priority", result)
+        self.assertIn("Assignee", result)
+        self.assertIn("State", result)
+        self.assertEqual(result["Priority"]["type"], "enum")
+
+    def test_get_all_custom_fields_schemas_api_error(self):
+        """Test getting all schemas with API error."""
+        self.projects_client.get_custom_fields = Mock(side_effect=Exception("API Error"))
+
+        result = self.projects_client.get_all_custom_fields_schemas("0-0")
+
+        self.assertEqual(result, {})
+
+    def test_validate_custom_field_for_project_valid_enum(self):
+        """Test validation for valid enum field value."""
+        mock_schema = {
+            "name": "Priority",
+            "type": "enum",
+            "required": False,
+            "multi_value": False,
+            "allowed_values": [
+                {"name": "High"}, {"name": "Medium"}, {"name": "Low"}
+            ]
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Priority", "High")
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["field"], "Priority")
+        self.assertEqual(result["value"], "High")
+
+    def test_validate_custom_field_for_project_invalid_enum(self):
+        """Test validation for invalid enum field value."""
+        mock_schema = {
+            "name": "Priority",
+            "type": "enum",
+            "required": False,
+            "multi_value": False,
+            "allowed_values": [
+                {"name": "High"}, {"name": "Medium"}, {"name": "Low"}
+            ]
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Priority", "VeryHigh")
+
+        self.assertFalse(result["valid"])
+        self.assertIn("Invalid value", result["error"])
+        self.assertIn("High, Medium, Low", result["suggestion"])
+
+    def test_validate_custom_field_for_project_required_field_empty(self):
+        """Test validation for required field with empty value."""
+        mock_schema = {
+            "name": "Priority",
+            "type": "enum",
+            "required": True,
+            "multi_value": False
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Priority", "")
+
+        self.assertFalse(result["valid"])
+        self.assertIn("is required", result["error"])
+
+    def test_validate_custom_field_for_project_user_field_valid(self):
+        """Test validation for valid user field."""
+        mock_schema = {
+            "name": "Assignee",
+            "type": "user",
+            "required": False,
+            "multi_value": False
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        self.mock_client.get.return_value = {"id": "user-1", "login": "john.doe"}
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Assignee", "john.doe")
+
+        self.assertTrue(result["valid"])
+
+    def test_validate_custom_field_for_project_user_field_invalid(self):
+        """Test validation for invalid user field."""
+        mock_schema = {
+            "name": "Assignee",
+            "type": "user",
+            "required": False,
+            "multi_value": False
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        self.mock_client.get.side_effect = Exception("User not found")
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Assignee", "nonexistent")
+
+        self.assertFalse(result["valid"])
+        self.assertIn("not found", result["error"])
+
+    def test_validate_custom_field_for_project_integer_field_valid(self):
+        """Test validation for valid integer field."""
+        mock_schema = {
+            "name": "Story Points",
+            "type": "integer",
+            "required": False,
+            "multi_value": False
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Story Points", "8")
+
+        self.assertTrue(result["valid"])
+
+    def test_validate_custom_field_for_project_integer_field_invalid(self):
+        """Test validation for invalid integer field."""
+        mock_schema = {
+            "name": "Story Points",
+            "type": "integer",
+            "required": False,
+            "multi_value": False
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Story Points", "not-a-number")
+
+        self.assertFalse(result["valid"])
+        self.assertIn("Invalid integer", result["error"])
+
+    def test_validate_custom_field_for_project_float_field_valid(self):
+        """Test validation for valid float field."""
+        mock_schema = {
+            "name": "Estimated Hours",
+            "type": "float",
+            "required": False,
+            "multi_value": False
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Estimated Hours", "2.5")
+
+        self.assertTrue(result["valid"])
+
+    def test_validate_custom_field_for_project_multi_value_field_invalid(self):
+        """Test validation for multi-value field with single value."""
+        mock_schema = {
+            "name": "Tags",
+            "type": "enum",
+            "required": False,
+            "multi_value": True,
+            "allowed_values": [{"name": "single-value"}]  # Include the value so enum check passes
+        }
+        
+        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Tags", "single-value")
+
+        self.assertFalse(result["valid"])
+        self.assertIn("expects multiple values", result["error"])
+
+    def test_validate_custom_field_for_project_field_not_found(self):
+        """Test validation for non-existent field."""
+        self.projects_client.get_custom_field_schema = Mock(return_value=None)
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "NonExistent", "value")
+
+        self.assertFalse(result["valid"])
+        self.assertIn("not found", result["error"])
+
+    def test_validate_custom_field_for_project_api_error(self):
+        """Test validation with API error."""
+        self.projects_client.get_custom_field_schema = Mock(side_effect=Exception("API Error"))
+
+        result = self.projects_client.validate_custom_field_for_project("0-0", "Field", "value")
+
+        self.assertFalse(result["valid"])
+        self.assertIn("Validation error", result["error"])
+
+
+if __name__ == "__main__":
+    unittest.main() 
