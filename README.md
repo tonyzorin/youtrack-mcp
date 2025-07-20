@@ -67,9 +67,10 @@ export YOUTRACK_VERIFY_SSL="true"
 
 ## Documentation
 
-- [API Documentation](docs/API.md)
-- [Development Workflow](DOCKER_TAGGING.md)
+- [Development Workflow & Release Process](automations/RELEASE_INSTRUCTIONS.md)
+- [Docker Tagging Strategy](automations/DOCKER_TAGGING.md)
 - [Testing Guide](tests/README.md)
+- [Automation Scripts](automations/README.md)
 
 ## Support
 
