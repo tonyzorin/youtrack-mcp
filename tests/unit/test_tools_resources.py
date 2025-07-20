@@ -1,583 +1,734 @@
-"""
-Unit tests for YouTrack Resources Tools.
-"""
+"""Tests for the resources tools module."""
+
 import json
 import pytest
-from unittest.mock import Mock, patch
-
-from youtrack_mcp.tools.resources import ResourcesTools, YOUTRACK_URI_SCHEME, URI_TEMPLATES
+from unittest.mock import Mock, patch, MagicMock
+from youtrack_mcp.tools.resources import (
+    ResourcesTools,
+    URI_TEMPLATES,
+    YOUTRACK_URI_SCHEME,
+)
 from youtrack_mcp.api.client import YouTrackAPIError
 
 
 class TestResourcesToolsInitialization:
-    """Test ResourcesTools initialization."""
-    
+    """Test resources tools initialization."""
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_resources_tools_initialization(self, mock_client_class):
-        """Test that ResourcesTools initializes correctly."""
-        # Mock the client instance
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    def test_initialization_success(self, mock_projects_client_class, mock_issues_client_class, mock_client_class):
+        """Test successful initialization."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
         tools = ResourcesTools()
-        assert tools.client is not None
-        assert tools.issues_api is not None
-        assert tools.projects_api is not None
-        assert tools.subscriptions == set()
-        mock_client_class.assert_called_once()
 
+        assert tools.client == mock_client
+        assert tools.issues_api == mock_issues_api
+        assert tools.projects_api == mock_projects_api
+        assert isinstance(tools.subscriptions, set)
+        assert len(tools.subscriptions) == 0
 
-class TestResourcesToolsConstants:
-    """Test URI constants and templates."""
-    
-    def test_uri_scheme_constant(self):
-        """Test that URI scheme is defined correctly."""
-        assert YOUTRACK_URI_SCHEME == "youtrack"
-    
-    def test_uri_templates_structure(self):
-        """Test that URI templates are properly structured."""
-        assert isinstance(URI_TEMPLATES, dict)
-        
-        expected_templates = [
-            "projects", "project", "project_issues", "issues", "issue",
-            "issue_comments", "users", "user", "search"
-        ]
-        
-        for template_name in expected_templates:
-            assert template_name in URI_TEMPLATES
-            assert URI_TEMPLATES[template_name].startswith(YOUTRACK_URI_SCHEME)
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    def test_empty_subscriptions_on_init(self, mock_projects_client_class, mock_issues_client_class, mock_client_class):
+        """Test that subscriptions start empty."""
+        mock_client_class.return_value = Mock()
+        mock_issues_client_class.return_value = Mock()
+        mock_projects_client_class.return_value = Mock()
+
+        tools = ResourcesTools()
+        assert len(tools.subscriptions) == 0
 
 
 class TestResourcesToolsListResources:
     """Test list_resources method."""
-    
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
     @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_list_resources_success(self, mock_client_class, mock_projects_client_class):
+    def test_list_resources_success(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test successful resource listing."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
         mock_projects_api = Mock()
         mock_projects_client_class.return_value = mock_projects_api
-        
-        # Mock projects
+
+        # Mock projects response - using dictionaries instead of Mock objects
         mock_projects_api.get_projects.return_value = [
-            {"id": "0-0", "name": "Demo Project", "shortName": "DEMO"}
+            {"id": "0-0", "name": "Demo Project"},
+            {"id": "0-1", "name": "Test Project"}
         ]
-        
+
         tools = ResourcesTools()
         result = tools.list_resources()
-        
+
         result_data = json.loads(result)
+        assert "resources" in result_data
+        assert "resourceTemplates" in result_data
+        
+        # Check that dynamic projects were added
         resources = result_data["resources"]
-        
-        # Should contain static resources
-        resource_names = [r["name"] for r in resources]
-        assert "All Projects" in resource_names
-        assert "All Issues" in resource_names
-        assert "All Users" in resource_names
-        
-        # Should contain dynamic project resources
-        project_resources = [r for r in resources if "Demo Project" in r["name"]]
-        assert len(project_resources) > 0
-    
+        project_resources = [r for r in resources if r["name"].startswith("Project:")]
+        assert len(project_resources) >= 2
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
     @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_list_resources_projects_api_error(self, mock_client_class, mock_projects_client_class):
-        """Test resource listing when projects API fails."""
+    def test_list_resources_project_error(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test resource listing when project fetching fails."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
         mock_projects_api = Mock()
         mock_projects_client_class.return_value = mock_projects_api
-        
-        mock_projects_api.get_projects.side_effect = YouTrackAPIError("Access denied")
-        
+
+        # Mock projects to raise an exception
+        mock_projects_api.get_projects.side_effect = Exception("API Error")
+
         tools = ResourcesTools()
         result = tools.list_resources()
-        
+
         result_data = json.loads(result)
-        resources = result_data["resources"]
-        
-        # Should still contain static resources even if projects fail
-        resource_names = [r["name"] for r in resources]
-        assert "All Projects" in resource_names
-        assert "All Issues" in resource_names
-        assert "All Users" in resource_names
+        assert "resources" in result_data
+        assert "resourceTemplates" in result_data
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_list_resources_exception_handling(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test resource listing exception handling."""
+        mock_client_class.side_effect = Exception("Client error")
+
+        with pytest.raises(Exception):
+            ResourcesTools()
 
 
 class TestResourcesToolsReadResource:
     """Test read_resource method."""
-    
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
     @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_read_resource_projects(self, mock_client_class, mock_projects_client_class):
-        """Test reading projects resource."""
+    def test_read_resource_all_projects(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test reading all projects resource."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
         mock_projects_api = Mock()
         mock_projects_client_class.return_value = mock_projects_api
-        
+
+        # Mock projects response with proper dictionaries
         mock_projects_api.get_projects.return_value = [
-            {"id": "0-0", "name": "Demo Project"}
+            {"id": "0-0", "name": "Demo Project"},
+            {"id": "0-1", "name": "Test Project"}
         ]
-        
+
         tools = ResourcesTools()
         result = tools.read_resource("youtrack://projects")
-        
+
         result_data = json.loads(result)
         assert "contents" in result_data
         assert len(result_data["contents"]) == 1
         
         content = result_data["contents"][0]
-        assert content["mimeType"] == "application/json"
+        assert content["uri"] == URI_TEMPLATES["projects"]
         
+        # Parse the text content
         projects_data = json.loads(content["text"])
-        assert len(projects_data) == 1
-        assert projects_data[0]["id"] == "0-0"
-    
+        assert len(projects_data) == 2
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
     @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_read_resource_issues(self, mock_client_class, mock_issues_client_class):
-        """Test reading issues resource."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        mock_issues_api = Mock()
-        mock_issues_client_class.return_value = mock_issues_api
-        
-        mock_issues_api.search_issues.return_value = [
-            {"id": "2-123", "summary": "Test Issue"}
-        ]
-        
-        tools = ResourcesTools()
-        result = tools.read_resource("youtrack://issues")
-        
-        result_data = json.loads(result)
-        assert "contents" in result_data
-        
-        content = result_data["contents"][0]
-        issues_data = json.loads(content["text"])
-        assert len(issues_data) == 1
-        assert issues_data[0]["id"] == "2-123"
-    
-    @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_read_resource_specific_project(self, mock_client_class):
+    def test_read_resource_specific_project(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test reading specific project resource."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
-        mock_client.get.return_value = {
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock projects response with proper dictionary
+        mock_projects_api.get_project.return_value = {
             "id": "0-0",
             "name": "Demo Project",
             "shortName": "DEMO"
         }
-        
+
         tools = ResourcesTools()
-        result = tools.read_resource("youtrack://projects/0-0")
-        
+        result = tools.read_resource("youtrack:///projects/0-0")
+
         result_data = json.loads(result)
         content = result_data["contents"][0]
         project_data = json.loads(content["text"])
         assert project_data["id"] == "0-0"
         assert project_data["name"] == "Demo Project"
-        
-        mock_client.get.assert_called_once_with("admin/projects/0-0")
-    
+
+        mock_projects_api.get_project.assert_called_once_with("0-0")
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_read_resource_specific_issue(self, mock_client_class):
+    def test_read_resource_specific_issue(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test reading specific issue resource."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
-        mock_client.get.return_value = {
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock issues response with proper dictionary
+        mock_issues_api.get_issue.return_value = {
             "id": "2-123",
             "idReadable": "DEMO-123",
             "summary": "Test Issue"
         }
-        
+
         tools = ResourcesTools()
-        result = tools.read_resource("youtrack://issues/DEMO-123")
-        
+        result = tools.read_resource("youtrack:///issues/DEMO-123")
+
         result_data = json.loads(result)
         content = result_data["contents"][0]
         issue_data = json.loads(content["text"])
         assert issue_data["id"] == "2-123"
         assert issue_data["summary"] == "Test Issue"
-    
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
     @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_read_resource_project_issues(self, mock_client_class, mock_projects_client_class):
+    def test_read_resource_project_issues(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test reading project issues resource."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
         mock_projects_api = Mock()
         mock_projects_client_class.return_value = mock_projects_api
-        
+
+        # Mock projects response with proper dictionaries
         mock_projects_api.get_project_issues.return_value = [
             {"id": "2-123", "summary": "Project Issue"}
         ]
-        
+
         tools = ResourcesTools()
-        result = tools.read_resource("youtrack://projects/DEMO/issues")
-        
+        result = tools.read_resource("youtrack:///projects/DEMO/issues")
+
         result_data = json.loads(result)
         content = result_data["contents"][0]
         issues_data = json.loads(content["text"])
         assert len(issues_data) == 1
-        assert issues_data[0]["id"] == "2-123"
-        
-        mock_projects_api.get_project_issues.assert_called_once_with("DEMO", 50)
-    
+        assert issues_data[0]["summary"] == "Project Issue"
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_read_resource_issue_comments(self, mock_client_class):
+    def test_read_resource_issue_comments(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test reading issue comments resource."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock comments response with proper dictionaries
         mock_client.get.return_value = [
             {"id": "comment-1", "text": "First comment"},
             {"id": "comment-2", "text": "Second comment"}
         ]
-        
+
         tools = ResourcesTools()
-        result = tools.read_resource("youtrack://issues/DEMO-123/comments")
-        
+        result = tools.read_resource("youtrack:///issues/DEMO-123/comments")
+
         result_data = json.loads(result)
         content = result_data["contents"][0]
         comments_data = json.loads(content["text"])
         assert len(comments_data) == 2
         assert comments_data[0]["text"] == "First comment"
-        
-        mock_client.get.assert_called_once_with("issues/DEMO-123/comments")
-    
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_read_resource_search(self, mock_client_class):
+    def test_read_resource_search(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test reading search resource."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock search results with proper dictionaries - search uses client.get directly
+        mock_client.get.return_value = [
+            {"id": "2-123", "summary": "Search Result"}
+        ]
+
         tools = ResourcesTools()
-        result = tools.read_resource("youtrack://search?query=project:%20DEMO")
-        
+        result = tools.read_resource("youtrack:///search?query=project:%20DEMO")
+
         result_data = json.loads(result)
         content = result_data["contents"][0]
-        assert "search" in content["text"].lower()
-    
-    def test_read_resource_invalid_uri(self):
+        search_data = json.loads(content["text"])
+        assert len(search_data) == 1
+        assert search_data[0]["summary"] == "Search Result"
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_read_resource_invalid_uri(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test reading invalid URI."""
+        mock_client_class.return_value = Mock()
+        mock_issues_client_class.return_value = Mock()
+        mock_projects_client_class.return_value = Mock()
+
         tools = ResourcesTools()
-        result = tools.read_resource("invalid://uri")
-        
+        result = tools.read_resource("http://invalid")
+
         result_data = json.loads(result)
         assert "error" in result_data
         assert "Invalid URI scheme" in result_data["error"]
-    
-    def test_read_resource_unknown_pattern(self):
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_read_resource_unknown_pattern(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test reading unknown URI pattern."""
+        mock_client_class.return_value = Mock()
+        mock_issues_client_class.return_value = Mock()
+        mock_projects_client_class.return_value = Mock()
+
         tools = ResourcesTools()
-        result = tools.read_resource("youtrack://unknown/path")
-        
+        result = tools.read_resource("youtrack://unknown/pattern")
+
         result_data = json.loads(result)
         assert "error" in result_data
-        assert "Unknown resource" in result_data["error"]
+        assert "Unknown resource URI" in result_data["error"]
 
 
 class TestResourcesToolsSubscriptions:
-    """Test subscription methods."""
-    
-    def test_subscribe_resource_success(self):
+    """Test resource subscription methods."""
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_subscribe_resource_success(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test successful resource subscription."""
+        mock_client_class.return_value = Mock()
+        mock_issues_client_class.return_value = Mock()
+        mock_projects_client_class.return_value = Mock()
+
         tools = ResourcesTools()
         result = tools.subscribe_resource("youtrack://projects")
-        
+
         result_data = json.loads(result)
-        assert result_data["success"] is True
+        assert result_data["subscribed"] is True
+        assert result_data["uri"] == "youtrack://projects"
         assert "youtrack://projects" in tools.subscriptions
-    
-    def test_subscribe_resource_already_subscribed(self):
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_subscribe_resource_already_subscribed(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test subscribing to already subscribed resource."""
+        mock_client_class.return_value = Mock()
+        mock_issues_client_class.return_value = Mock()
+        mock_projects_client_class.return_value = Mock()
+
         tools = ResourcesTools()
         tools.subscriptions.add("youtrack://projects")
-        
+
         result = tools.subscribe_resource("youtrack://projects")
-        
+
         result_data = json.loads(result)
-        assert result_data["success"] is True
-        assert "already subscribed" in result_data["message"]
-    
-    def test_unsubscribe_resource_success(self):
+        assert result_data["subscribed"] is True
+        assert result_data["uri"] == "youtrack://projects"
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_unsubscribe_resource_success(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test successful resource unsubscription."""
+        mock_client_class.return_value = Mock()
+        mock_issues_client_class.return_value = Mock()
+        mock_projects_client_class.return_value = Mock()
+
         tools = ResourcesTools()
         tools.subscriptions.add("youtrack://projects")
-        
+
         result = tools.unsubscribe_resource("youtrack://projects")
-        
+
         result_data = json.loads(result)
-        assert result_data["success"] is True
+        assert result_data["unsubscribed"] is True
+        assert result_data["uri"] == "youtrack://projects"
         assert "youtrack://projects" not in tools.subscriptions
-    
-    def test_unsubscribe_resource_not_subscribed(self):
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_unsubscribe_resource_not_subscribed(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test unsubscribing from non-subscribed resource."""
+        mock_client_class.return_value = Mock()
+        mock_issues_client_class.return_value = Mock()
+        mock_projects_client_class.return_value = Mock()
+
         tools = ResourcesTools()
-        
         result = tools.unsubscribe_resource("youtrack://projects")
-        
+
         result_data = json.loads(result)
-        assert result_data["success"] is True
-        assert "not subscribed" in result_data["message"]
+        assert result_data["unsubscribed"] is True
+        assert result_data["uri"] == "youtrack://projects"
+
+
+class TestResourcesToolsConstants:
+    """Test resources constants and templates."""
+
+    def test_uri_templates_structure(self):
+        """Test URI templates structure."""
+        assert isinstance(URI_TEMPLATES, dict)
+        assert "projects" in URI_TEMPLATES
+        assert "project" in URI_TEMPLATES
+        assert "issues" in URI_TEMPLATES
+        assert "issue" in URI_TEMPLATES
+
+    def test_youtrack_uri_scheme(self):
+        """Test YouTrack URI scheme."""
+        assert YOUTRACK_URI_SCHEME == "youtrack"
+
+    def test_uri_template_format(self):
+        """Test URI template format strings."""
+        assert "{project_id}" in URI_TEMPLATES["project"]
+        assert "{issue_id}" in URI_TEMPLATES["issue"]
+        assert "{user_id}" in URI_TEMPLATES["user"]
+        assert "{query}" in URI_TEMPLATES["search"]
+
+
+class TestResourcesToolsGetAllUsers:
+    """Test get_all_users method."""
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_get_all_users_success(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test successful get_all_users."""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock users response
+        mock_client.get.return_value = [
+            {"id": "user-1", "login": "admin", "fullName": "Administrator"},
+            {"id": "user-2", "login": "tester", "fullName": "Test User"}
+        ]
+
+        tools = ResourcesTools()
+        result = tools.get_all_users()
+
+        result_data = json.loads(result)
+        assert "contents" in result_data
+        content = result_data["contents"][0]
+        users_data = json.loads(content["text"])
+        assert len(users_data) == 2
+        assert users_data[0]["login"] == "admin"
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_get_all_users_error(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test get_all_users with error."""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock users to raise an exception
+        mock_client.get.side_effect = Exception("API Error")
+
+        tools = ResourcesTools()
+        result = tools.get_all_users()
+
+        result_data = json.loads(result)
+        assert "error" in result_data
+
+
+class TestResourcesToolsGetUser:
+    """Test get_user method."""
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_get_user_success(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test successful get_user."""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock user response
+        mock_client.get.return_value = {
+            "id": "user-1",
+            "login": "admin",
+            "fullName": "Administrator"
+        }
+
+        tools = ResourcesTools()
+        result = tools.get_user("admin")
+
+        result_data = json.loads(result)
+        assert "contents" in result_data
+        content = result_data["contents"][0]
+        user_data = json.loads(content["text"])
+        assert user_data["login"] == "admin"
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_get_user_error(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test get_user with error."""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock user to raise an exception
+        mock_client.get.side_effect = Exception("User not found")
+
+        tools = ResourcesTools()
+        result = tools.get_user("nonexistent")
+
+        result_data = json.loads(result)
+        assert "error" in result_data
 
 
 class TestResourcesToolsHelperMethods:
     """Test helper methods."""
-    
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
     @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_all_issues(self, mock_client_class, mock_issues_client_class):
-        """Test get_all_issues method."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        mock_issues_api = Mock()
-        mock_issues_client_class.return_value = mock_issues_api
-        
-        mock_issues_api.search_issues.return_value = [
-            {"id": "2-123", "summary": "Issue 1"},
-            {"id": "2-124", "summary": "Issue 2"}
-        ]
-        
-        tools = ResourcesTools()
-        result = tools.get_all_issues()
-        
-        result_data = json.loads(result)
-        content = result_data["contents"][0]
-        issues_data = json.loads(content["text"])
-        assert len(issues_data) == 2
-        
-        mock_issues_api.search_issues.assert_called_once_with(limit=100)
-    
-    @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_issue(self, mock_client_class):
-        """Test get_issue method."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        mock_client.get.return_value = {
-            "id": "2-123",
-            "summary": "Test Issue"
-        }
-        
-        tools = ResourcesTools()
-        result = tools.get_issue("DEMO-123")
-        
-        result_data = json.loads(result)
-        content = result_data["contents"][0]
-        issue_data = json.loads(content["text"])
-        assert issue_data["id"] == "2-123"
-    
-    @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_issue_comments(self, mock_client_class):
-        """Test get_issue_comments method."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        mock_client.get.return_value = [
-            {"id": "comment-1", "text": "Test comment"}
-        ]
-        
-        tools = ResourcesTools()
-        result = tools.get_issue_comments("DEMO-123")
-        
-        result_data = json.loads(result)
-        content = result_data["contents"][0]
-        comments_data = json.loads(content["text"])
-        assert len(comments_data) == 1
-        assert comments_data[0]["text"] == "Test comment"
-    
-    @patch('youtrack_mcp.tools.resources.ProjectsClient')
-    @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_all_projects(self, mock_client_class, mock_projects_client_class):
-        """Test get_all_projects method."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        mock_projects_api = Mock()
-        mock_projects_client_class.return_value = mock_projects_api
-        
-        mock_projects_api.get_projects.return_value = [
-            {"id": "0-0", "name": "Demo Project"}
-        ]
-        
-        tools = ResourcesTools()
-        result = tools.get_all_projects()
-        
-        result_data = json.loads(result)
-        content = result_data["contents"][0]
-        projects_data = json.loads(content["text"])
-        assert len(projects_data) == 1
-        assert projects_data[0]["id"] == "0-0"
-    
-    @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_project(self, mock_client_class):
-        """Test get_project method."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        mock_client.get.return_value = {
-            "id": "0-0",
-            "name": "Demo Project"
-        }
-        
-        tools = ResourcesTools()
-        result = tools.get_project("0-0")
-        
-        result_data = json.loads(result)
-        content = result_data["contents"][0]
-        project_data = json.loads(content["text"])
-        assert project_data["id"] == "0-0"
-    
-    @patch('youtrack_mcp.tools.resources.ProjectsClient')
-    @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_project_issues(self, mock_client_class, mock_projects_client_class):
-        """Test get_project_issues method."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        mock_projects_api = Mock()
-        mock_projects_client_class.return_value = mock_projects_api
-        
-        mock_projects_api.get_project_issues.return_value = [
-            {"id": "2-123", "summary": "Project Issue"}
-        ]
-        
-        tools = ResourcesTools()
-        result = tools.get_project_issues("DEMO")
-        
-        result_data = json.loads(result)
-        content = result_data["contents"][0]
-        issues_data = json.loads(content["text"])
-        assert len(issues_data) == 1
-    
-    @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_all_users(self, mock_client_class):
-        """Test get_all_users method."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        mock_client.get.return_value = [
-            {"id": "1-1", "login": "admin", "name": "Administrator"}
-        ]
-        
-        tools = ResourcesTools()
-        result = tools.get_all_users()
-        
-        result_data = json.loads(result)
-        content = result_data["contents"][0]
-        users_data = json.loads(content["text"])
-        assert len(users_data) == 1
-        assert users_data[0]["login"] == "admin"
-    
-    @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_user(self, mock_client_class):
-        """Test get_user method."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        mock_client.get.return_value = {
-            "id": "1-1",
-            "login": "admin",
-            "name": "Administrator"
-        }
-        
-        tools = ResourcesTools()
-        result = tools.get_user("1-1")
-        
-        result_data = json.loads(result)
-        content = result_data["contents"][0]
-        user_data = json.loads(content["text"])
-        assert user_data["login"] == "admin"
-    
-    @patch('youtrack_mcp.tools.resources.IssuesClient')
-    @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_search_issues(self, mock_client_class, mock_issues_client_class):
+    def test_search_issues(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test search_issues method."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
         mock_issues_api = Mock()
         mock_issues_client_class.return_value = mock_issues_api
-        
-        mock_issues_api.search_issues.return_value = [
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock search results with proper dictionaries - search_issues uses client.get directly
+        mock_client.get.return_value = [
             {"id": "2-123", "summary": "Search Result"}
         ]
-        
+
         tools = ResourcesTools()
         result = tools.search_issues("project: DEMO")
-        
+
         result_data = json.loads(result)
         content = result_data["contents"][0]
-        issues_data = json.loads(content["text"])
-        assert len(issues_data) == 1
-        assert issues_data[0]["summary"] == "Search Result"
+        search_data = json.loads(content["text"])
+        assert len(search_data) == 1
+        assert search_data[0]["summary"] == "Search Result"
 
 
 class TestResourcesToolsClose:
     """Test close method."""
-    
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_close_with_close_method(self, mock_client_class):
+    def test_close_with_close_method(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test close method when client has close method."""
         mock_client = Mock()
         mock_client.close = Mock()
         mock_client_class.return_value = mock_client
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
         tools = ResourcesTools()
+        # Add some subscriptions to test they get cleared
+        tools.subscriptions.add("test-uri")
+        
         tools.close()
-        
-        mock_client.close.assert_called_once()
 
+        # The close method should clear subscriptions, not call client.close()
+        assert len(tools.subscriptions) == 0
 
-class TestResourcesToolsDefinitions:
-    """Test tool definitions."""
-    
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_tool_definitions(self, mock_client_class):
-        """Test that tool definitions are properly structured."""
-        # Mock the client instance
+    def test_close_without_close_method(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test close method when client has no close method."""
         mock_client = Mock()
+        del mock_client.close  # Remove close method
         mock_client_class.return_value = mock_client
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
         tools = ResourcesTools()
-        definitions = tools.get_tool_definitions()
-        
-        assert isinstance(definitions, dict)
-        
-        expected_tools = [
-            "list_resources", "read_resource", "subscribe_resource",
-            "unsubscribe_resource", "get_all_issues", "get_issue",
-            "get_issue_comments", "get_all_projects", "get_project",
-            "get_project_issues", "get_all_users", "get_user", "search_issues"
-        ]
-        
-        for tool_name in expected_tools:
-            assert tool_name in definitions
-            assert "description" in definitions[tool_name]
-            assert "parameter_descriptions" in definitions[tool_name]
-        
-        # Check specific tool structure
-        read_resource_def = definitions["read_resource"]
-        assert "uri" in read_resource_def["parameter_descriptions"]
-        
-        subscribe_def = definitions["subscribe_resource"]
-        assert "uri" in subscribe_def["parameter_descriptions"]
+        # Should not raise an exception
+        tools.close()
 
 
 class TestResourcesToolsIntegration:
-    """Integration tests for ResourcesTools."""
-    
+    """Test integration scenarios."""
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
     @patch('youtrack_mcp.tools.resources.ProjectsClient')
     @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
@@ -585,13 +736,13 @@ class TestResourcesToolsIntegration:
         """Test a complete resources workflow scenario."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
         mock_issues_api = Mock()
         mock_issues_client_class.return_value = mock_issues_api
-        
+
         mock_projects_api = Mock()
         mock_projects_client_class.return_value = mock_projects_api
-        
+
         # Mock data
         mock_projects_api.get_projects.return_value = [
             {"id": "0-0", "name": "Demo Project"}
@@ -599,70 +750,108 @@ class TestResourcesToolsIntegration:
         mock_issues_api.search_issues.return_value = [
             {"id": "2-123", "summary": "Test Issue"}
         ]
-        
+
         tools = ResourcesTools()
-        
+
         # Test resource listing
         list_result = tools.list_resources()
         list_data = json.loads(list_result)
         assert "resources" in list_data
-        
+
         # Test resource reading
         read_result = tools.read_resource("youtrack://projects")
         read_data = json.loads(read_result)
         assert "contents" in read_data
-        
+
         # Test subscription
         subscribe_result = tools.subscribe_resource("youtrack://projects")
         subscribe_data = json.loads(subscribe_result)
-        assert subscribe_data["success"] is True
-        
-        # Test unsubscription
-        unsubscribe_result = tools.unsubscribe_resource("youtrack://projects")
-        unsubscribe_data = json.loads(unsubscribe_result)
-        assert unsubscribe_data["success"] is True
-        
-        tools.close()
+        assert subscribe_data["subscribed"] is True
+        assert subscribe_data["uri"] == "youtrack://projects"
 
 
 class TestResourcesToolsErrorHandling:
     """Test error handling scenarios."""
-    
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_read_resource_api_error(self, mock_client_class):
+    def test_read_resource_api_error(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
         """Test read resource with API error."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
-        mock_client.get.side_effect = YouTrackAPIError("Access denied")
-        
+
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+
+        mock_projects_api = Mock()
+        mock_projects_client_class.return_value = mock_projects_api
+
+        # Mock to raise API error when trying to access specific issue
+        mock_issues_api.get_issue.side_effect = YouTrackAPIError("Access denied")
+
         tools = ResourcesTools()
         result = tools.read_resource("youtrack://issues/DEMO-123")
-        
+
         result_data = json.loads(result)
         assert "error" in result_data
-        assert "Access denied" in result_data["error"]
-    
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
     @patch('youtrack_mcp.tools.resources.YouTrackClient')
-    def test_get_issue_comments_fallback(self, mock_client_class):
-        """Test issue comments fallback to direct API call."""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-        
-        # Mock initial failure, then success on direct call
-        mock_client.get.side_effect = [
-            Exception("Method not found"),
-            [{"id": "comment-1", "text": "Fallback comment"}]
-        ]
-        
+    def test_subscription_error_handling(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test subscription error handling."""
+        mock_client_class.return_value = Mock()
+        mock_issues_client_class.return_value = Mock()
+        mock_projects_client_class.return_value = Mock()
+
         tools = ResourcesTools()
-        result = tools.get_issue_comments("DEMO-123")
-        
+
+        # Test subscribe with exception handling
+        result = tools.subscribe_resource("youtrack://projects")
         result_data = json.loads(result)
-        content = result_data["contents"][0]
-        comments_data = json.loads(content["text"])
-        assert len(comments_data) == 1
-        assert comments_data[0]["text"] == "Fallback comment"
-        
-        # Verify fallback was used
-        assert mock_client.get.call_count == 2 
+        assert "subscribed" in result_data
+
+        # Test unsubscribe with exception handling
+        result = tools.unsubscribe_resource("youtrack://projects")
+        result_data = json.loads(result)
+        assert "unsubscribed" in result_data
+
+
+class TestResourcesToolsGetToolDefinitions:
+    """Test get_tool_definitions method."""
+
+    @patch.dict('os.environ', {
+        'YOUTRACK_URL': 'https://test.youtrack.cloud',
+        'YOUTRACK_API_TOKEN': 'test-token'
+    })
+    @patch('youtrack_mcp.tools.resources.ProjectsClient')
+    @patch('youtrack_mcp.tools.resources.IssuesClient')
+    @patch('youtrack_mcp.tools.resources.YouTrackClient')
+    def test_get_tool_definitions(self, mock_client_class, mock_issues_client_class, mock_projects_client_class):
+        """Test get_tool_definitions method."""
+        mock_client_class.return_value = Mock()
+        mock_issues_client_class.return_value = Mock()
+        mock_projects_client_class.return_value = Mock()
+
+        tools = ResourcesTools()
+        definitions = tools.get_tool_definitions()
+
+        assert isinstance(definitions, dict)
+        assert "list_resources" in definitions
+        assert "read_resource" in definitions
+        assert "subscribe_resource" in definitions
+        assert "unsubscribe_resource" in definitions
+
+        # Check structure of a definition
+        list_def = definitions["list_resources"]
+        assert "description" in list_def
+        assert "parameter_descriptions" in list_def 

@@ -29,7 +29,7 @@ jobs:
         YOUTRACK_URL: https://test.youtrack.cloud
         YOUTRACK_API_TOKEN: test-token
       run: |
-        python -m coverage run -m pytest tests/unit/ -v --ignore=tests/unit/test_tools_issues.py --ignore=tests/unit/test_tools_projects.py --ignore=tests/unit/test_tools_resources.py --ignore=tests/unit/test_tools_search.py --ignore=tests/unit/test_api_mcp_wrappers.py
+        python -m coverage run -m pytest tests/unit/ -v
         python -m coverage report --show-missing
         python -m coverage html
     
@@ -38,8 +38,8 @@ jobs:
         YOUTRACK_URL: https://test.youtrack.cloud
         YOUTRACK_API_TOKEN: test-token
       run: |
-        # Enforce minimum 35% coverage (temporarily lowered due to excluded problematic tests)
-        python -m coverage report --fail-under=35
+        # Enforce minimum 50% coverage
+        python -m coverage report --fail-under=50
     
     - name: Upload coverage reports
       uses: actions/upload-artifact@v4
