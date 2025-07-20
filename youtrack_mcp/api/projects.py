@@ -360,3 +360,238 @@ class ProjectsClient:
         return self.client.post(
             f"admin/projects/{project_id}/customFields", data=data
         )
+
+    def get_custom_field_schema(
+        self, project_id: str, field_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed schema for a specific custom field.
+
+        Args:
+            project_id: The project ID
+            field_name: The custom field name
+
+        Returns:
+            Custom field schema with type information and constraints
+        """
+        try:
+            fields = self.get_custom_fields(project_id)
+            for field in fields:
+                if field.get("field", {}).get("name") == field_name:
+                    field_schema = field.get("field", {})
+                    
+                    # Enhance with additional type information
+                    field_type = field_schema.get("fieldType", {})
+                    enhanced_schema = {
+                        "name": field_name,
+                        "type": field_type.get("valueType", "string"),
+                        "bundle_type": field_type.get("$type", ""),
+                        "required": field.get("canBeEmpty", True) == False,
+                        "multi_value": field_schema.get("isMultiValue", False),
+                        "auto_attach": field.get("autoAttached", False),
+                        "field_id": field_schema.get("id"),
+                        "bundle_id": field_type.get("id")
+                    }
+                    
+                    # Add allowed values for enum/state fields
+                    if field_type.get("valueType") in ["enum", "state"]:
+                        enhanced_schema["allowed_values"] = self.get_custom_field_allowed_values(project_id, field_name)
+                    
+                    return enhanced_schema
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error getting custom field schema: {str(e)}")
+            return None
+
+    def get_custom_field_allowed_values(
+        self, project_id: str, field_name: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Get allowed values for enum/state custom fields.
+
+        Args:
+            project_id: The project ID
+            field_name: The custom field name
+
+        Returns:
+            List of allowed values with details
+        """
+        try:
+            # First get the field schema
+            field_schema = self.get_custom_field_schema(project_id, field_name)
+            if not field_schema:
+                return []
+            
+            bundle_type = field_schema.get("bundle_type", "")
+            bundle_id = field_schema.get("bundle_id")
+            
+            if not bundle_id:
+                return []
+            
+            # Get bundle values based on type
+            if "EnumBundle" in bundle_type:
+                bundle_data = self.client.get(f"admin/customFieldSettings/bundles/enum/{bundle_id}")
+                values = bundle_data.get("values", [])
+                return [
+                    {
+                        "name": value.get("name", ""),
+                        "description": value.get("description", ""),
+                        "id": value.get("id"),
+                        "color": value.get("color", {})
+                    }
+                    for value in values
+                ]
+            
+            elif "StateBundle" in bundle_type:
+                bundle_data = self.client.get(f"admin/customFieldSettings/bundles/state/{bundle_id}")
+                values = bundle_data.get("values", [])
+                return [
+                    {
+                        "name": value.get("name", ""),
+                        "description": value.get("description", ""),
+                        "id": value.get("id"),
+                        "resolved": value.get("isResolved", False),
+                        "color": value.get("color", {})
+                    }
+                    for value in values
+                ]
+            
+            elif "UserBundle" in bundle_type:
+                # For user fields, get available users
+                users_data = self.client.get("users?fields=id,login,name,email")
+                return [
+                    {
+                        "name": user.get("name", ""),
+                        "login": user.get("login", ""),
+                        "id": user.get("id"),
+                        "email": user.get("email", "")
+                    }
+                    for user in users_data
+                ]
+            
+            return []
+            
+        except Exception as e:
+            logger.error(f"Error getting custom field allowed values: {str(e)}")
+            return []
+
+    def get_all_custom_fields_schemas(
+        self, project_id: str
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Get schemas for all custom fields in a project.
+
+        Args:
+            project_id: The project ID
+
+        Returns:
+            Dictionary mapping field names to their schemas
+        """
+        try:
+            fields = self.get_custom_fields(project_id)
+            schemas = {}
+            
+            for field in fields:
+                field_name = field.get("field", {}).get("name")
+                if field_name:
+                    schema = self.get_custom_field_schema(project_id, field_name)
+                    if schema:
+                        schemas[field_name] = schema
+            
+            return schemas
+        except Exception as e:
+            logger.error(f"Error getting all custom field schemas: {str(e)}")
+            return {}
+
+    def validate_custom_field_for_project(
+        self, 
+        project_id: str, 
+        field_name: str, 
+        field_value: Any
+    ) -> Dict[str, Any]:
+        """
+        Validate a custom field value against the project's schema.
+
+        Args:
+            project_id: The project ID
+            field_name: The custom field name
+            field_value: The value to validate
+
+        Returns:
+            Validation result with details
+        """
+        try:
+            field_schema = self.get_custom_field_schema(project_id, field_name)
+            if not field_schema:
+                return {
+                    "valid": False,
+                    "error": f"Custom field '{field_name}' not found in project {project_id}",
+                    "suggestion": "Check field name spelling and project configuration"
+                }
+            
+            field_type = field_schema.get("type", "string")
+            
+            # Required field validation
+            if field_schema.get("required", False) and (field_value is None or field_value == ""):
+                return {
+                    "valid": False,
+                    "error": f"Field '{field_name}' is required",
+                    "suggestion": "Provide a value for this required field"
+                }
+            
+            # Type-specific validation
+            if field_type in ["enum", "state"]:
+                allowed_values = [v.get("name") for v in field_schema.get("allowed_values", [])]
+                if str(field_value) not in allowed_values:
+                    return {
+                        "valid": False,
+                        "error": f"Invalid value '{field_value}' for field '{field_name}'",
+                        "suggestion": f"Use one of: {', '.join(allowed_values)}"
+                    }
+            
+            elif field_type == "user":
+                # Check if user exists
+                try:
+                    self.client.get(f"users/{field_value}")
+                except:
+                    return {
+                        "valid": False,
+                        "error": f"User '{field_value}' not found",
+                        "suggestion": "Use valid user login or ID"
+                    }
+            
+            elif field_type in ["integer", "float"]:
+                try:
+                    if field_type == "integer":
+                        int(field_value)
+                    else:
+                        float(field_value)
+                except (ValueError, TypeError):
+                    return {
+                        "valid": False,
+                        "error": f"Invalid {field_type} value: {field_value}",
+                        "suggestion": f"Provide a valid {field_type} number"
+                    }
+            
+            # Multi-value field validation
+            if field_schema.get("multi_value", False) and not isinstance(field_value, list):
+                return {
+                    "valid": False,
+                    "error": f"Field '{field_name}' expects multiple values (array)",
+                    "suggestion": "Provide value as an array, e.g., ['value1', 'value2']"
+                }
+            
+            return {
+                "valid": True,
+                "field": field_name,
+                "value": field_value,
+                "message": "Valid"
+            }
+            
+        except Exception as e:
+            return {
+                "valid": False,
+                "error": f"Validation error: {str(e)}",
+                "suggestion": "Check field configuration and project setup"
+            }

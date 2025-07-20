@@ -406,15 +406,28 @@ class TestMCPWrapperClientInitializationFailure:
         # Mock the initialization to raise an exception
         mock_youtrack_client.side_effect = Exception("Connection failed")
         
-        # Reload the module to trigger the initialization error
-        import importlib
+        # Mock the module-level API clients to be None (simulating failed initialization)
         import youtrack_mcp.api.mcp_wrappers as mcp_wrappers
-        importlib.reload(mcp_wrappers)
+        original_issues_api = mcp_wrappers.issues_api
+        original_projects_api = mcp_wrappers.projects_api
+        original_users_api = mcp_wrappers.users_api
         
-        # Test that functions return appropriate error responses
-        result = mcp_wrappers.get_issue("TEST-123")
-        assert result["status"] == "error"
-        assert "YouTrack API client failed to initialize" in result["error"]
+        try:
+            # Set API clients to None to simulate initialization failure
+            mcp_wrappers.issues_api = None
+            mcp_wrappers.projects_api = None
+            mcp_wrappers.users_api = None
+            
+            # Test that functions return appropriate error responses
+            result = mcp_wrappers.get_issue("TEST-123")
+            assert result["status"] == "error"
+            assert "YouTrack API client failed to initialize" in result["error"]
+            
+        finally:
+            # Restore original API clients
+            mcp_wrappers.issues_api = original_issues_api
+            mcp_wrappers.projects_api = original_projects_api
+            mcp_wrappers.users_api = original_users_api
 
     @patch('youtrack_mcp.api.mcp_wrappers.issues_api', None)
     def test_get_issue_with_none_api_client(self):

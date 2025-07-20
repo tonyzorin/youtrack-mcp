@@ -227,6 +227,172 @@ class ProjectTools:
             return format_json_response({"error": str(e)})
 
     @sync_wrapper
+    def get_custom_field_schema(self, project_id: str, field_name: str) -> str:
+        """
+        Get detailed schema for a specific custom field in a project.
+
+        FORMAT: get_custom_field_schema(project_id="DEMO", field_name="Priority")
+
+        Args:
+            project_id: The project identifier (e.g., "DEMO", "0-0")
+            field_name: The custom field name
+
+        Returns:
+            JSON string with custom field schema and constraints
+        """
+        try:
+            if not project_id:
+                return format_json_response(
+                    {"error": "Project ID is required"}
+                )
+            
+            if not field_name:
+                return format_json_response(
+                    {"error": "Field name is required"}
+                )
+
+            schema = self.projects_api.get_custom_field_schema(project_id, field_name)
+            
+            if schema:
+                return format_json_response({
+                    "status": "success",
+                    "project_id": project_id,
+                    "field_name": field_name,
+                    "schema": schema
+                })
+            else:
+                return format_json_response({
+                    "status": "not_found",
+                    "error": f"Custom field '{field_name}' not found in project {project_id}",
+                    "suggestion": "Check field name spelling and project configuration"
+                })
+
+        except Exception as e:
+            logger.exception(
+                f"Error getting custom field schema for {field_name} in project {project_id}"
+            )
+            return format_json_response({"error": str(e)})
+
+    @sync_wrapper
+    def get_custom_field_allowed_values(self, project_id: str, field_name: str) -> str:
+        """
+        Get allowed values for enum/state custom fields in a project.
+
+        FORMAT: get_custom_field_allowed_values(project_id="DEMO", field_name="Priority")
+
+        Args:
+            project_id: The project identifier (e.g., "DEMO", "0-0")
+            field_name: The custom field name
+
+        Returns:
+            JSON string with allowed values and their details
+        """
+        try:
+            if not project_id:
+                return format_json_response(
+                    {"error": "Project ID is required"}
+                )
+            
+            if not field_name:
+                return format_json_response(
+                    {"error": "Field name is required"}
+                )
+
+            allowed_values = self.projects_api.get_custom_field_allowed_values(project_id, field_name)
+            
+            return format_json_response({
+                "status": "success",
+                "project_id": project_id,
+                "field_name": field_name,
+                "allowed_values": allowed_values,
+                "value_count": len(allowed_values)
+            })
+
+        except Exception as e:
+            logger.exception(
+                f"Error getting allowed values for field {field_name} in project {project_id}"
+            )
+            return format_json_response({"error": str(e)})
+
+    @sync_wrapper
+    def get_all_custom_fields_schemas(self, project_id: str) -> str:
+        """
+        Get schemas for all custom fields in a project.
+
+        FORMAT: get_all_custom_fields_schemas(project_id="DEMO")
+
+        Args:
+            project_id: The project identifier (e.g., "DEMO", "0-0")
+
+        Returns:
+            JSON string with all custom field schemas
+        """
+        try:
+            if not project_id:
+                return format_json_response(
+                    {"error": "Project ID is required"}
+                )
+
+            schemas = self.projects_api.get_all_custom_fields_schemas(project_id)
+            
+            return format_json_response({
+                "status": "success",
+                "project_id": project_id,
+                "schemas": schemas,
+                "field_count": len(schemas)
+            })
+
+        except Exception as e:
+            logger.exception(
+                f"Error getting all custom field schemas for project {project_id}"
+            )
+            return format_json_response({"error": str(e)})
+
+    @sync_wrapper
+    def validate_custom_field_for_project(
+        self, 
+        project_id: str, 
+        field_name: str, 
+        field_value: Any
+    ) -> str:
+        """
+        Validate a custom field value against the project's schema.
+
+        FORMAT: validate_custom_field_for_project(project_id="DEMO", field_name="Priority", field_value="High")
+
+        Args:
+            project_id: The project identifier (e.g., "DEMO", "0-0")
+            field_name: The custom field name
+            field_value: The value to validate
+
+        Returns:
+            JSON string with validation result and suggestions
+        """
+        try:
+            if not project_id or not field_name:
+                return format_json_response({
+                    "valid": False,
+                    "error": "Project ID and field name are required"
+                })
+
+            validation_result = self.projects_api.validate_custom_field_for_project(
+                project_id, field_name, field_value
+            )
+            
+            return format_json_response(validation_result)
+
+        except Exception as e:
+            logger.exception(
+                f"Error validating custom field {field_name} for project {project_id}"
+            )
+            return format_json_response({
+                "valid": False,
+                "error": f"Validation error: {str(e)}",
+                "field": field_name,
+                "value": field_value
+            })
+
+    @sync_wrapper
     def create_project(
         self,
         name: str,
@@ -452,6 +618,34 @@ class ProjectTools:
                     "archived": "Whether to archive the project (optional)",
                     "lead_id": "New project leader ID (optional)",
                     "short_name": "New short name for issue prefixes (optional)",
+                },
+            },
+            "get_custom_field_schema": {
+                "description": 'Get detailed schema for a specific custom field in a project. Example: get_custom_field_schema(project_id="DEMO", field_name="Priority")',
+                "parameter_descriptions": {
+                    "project_id": "Project identifier like 'DEMO' or '0-0'",
+                    "field_name": "Custom field name like 'Priority' or 'Assignee'"
+                },
+            },
+            "get_custom_field_allowed_values": {
+                "description": 'Get allowed values for enum/state custom fields in a project. Example: get_custom_field_allowed_values(project_id="DEMO", field_name="Priority")',
+                "parameter_descriptions": {
+                    "project_id": "Project identifier like 'DEMO' or '0-0'",
+                    "field_name": "Custom field name like 'Priority' or 'State'"
+                },
+            },
+            "get_all_custom_fields_schemas": {
+                "description": 'Get schemas for all custom fields in a project. Example: get_all_custom_fields_schemas(project_id="DEMO")',
+                "parameter_descriptions": {
+                    "project_id": "Project identifier like 'DEMO' or '0-0'"
+                },
+            },
+            "validate_custom_field_for_project": {
+                "description": 'Validate a custom field value against the project schema. Example: validate_custom_field_for_project(project_id="DEMO", field_name="Priority", field_value="High")',
+                "parameter_descriptions": {
+                    "project_id": "Project identifier like 'DEMO' or '0-0'",
+                    "field_name": "Custom field name like 'Priority' or 'Assignee'",
+                    "field_value": "Value to validate against field constraints"
                 },
             },
         }

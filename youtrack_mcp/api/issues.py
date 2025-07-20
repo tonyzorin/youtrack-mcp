@@ -284,6 +284,187 @@ class IssuesClient:
         response = self.client.post(f"issues/{issue_id}", data=data)
         return Issue.model_validate(response)
 
+    def update_issue_custom_fields(
+        self,
+        issue_id: str,
+        custom_fields: Dict[str, Any],
+        validate: bool = True,
+    ) -> Issue:
+        """
+        Update multiple custom fields on an issue with validation.
+
+        Args:
+            issue_id: The issue ID or readable ID
+            custom_fields: Dictionary of custom field name-value pairs
+            validate: Whether to validate field values against project schema
+
+        Returns:
+            The updated issue data
+
+        Raises:
+            YouTrackAPIError: If validation fails or API call fails
+        """
+        if not custom_fields:
+            return self.get_issue(issue_id)
+
+        # Get current issue to determine project
+        current_issue = self.get_issue(issue_id)
+        project_id = current_issue.project.get("id") if current_issue.project else None
+
+        if validate and project_id:
+            # Validate each field before updating
+            validation_errors = []
+            for field_name, field_value in custom_fields.items():
+                try:
+                    if not self._validate_custom_field_value(project_id, field_name, field_value):
+                        validation_errors.append(f"Invalid value for field '{field_name}': {field_value}")
+                except Exception as e:
+                    validation_errors.append(f"Validation error for field '{field_name}': {str(e)}")
+            
+            if validation_errors:
+                raise YouTrackAPIError(f"Custom field validation failed: {'; '.join(validation_errors)}")
+
+        # Transform custom fields to YouTrack API format
+        custom_fields_data = []
+        for field_name, field_value in custom_fields.items():
+            field_data = self._format_custom_field_value(field_name, field_value)
+            custom_fields_data.append(field_data)
+
+        # Update the issue with custom fields
+        data = {"customFields": custom_fields_data}
+        response = self.client.post(f"issues/{issue_id}", data=data)
+        return Issue.model_validate(response)
+
+    def get_issue_custom_fields(self, issue_id: str) -> Dict[str, Any]:
+        """
+        Get all custom fields for a specific issue.
+
+        Args:
+            issue_id: The issue ID or readable ID
+
+        Returns:
+            Dictionary of custom field name-value pairs
+        """
+        fields = "customFields(id,name,value($type,name,text,id,login))"
+        response = self.client.get(f"issues/{issue_id}?fields={fields}")
+        
+        custom_fields = {}
+        if "customFields" in response:
+            for field in response["customFields"]:
+                field_name = field.get("name", "")
+                field_value = self._extract_custom_field_value(field.get("value"))
+                custom_fields[field_name] = field_value
+        
+        return custom_fields
+
+    def validate_custom_field_value(
+        self, 
+        project_id: str, 
+        field_name: str, 
+        field_value: Any
+    ) -> Dict[str, Any]:
+        """
+        Validate a custom field value against project schema.
+
+        Args:
+            project_id: The project ID
+            field_name: The custom field name
+            field_value: The value to validate
+
+        Returns:
+            Dictionary with validation result and details
+        """
+        try:
+            is_valid = self._validate_custom_field_value(project_id, field_name, field_value)
+            
+            if is_valid:
+                return {
+                    "valid": True,
+                    "field": field_name,
+                    "value": field_value,
+                    "message": "Valid"
+                }
+            else:
+                # Get available values for better error messages
+                available_values = self._get_custom_field_allowed_values(project_id, field_name)
+                suggestion = f"Available values: {', '.join(map(str, available_values))}" if available_values else "Check field configuration"
+                
+                return {
+                    "valid": False,
+                    "field": field_name,
+                    "value": field_value,
+                    "error": f"Invalid value '{field_value}' for field '{field_name}'",
+                    "suggestion": suggestion
+                }
+        except Exception as e:
+            return {
+                "valid": False,
+                "field": field_name,
+                "value": field_value,
+                "error": f"Validation error: {str(e)}",
+                "suggestion": "Check field name and project configuration"
+            }
+
+    def batch_update_custom_fields(
+        self,
+        updates: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Update custom fields for multiple issues in a single operation.
+
+        Args:
+            updates: List of update dictionaries with format:
+                    [{"issue_id": "DEMO-123", "fields": {"Priority": "High"}}]
+
+        Returns:
+            List of update results with success/error status
+        """
+        results = []
+        
+        for update in updates:
+            issue_id = update.get("issue_id")
+            fields = update.get("fields", {})
+            
+            if not issue_id:
+                results.append({
+                    "issue_id": None,
+                    "status": "error",
+                    "error": "Missing issue_id in update"
+                })
+                continue
+            
+            if not fields:
+                results.append({
+                    "issue_id": issue_id,
+                    "status": "skipped",
+                    "message": "No fields to update"
+                })
+                continue
+            
+            try:
+                updated_issue = self.update_issue_custom_fields(
+                    issue_id=issue_id,
+                    custom_fields=fields,
+                    validate=update.get("validate", True)
+                )
+                
+                results.append({
+                    "issue_id": issue_id,
+                    "status": "success",
+                    "updated_fields": list(fields.keys()),
+                    "issue_data": updated_issue.model_dump() if hasattr(updated_issue, 'model_dump') else updated_issue
+                })
+                
+            except Exception as e:
+                results.append({
+                    "issue_id": issue_id,
+                    "status": "error",
+                    "error": str(e),
+                    "attempted_fields": list(fields.keys())
+                })
+        
+        return results
+
     def search_issues(self, query: str, limit: int = 10) -> List[Issue]:
         """
         Search for issues using YouTrack query language.
@@ -554,3 +735,168 @@ class IssuesClient:
         fields = "name,localizedName,sourceToTarget,targetToSource"
         response = self.client.get(f"issueLinkTypes?fields={fields}")
         return response
+
+    def _validate_custom_field_value(
+        self, 
+        project_id: str, 
+        field_name: str, 
+        field_value: Any
+    ) -> bool:
+        """
+        Internal method to validate a custom field value.
+
+        Args:
+            project_id: The project ID
+            field_name: The custom field name  
+            field_value: The value to validate
+
+        Returns:
+            True if valid, False otherwise
+        """
+        try:
+            # Get field schema from project
+            field_schema = self._get_custom_field_schema(project_id, field_name)
+            if not field_schema:
+                # If we can't get schema, assume valid (fallback)
+                return True
+            
+            field_type = field_schema.get("type", "")
+            
+            # Type-specific validation
+            if field_type in ["StateMachineBundle", "StateBundle"]:
+                # State field - validate against available states
+                allowed_values = self._get_custom_field_allowed_values(project_id, field_name)
+                return str(field_value) in [str(v) for v in allowed_values]
+            
+            elif field_type in ["EnumBundle", "OwnedBundle"]:
+                # Enum field - validate against enum values
+                allowed_values = self._get_custom_field_allowed_values(project_id, field_name)
+                return str(field_value) in [str(v) for v in allowed_values]
+            
+            elif field_type == "UserBundle":
+                # User field - validate user exists
+                return self._validate_user_exists(field_value)
+            
+            elif field_type == "DateTimeBundle":
+                # Date field - validate format
+                return self._validate_date_format(field_value)
+            
+            elif field_type in ["IntegerBundle", "FloatBundle"]:
+                # Numeric field - validate numeric value
+                return self._validate_numeric_value(field_value, field_type)
+            
+            else:
+                # String or unknown type - minimal validation
+                return field_value is not None
+                
+        except Exception:
+            # If validation fails due to API errors, assume valid (fallback)
+            return True
+
+    def _get_custom_field_schema(self, project_id: str, field_name: str) -> Optional[Dict[str, Any]]:
+        """Get custom field schema from project."""
+        try:
+            fields = self.client.get(f"admin/projects/{project_id}/customFields")
+            for field in fields:
+                if field.get("field", {}).get("name") == field_name:
+                    return field.get("field", {})
+            return None
+        except Exception:
+            return None
+
+    def _get_custom_field_allowed_values(self, project_id: str, field_name: str) -> List[Any]:
+        """Get allowed values for enum/state fields."""
+        try:
+            field_schema = self._get_custom_field_schema(project_id, field_name)
+            if not field_schema:
+                return []
+            
+            field_type = field_schema.get("fieldType", {}).get("valueType")
+            if field_type in ["enum", "state"]:
+                # Get bundle values
+                bundle_id = field_schema.get("fieldType", {}).get("id")
+                if bundle_id:
+                    bundle = self.client.get(f"admin/customFieldSettings/bundles/{field_type}/{bundle_id}")
+                    return [value.get("name", "") for value in bundle.get("values", [])]
+            
+            return []
+        except Exception:
+            return []
+
+    def _validate_user_exists(self, user_value: str) -> bool:
+        """Validate that a user exists."""
+        try:
+            # Try to get user by login or ID
+            self.client.get(f"users/{user_value}")
+            return True
+        except Exception:
+            return False
+
+    def _validate_date_format(self, date_value: Any) -> bool:
+        """Validate date format."""
+        if isinstance(date_value, int):
+            # Unix timestamp
+            return date_value > 0
+        elif isinstance(date_value, str):
+            # ISO date string or other formats
+            import datetime
+            try:
+                datetime.datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+                return True
+            except ValueError:
+                return False
+        return False
+
+    def _validate_numeric_value(self, value: Any, field_type: str) -> bool:
+        """Validate numeric value."""
+        try:
+            if field_type == "IntegerBundle":
+                int(value)
+                return True
+            elif field_type == "FloatBundle":
+                float(value)
+                return True
+        except (ValueError, TypeError):
+            return False
+        return False
+
+    def _format_custom_field_value(self, field_name: str, field_value: Any) -> Dict[str, Any]:
+        """Format custom field value for YouTrack API."""
+        if isinstance(field_value, str):
+            return {
+                "name": field_name,
+                "value": {"name": field_value}
+            }
+        elif isinstance(field_value, dict):
+            return {
+                "name": field_name,
+                "value": field_value
+            }
+        elif isinstance(field_value, (int, float)):
+            return {
+                "name": field_name,
+                "value": field_value
+            }
+        else:
+            return {
+                "name": field_name,
+                "value": {"name": str(field_value)}
+            }
+
+    def _extract_custom_field_value(self, field_value_data: Any) -> Any:
+        """Extract readable value from YouTrack custom field value data."""
+        if not field_value_data:
+            return None
+        
+        if isinstance(field_value_data, dict):
+            # Try different value formats
+            if "name" in field_value_data:
+                return field_value_data["name"]
+            elif "login" in field_value_data:
+                return field_value_data["login"]
+            elif "text" in field_value_data:
+                return field_value_data["text"]
+            elif "id" in field_value_data:
+                return field_value_data["id"]
+        
+        return field_value_data
