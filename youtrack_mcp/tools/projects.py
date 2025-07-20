@@ -210,9 +210,9 @@ class ProjectTools:
                         result.append(field.model_dump())
                     elif isinstance(field, dict):
                         result.append(field)
-                else:
-                    # Last resort: convert to string
-                    result.append(str(field))
+                    else:
+                        # Last resort: convert to string
+                        result.append(str(field))
                 return format_json_response(result)
             except Exception as e:
                 # If we can't iterate, return the raw string representation

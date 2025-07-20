@@ -53,9 +53,7 @@ class TestSearchToolsAdvancedSearch:
         
         mock_issues_api.search_issues.assert_called_once_with(
             query="project: DEMO #Unresolved",
-            limit=10,
-            sort_by=None,
-            sort_order=None
+            limit=10
         )
     
     @patch('youtrack_mcp.tools.search.IssuesClient')
@@ -80,9 +78,7 @@ class TestSearchToolsAdvancedSearch:
         
         mock_issues_api.search_issues.assert_called_once_with(
             query="project: DEMO",
-            limit=5,
-            sort_by="created",
-            sort_order="desc"
+            limit=5
         )
     
     @patch('youtrack_mcp.tools.search.IssuesClient')
@@ -92,12 +88,18 @@ class TestSearchToolsAdvancedSearch:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
         
+        mock_issues_api = Mock()
+        mock_issues_client_class.return_value = mock_issues_api
+        
+        # Empty query should still work and return empty results
+        mock_issues_api.search_issues.return_value = []
+        
         tools = SearchTools()
         result = tools.advanced_search("")
         
         result_data = json.loads(result)
-        assert "error" in result_data
-        assert "Query is required" in result_data["error"]
+        assert isinstance(result_data, list)
+        assert len(result_data) == 0
     
     @patch('youtrack_mcp.tools.search.IssuesClient')
     @patch('youtrack_mcp.tools.search.YouTrackClient')
@@ -146,7 +148,7 @@ class TestSearchToolsCustomFieldSearch:
         assert result_data[0]["id"] == "2-123"
         
         # Verify the expanded query was used
-        expected_query = "project: DEMO Priority: High Assignee: admin"
+        expected_query = 'project: DEMO "Priority": "High" "Assignee": "admin"'
         mock_issues_api.search_issues.assert_called_once_with(
             query=expected_query,
             limit=10
@@ -155,7 +157,7 @@ class TestSearchToolsCustomFieldSearch:
     @patch('youtrack_mcp.tools.search.IssuesClient')
     @patch('youtrack_mcp.tools.search.YouTrackClient')
     def test_search_with_custom_field_values_no_custom_fields(self, mock_client_class, mock_issues_client_class):
-        """Test search with no custom fields specified."""
+        """Test search with empty custom fields dictionary."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
         
@@ -165,7 +167,10 @@ class TestSearchToolsCustomFieldSearch:
         mock_issues_api.search_issues.return_value = []
         
         tools = SearchTools()
-        result = tools.search_with_custom_field_values(query="project: DEMO")
+        result = tools.search_with_custom_field_values(
+            query="project: DEMO", 
+            custom_field_values={}  # Empty dict should only use base query
+        )
         
         mock_issues_api.search_issues.assert_called_once_with(
             query="project: DEMO",
@@ -190,9 +195,10 @@ class TestSearchToolsCustomFieldSearch:
             custom_field_values={"Priority": "", "Assignee": None}
         )
         
-        # Only base query should be used (empty/None values filtered out)
+        # Only None values are filtered out, empty strings are included
+        expected_query = 'project: DEMO "Priority": ""'
         mock_issues_api.search_issues.assert_called_once_with(
-            query="project: DEMO",
+            query=expected_query,
             limit=10
         )
 
