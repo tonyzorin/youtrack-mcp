@@ -7,6 +7,8 @@ This directory contains local automation scripts for project management and deve
 ### **Release Management**
 - **`create_release.sh`** - Automate GitHub release creation with proper tagging
 - **`build-local.sh`** - Build and test Docker images locally
+- **`RELEASE_INSTRUCTIONS.md`** - Step-by-step guide for creating GitHub releases
+- **`DOCKER_TAGGING.md`** - Docker tagging strategy and deployment documentation
 
 ### **GitHub Integration**
 - **`test_github_access.sh`** - Test GitHub API connectivity and permissions
