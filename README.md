@@ -78,14 +78,18 @@ For issues and questions:
 1. Check the [Issues](https://github.com/tonyzorin/youtrack-mcp/issues) page
 2. Review the documentation
 3. Submit a new issue with detailed information
+4. Contact directly: [t.me/tonyzorin](https://t.me/tonyzorin)
 
 ---
 
-*Latest update: Added ARM64/Apple Silicon support for multi-platform compatibility.*
+*Latest update: Comprehensive custom fields management with 567 test coverage and clean project organization.*
 
-## Version 1.1.2 Released
+## Version 1.11.1 Released
 
-🔧 **CRITICAL FIX** - ARM64/Apple Silicon Support
-- Added multi-platform Docker builds (AMD64 + ARM64)
-- Enhanced LLM tool descriptions with FORMAT examples  
-- Simplified architecture and improved maintainability
+🎉 **MAJOR FEATURE** - Custom Fields Management Support
+- ✅ Complete custom fields CRUD operations (create, read, update, delete)
+- ✅ Field validation against project schema (all field types supported)
+- ✅ Batch update capabilities for performance
+- ✅ Comprehensive error handling with detailed messages
+- ✅ 567 tests (+68 new tests) with extensive coverage
+- ✅ Clean project organization with `automations/` directory
