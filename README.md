@@ -47,7 +47,7 @@ This project maintains high code quality with comprehensive testing:
 - **CI/CD Pipeline**: Automated testing and Docker builds
 - **Quality Assurance**: Automated testing on every commit
 
-For development instructions, see the [Development Guide](DEVELOPMENT.md).
+For development instructions, see the [Automation Scripts Guide](automations/README.md) and [Release Process](automations/RELEASE_INSTRUCTIONS.md).
 
 ## Configuration
 
