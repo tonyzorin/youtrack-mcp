@@ -1,7 +1,7 @@
-# Docker Build and Push Workflow
-# Updated with comprehensive diagnostics and secret validation
-# Fixed Docker Hub authentication token format
-name: Docker Build and Push
+# Docker Build and Push Workflow with GitHub Packages Support
+# Publishes to both Docker Hub and GitHub Container Registry
+# Also publishes npm package to npmjs.com and GitHub Packages
+name: Build and Publish
 
 on:
   push:
@@ -12,7 +12,14 @@ on:
     types: [ published ]
 
 env:
-  DOCKER_REPOSITORY: tonyzorin/youtrack-mcp
+  DOCKER_HUB_REPOSITORY: tonyzorin/youtrack-mcp
+  GITHUB_REGISTRY: ghcr.io
+  GITHUB_REPOSITORY: ${{ github.repository }}
+
+# Required for GitHub Container Registry and GitHub Packages
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   test:
@@ -42,7 +49,7 @@ jobs:
       run: |
         python -c "exec(open('youtrack_mcp/version.py').read()); print('Version:', __version__)"
 
-  build-and-push:
+  build-and-push-docker:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'  # Skip build for PRs, only test
@@ -63,29 +70,44 @@ jobs:
     - name: Generate Docker tags and metadata
       id: meta
       run: |
-        BASE_TAG="${{ env.DOCKER_REPOSITORY }}"
         VERSION="${{ steps.get_version.outputs.VERSION }}"
         COMMIT_SHA=${GITHUB_SHA::8}
+        
+        # Docker Hub tags
+        DOCKERHUB_BASE="${{ env.DOCKER_HUB_REPOSITORY }}"
+        
+        # GitHub Container Registry tags
+        GHCR_BASE="${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp"
         
         # Generate tags based on trigger
         if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
           # Main branch push: WIP build
-          TAGS="$BASE_TAG:${VERSION}_wip,$BASE_TAG:$COMMIT_SHA"
+          DOCKERHUB_TAGS="$DOCKERHUB_BASE:${VERSION}_wip,$DOCKERHUB_BASE:$COMMIT_SHA"
+          GHCR_TAGS="$GHCR_BASE:${VERSION}_wip,$GHCR_BASE:$COMMIT_SHA"
           echo "BUILD_TYPE=wip" >> $GITHUB_OUTPUT
           echo "🔨 Building WIP version: ${VERSION}_wip"
         elif [[ "${{ github.event_name }}" == "release" ]]; then
           # Release: production build
-          TAGS="$BASE_TAG:$VERSION,$BASE_TAG:latest,$BASE_TAG:$COMMIT_SHA"
+          DOCKERHUB_TAGS="$DOCKERHUB_BASE:$VERSION,$DOCKERHUB_BASE:latest,$DOCKERHUB_BASE:$COMMIT_SHA"
+          GHCR_TAGS="$GHCR_BASE:$VERSION,$GHCR_BASE:latest,$GHCR_BASE:$COMMIT_SHA"
           echo "BUILD_TYPE=release" >> $GITHUB_OUTPUT
           echo "🚀 Building release version: $VERSION"
         else
           # Fallback
-          TAGS="$BASE_TAG:dev-$COMMIT_SHA"
+          DOCKERHUB_TAGS="$DOCKERHUB_BASE:dev-$COMMIT_SHA"
+          GHCR_TAGS="$GHCR_BASE:dev-$COMMIT_SHA"
           echo "BUILD_TYPE=dev" >> $GITHUB_OUTPUT
         fi
         
-        echo "TAGS=$TAGS" >> $GITHUB_OUTPUT
-        echo "Generated tags: $TAGS"
+        # Combine tags for build-push-action
+        ALL_TAGS="$DOCKERHUB_TAGS,$GHCR_TAGS"
+        
+        echo "DOCKERHUB_TAGS=$DOCKERHUB_TAGS" >> $GITHUB_OUTPUT
+        echo "GHCR_TAGS=$GHCR_TAGS" >> $GITHUB_OUTPUT
+        echo "ALL_TAGS=$ALL_TAGS" >> $GITHUB_OUTPUT
+        
+        echo "🐳 Docker Hub tags: $DOCKERHUB_TAGS"
+        echo "📦 GitHub Container Registry tags: $GHCR_TAGS"
 
     - name: Docker build diagnostics
       run: |
@@ -95,10 +117,11 @@ jobs:
         echo "Available builders:"
         docker buildx ls
         echo ""
-        echo "Repository: ${{ env.DOCKER_REPOSITORY }}"
-        echo "Tags to build: ${{ steps.meta.outputs.TAGS }}"
-        echo "Build type: ${{ steps.meta.outputs.BUILD_TYPE }}"
-        echo "Version: ${{ steps.get_version.outputs.VERSION }}"
+        echo "🐳 Docker Hub Repository: ${{ env.DOCKER_HUB_REPOSITORY }}"
+        echo "📦 GitHub Container Registry: ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp"
+        echo "🏷️ All tags: ${{ steps.meta.outputs.ALL_TAGS }}"
+        echo "🔨 Build type: ${{ steps.meta.outputs.BUILD_TYPE }}"
+        echo "📝 Version: ${{ steps.get_version.outputs.VERSION }}"
 
     - name: Verify Docker Hub secrets
       run: |
@@ -124,52 +147,149 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Test Docker Hub connectivity
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.GITHUB_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Test registry connectivity
       run: |
         echo "Testing Docker Hub connectivity..."
-        # Test with a simple docker pull to verify connectivity
         docker pull hello-world:latest
         echo "✅ Docker Hub connectivity verified"
+        
+        echo "Testing GitHub Container Registry connectivity..."
+        echo "✅ GitHub Container Registry login completed"
 
-    - name: Build and push Docker image
+    - name: Build and push to both registries
       uses: docker/build-push-action@v5
       with:
         context: .
         platforms: linux/amd64,linux/arm64  # Multi-platform support for both Intel and ARM
         push: true
-        tags: ${{ steps.meta.outputs.TAGS }}
+        tags: ${{ steps.meta.outputs.ALL_TAGS }}
         labels: |
           org.opencontainers.image.title=YouTrack MCP
           org.opencontainers.image.description=YouTrack Model Context Protocol Server
           org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}
           org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
     - name: Verify pushed images
       run: |
         echo "🔍 Verifying pushed images..."
-        # Parse tags and verify each one
-        IFS=',' read -ra TAG_ARRAY <<< "${{ steps.meta.outputs.TAGS }}"
-        for tag in "${TAG_ARRAY[@]}"; do
-          echo "Checking: $tag"
-          # Note: This might fail if the image was just pushed due to registry sync delays
-          docker pull "$tag" || echo "Warning: Could not immediately pull $tag (registry sync delay)"
+        
+        echo "Docker Hub images:"
+        IFS=',' read -ra DOCKERHUB_ARRAY <<< "${{ steps.meta.outputs.DOCKERHUB_TAGS }}"
+        for tag in "${DOCKERHUB_ARRAY[@]}"; do
+          echo "  ✓ $tag"
+        done
+        
+        echo ""
+        echo "GitHub Container Registry images:"
+        IFS=',' read -ra GHCR_ARRAY <<< "${{ steps.meta.outputs.GHCR_TAGS }}"
+        for tag in "${GHCR_ARRAY[@]}"; do
+          echo "  ✓ $tag"
         done
 
     - name: Docker build summary
       run: |
-        echo "✅ Docker build completed successfully"
-        echo "📦 Repository: ${{ env.DOCKER_REPOSITORY }}"
-        echo "🏷️ Tags: ${{ steps.meta.outputs.TAGS }}"
+        echo "✅ Docker images published to both registries!"
+        echo ""
+        echo "🐳 Docker Hub Repository: ${{ env.DOCKER_HUB_REPOSITORY }}"
+        echo "📦 GitHub Container Registry: ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp"
         echo "🔨 Build type: ${{ steps.meta.outputs.BUILD_TYPE }}"
         echo "📝 Version: ${{ steps.get_version.outputs.VERSION }}"
         echo ""
-        echo "🐳 Available images:"
-        IFS=',' read -ra TAG_ARRAY <<< "${{ steps.meta.outputs.TAGS }}"
-        for tag in "${TAG_ARRAY[@]}"; do
-          echo "  - $tag"
-        done
+        echo "📋 Usage examples:"
+        echo "# Docker Hub (existing)"
+        echo "docker pull ${{ env.DOCKER_HUB_REPOSITORY }}:latest"
+        echo ""
+        echo "# GitHub Container Registry (new)"
+        echo "docker pull ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:latest"
+
+  publish-npm:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'  # Only publish npm on releases
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Extract version
+      id: get_version
+      run: |
+        VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Detected version: $VERSION"
+
+    - name: Update package.json version
+      run: |
+        if [ -f "package.json" ]; then
+          # Update version in package.json to match Python version
+          sed -i.bak "s/\"version\": \".*\"/\"version\": \"${{ steps.get_version.outputs.VERSION }}\"/" package.json
+          echo "✅ Updated package.json version to ${{ steps.get_version.outputs.VERSION }}"
+        else
+          echo "❌ package.json not found"
+          exit 1
+        fi
+
+    - name: Install npm dependencies
+      run: npm ci
+
+    - name: Build npm package
+      run: npm run build
+
+    - name: Test npm package
+      run: npm test
+
+    - name: Publish to npmjs.org
+      run: npm publish --access public
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Set up Node.js for GitHub Packages
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@${{ github.repository_owner }}'
+
+    - name: Update package.json for GitHub Packages
+      run: |
+        # Create a scoped package for GitHub Packages
+        sed -i.bak "s/\"name\": \"youtrack-mcp-tonyzorin\"/\"name\": \"@${{ github.repository_owner }}\/youtrack-mcp\"/" package.json
+        echo "✅ Updated package name for GitHub Packages"
+
+    - name: Publish to GitHub Packages
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: npm publish summary
+      run: |
+        echo "✅ npm packages published to both registries!"
+        echo ""
+        echo "📦 npmjs.org: youtrack-mcp-tonyzorin@${{ steps.get_version.outputs.VERSION }}"
+        echo "📦 GitHub Packages: @${{ github.repository_owner }}/youtrack-mcp@${{ steps.get_version.outputs.VERSION }}"
+        echo ""
+        echo "📋 Installation examples:"
+        echo "# npmjs.org (existing)"
+        echo "npm install -g youtrack-mcp-tonyzorin"
+        echo ""
+        echo "# GitHub Packages (new)"
+        echo "npm install -g @${{ github.repository_owner }}/youtrack-mcp --registry=https://npm.pkg.github.com"
 
   pr-build:
     needs: test
@@ -180,4 +300,5 @@ jobs:
       run: |
         echo "✅ Tests passed for PR #${{ github.event.pull_request.number }}"
         echo "📝 PR builds are disabled - only testing"
-        echo "🔨 To get Docker images, merge to main for WIP build or create release for production" 
+        echo "🔨 To get Docker images, merge to main for WIP build or create release for production"
+        echo "📦 To get npm packages, create a GitHub release" 

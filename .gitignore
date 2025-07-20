@@ -58,4 +58,4 @@ plan.md
 IMPLEMENTATION_STATUS.md
 todo.md
 integration_tests/
-.python-version 
+.python-version node_modules/

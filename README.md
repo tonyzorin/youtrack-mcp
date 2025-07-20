@@ -8,6 +8,9 @@ This project provides a Model Context Protocol (MCP) server for YouTrack, enabli
 
 ### Using Docker (Recommended)
 
+Choose from multiple registries:
+
+#### Docker Hub (Primary)
 ```bash
 # Use the latest stable release
 docker run --rm \
@@ -22,12 +25,54 @@ docker run --rm \
   tonyzorin/youtrack-mcp:1.1.2_wip
 ```
 
+#### GitHub Container Registry (New)
+```bash
+# Use the latest stable release
+docker run --rm \
+  -e YOUTRACK_URL="https://your-instance.youtrack.cloud" \
+  -e YOUTRACK_API_TOKEN="your-token" \
+  ghcr.io/tonyzorin/youtrack-mcp:latest
+
+# Or use the latest development build
+docker run --rm \
+  -e YOUTRACK_URL="https://your-instance.youtrack.cloud" \
+  -e YOUTRACK_API_TOKEN="your-token" \
+  ghcr.io/tonyzorin/youtrack-mcp:1.1.2_wip
+```
+
 ### Available Docker Tags
+
+Both registries provide identical tags:
 
 - `latest` - Latest stable release (currently 1.1.2)
 - `1.1.2` - Specific version tags  
 - `1.1.2_wip` - Work-in-progress builds from main branch
 - `pr-<number>` - Pull request builds for testing
+
+### Using npm Package
+
+Choose from multiple registries:
+
+#### npmjs.org (Primary)
+```bash
+# Install globally
+npm install -g youtrack-mcp-tonyzorin
+
+# Or use with npx (no installation required)
+npx youtrack-mcp-tonyzorin
+```
+
+#### GitHub Packages (New)
+```bash
+# Configure GitHub registry
+npm config set @tonyzorin:registry https://npm.pkg.github.com
+
+# Install globally
+npm install -g @tonyzorin/youtrack-mcp
+
+# Or use with npx
+npx @tonyzorin/youtrack-mcp
+```
 
 ## Features
 

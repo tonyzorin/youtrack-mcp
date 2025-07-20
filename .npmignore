@@ -1,0 +1,51 @@
+# Development files
+src/
+scripts/
+tests/
+test/
+.pytest_cache/
+.mypy_cache/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+htmlcov/
+.coverage
+.coveragerc
+*.py-e
+
+# Development tools
+.git/
+.github/
+.vscode/
+.cursor/
+.claude/
+venv/
+env/
+.env
+.env.*
+
+# Build artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+*~
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Automation scripts
+automations/
+
+# Other
+screenshot/
+*.md.backup 

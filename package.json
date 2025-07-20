@@ -1,0 +1,64 @@
+{
+  "name": "youtrack-mcp-tonyzorin",
+  "version": "1.11.1",
+  "description": "A Model Context Protocol (MCP) server for JetBrains YouTrack integration",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "youtrack",
+    "jetbrains",
+    "issue-tracking",
+    "claude",
+    "ai"
+  ],
+  "homepage": "https://github.com/tonyzorin/youtrack-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tonyzorin/youtrack-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tonyzorin/youtrack-mcp/issues"
+  },
+  "author": {
+    "name": "Anton Zorin",
+    "url": "https://antonzorin.com"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "youtrack-mcp-tonyzorin": "dist/bin/youtrack-mcp.js"
+  },
+  "files": [
+    "dist",
+    "python",
+    "requirements.txt",
+    "README.npm.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js",
+    "prepublishOnly": "npm run build",
+    "test": "node scripts/test.js",
+    "start": "node dist/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "which": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+} 
