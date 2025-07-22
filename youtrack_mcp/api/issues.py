@@ -291,7 +291,7 @@ class IssuesClient:
         validate: bool = True,
     ) -> Issue:
         """
-        Update multiple custom fields on an issue with validation.
+        Update multiple custom fields on an issue using YouTrack Commands API.
 
         Args:
             issue_id: The issue ID or readable ID
@@ -307,35 +307,37 @@ class IssuesClient:
         if not custom_fields:
             return self.get_issue(issue_id)
 
-        # Get current issue to determine project - ensure we get project info
-        try:
-            # Get issue with explicit project field to ensure we have project ID
-            fields = "id,idReadable,project(id,shortName)"
-            issue_response = self.client.get(f"issues/{issue_id}?fields={fields}")
-            project_id = issue_response.get("project", {}).get("id") if issue_response.get("project") else None
-            
-            if not project_id:
-                # Fallback: try to extract project from issue ID format (e.g., DEMO-123 -> DEMO)
-                if "-" in issue_id and not issue_id.replace("-", "").isdigit():
-                    project_short_name = issue_id.split("-")[0]
-                    logger.info(f"Extracting project short name '{project_short_name}' from issue ID '{issue_id}'")
-                    # Get project ID from short name
-                    try:
-                        projects_response = self.client.get(f"admin/projects?fields=id,shortName")
-                        for proj in projects_response:
-                            if proj.get("shortName") == project_short_name:
-                                project_id = proj.get("id")
-                                logger.info(f"Found project ID '{project_id}' for short name '{project_short_name}'")
-                                break
-                    except Exception as e:
-                        logger.warning(f"Could not find project by short name '{project_short_name}': {str(e)}")
-            
-            if not project_id:
-                logger.error(f"Could not determine project ID for issue '{issue_id}'. Issue response: {issue_response}")
+        # Get current issue to determine project for validation
+        project_id = None
+        if validate:
+            try:
+                # Get issue with explicit project field to ensure we have project ID
+                fields = "id,idReadable,project(id,shortName)"
+                issue_response = self.client.get(f"issues/{issue_id}?fields={fields}")
+                project_id = issue_response.get("project", {}).get("id") if issue_response.get("project") else None
                 
-        except Exception as e:
-            logger.error(f"Error getting issue project info: {str(e)}")
-            project_id = None
+                if not project_id:
+                    # Fallback: try to extract project from issue ID format (e.g., DEMO-123 -> DEMO)
+                    if "-" in issue_id and not issue_id.replace("-", "").isdigit():
+                        project_short_name = issue_id.split("-")[0]
+                        logger.info(f"Extracting project short name '{project_short_name}' from issue ID '{issue_id}'")
+                        # Get project ID from short name
+                        try:
+                            projects_response = self.client.get(f"admin/projects?fields=id,shortName")
+                            for proj in projects_response:
+                                if proj.get("shortName") == project_short_name:
+                                    project_id = proj.get("id")
+                                    logger.info(f"Found project ID '{project_id}' for short name '{project_short_name}'")
+                                    break
+                        except Exception as e:
+                            logger.warning(f"Could not find project by short name '{project_short_name}': {str(e)}")
+                
+                if not project_id:
+                    logger.error(f"Could not determine project ID for issue '{issue_id}'. Issue response: {issue_response}")
+                    
+            except Exception as e:
+                logger.error(f"Error getting issue project info: {str(e)}")
+                project_id = None
 
         if validate and project_id:
             # Validate each field before updating
@@ -350,24 +352,43 @@ class IssuesClient:
             if validation_errors:
                 raise YouTrackAPIError(f"Custom field validation failed: {'; '.join(validation_errors)}")
 
-        # Transform custom fields to YouTrack API format
-        # CRITICAL: YouTrack API requires field IDs for updates, not names!
-        custom_fields_data = []
+        # Use YouTrack Commands API to update custom fields
+        # This is the CORRECT way to update custom fields according to YouTrack documentation
+        
+        # Build command query from custom fields
+        command_parts = []
         for field_name, field_value in custom_fields.items():
-            # Get field ID from project schema
-            field_id = self._get_custom_field_id(project_id, field_name)
-            if not field_id:
-                logger.warning(f"Could not find field ID for '{field_name}' in project {project_id}")
-                # Try using the field name as fallback
-                field_id = field_name
+            # Format field value for commands API
+            if isinstance(field_value, str):
+                # If value contains spaces, wrap in quotes if needed
+                if " " in field_value and not (field_value.startswith('"') and field_value.endswith('"')):
+                    formatted_value = f'"{field_value}"'
+                else:
+                    formatted_value = field_value
+            else:
+                formatted_value = str(field_value)
             
-            field_data = self._format_custom_field_value_with_id(field_id, field_value, project_id)
-            custom_fields_data.append(field_data)
-
-        # Update the issue with custom fields
-        data = {"customFields": custom_fields_data}
-        response = self.client.post(f"issues/{issue_id}", data=data)
-        return Issue.model_validate(response)
+            command_parts.append(f"{field_name} {formatted_value}")
+        
+        command_query = " ".join(command_parts)
+        logger.info(f"Executing command: {command_query}")
+        
+        # Execute the command using Commands API
+        command_data = {
+            "query": command_query,
+            "issues": [{"idReadable": issue_id}]
+        }
+        
+        try:
+            self.client.post("commands", data=command_data)
+            logger.info(f"Successfully applied command to issue {issue_id}")
+            
+            # Return the updated issue
+            return self.get_issue(issue_id)
+            
+        except Exception as e:
+            logger.error(f"Failed to apply command '{command_query}' to issue {issue_id}: {str(e)}")
+            raise YouTrackAPIError(f"Failed to update custom fields: {str(e)}")
 
     def get_issue_custom_fields(self, issue_id: str) -> Dict[str, Any]:
         """
