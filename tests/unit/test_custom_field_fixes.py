@@ -6,6 +6,9 @@ from youtrack_mcp.api.issues import IssuesClient
 from youtrack_mcp.api.projects import ProjectsClient
 from youtrack_mcp.api.client import YouTrackClient
 
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
+
 
 class TestCustomFieldUpdateFixes:
     """Test the fixes for custom field updates."""

@@ -111,11 +111,19 @@ def sample_user_data() -> Dict[str, Any]:
 
 # Pytest configuration
 def pytest_configure(config):
-    """Configure pytest with custom markers."""
-    config.addinivalue_line("markers", "unit: mark test as a unit test")
+    """Configure pytest markers and settings."""
     config.addinivalue_line(
-        "markers", "integration: mark test as an integration test"
+        "markers", "unit: Unit tests (fast, no external dependencies)"
     )
-    config.addinivalue_line("markers", "e2e: mark test as an end-to-end test")
-    config.addinivalue_line("markers", "docker: mark test as a docker test")
-    config.addinivalue_line("markers", "slow: mark test as slow running")
+    config.addinivalue_line(
+        "markers", "integration: Integration tests (mocked external services)"
+    )
+    config.addinivalue_line(
+        "markers", "e2e: End-to-end tests (real external services)"
+    )
+    config.addinivalue_line(
+        "markers", "docker: Docker container tests"
+    )
+    config.addinivalue_line(
+        "markers", "slow: Slow running tests"
+    )

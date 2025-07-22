@@ -8,6 +8,9 @@ focusing on easily testable components without complex mocking.
 import unittest
 import pytest
 from unittest.mock import Mock, patch
+
+# Mark all tests in this module as unit tests
+pytestmark = pytest.mark.unit
 from typing import List, Dict, Any
 
 from youtrack_mcp.api.issues import IssuesClient, Issue

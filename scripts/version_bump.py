@@ -64,19 +64,22 @@ def run_command(cmd, check=True):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python version_bump.py <bump_type|version>")
+        print("Usage: python version_bump.py <bump_type|version> [--dry-run]")
         print("  bump_type: major, minor, patch")
         print("  version: specific version like 1.0.0")
+        print("  --dry-run: Only calculate the new version, don't make changes")
         print("Examples:")
         print("  python version_bump.py patch    # 1.0.0 -> 1.0.1")
         print("  python version_bump.py minor    # 1.0.0 -> 1.1.0")
         print("  python version_bump.py major    # 1.0.0 -> 2.0.0")
         print("  python version_bump.py 1.1.0    # Set to specific version")
+        print("  python version_bump.py patch --dry-run  # Just show what would happen")
         sys.exit(1)
     
     arg = sys.argv[1]
+    dry_run = '--dry-run' in sys.argv
+    
     current_version = get_current_version()
-    print(f"Current version: {current_version}")
     
     # Determine new version
     if arg in ['major', 'minor', 'patch']:
@@ -85,6 +88,12 @@ def main():
         # Assume it's a specific version
         new_version = arg
     
+    if dry_run:
+        # For dry run, just print the new version and exit
+        print(new_version)
+        return
+    
+    print(f"Current version: {current_version}")
     print(f"New version: {new_version}")
     
     # Check if working directory is clean

@@ -1,0 +1,440 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Manual trigger for production builds
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+        - custom
+      custom_version:
+        description: 'Custom version (only if release_type is custom)'
+        required: false
+        type: string
+      create_release:
+        description: 'Create GitHub release'
+        required: true
+        default: true
+        type: boolean
+      publish_packages:
+        description: 'Publish npm packages'
+        required: true
+        default: true
+        type: boolean
+
+env:
+  DOCKER_HUB_REPOSITORY: tonyzorin/youtrack-mcp
+  GITHUB_REGISTRY: ghcr.io
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+
+jobs:
+  # ==============================
+  # TESTING STAGE
+  # ==============================
+  test-unit:
+    name: "🧪 Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run unit tests
+      env:
+        YOUTRACK_URL: https://test.youtrack.cloud
+        YOUTRACK_API_TOKEN: test-token
+      run: |
+        python -m pytest tests/unit/ -v --tb=short -m "unit" --cov=youtrack_mcp --cov-report=xml --cov-report=term-missing
+        
+    - name: Upload unit test coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unit
+        name: unit-tests
+
+  test-integration:
+    name: "🔗 Integration Tests"
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run integration tests
+      env:
+        YOUTRACK_URL: https://test.youtrack.cloud
+        YOUTRACK_API_TOKEN: test-token
+      run: |
+        python -m pytest tests/integration/ -v --tb=short -m "integration" --cov=youtrack_mcp --cov-report=xml
+        
+    - name: Upload integration test coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: integration
+        name: integration-tests
+
+  test-docker:
+    name: "🐳 Docker Tests"
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+        
+    - name: Build test Docker image
+      run: |
+        docker build -t youtrack-mcp-test .
+        
+    - name: Test Docker container
+      run: |
+        # Test that container starts and responds
+        docker run --rm -d --name test-container \
+          -e YOUTRACK_URL=https://test.youtrack.cloud \
+          -e YOUTRACK_API_TOKEN=test-token \
+          youtrack-mcp-test &
+        
+        # Wait for container to start
+        sleep 5
+        
+        # Test that container is running
+        if docker ps | grep -q test-container; then
+          echo "✅ Docker container started successfully"
+          docker stop test-container
+        else
+          echo "❌ Docker container failed to start"
+          docker logs test-container
+          exit 1
+        fi
+
+  test-e2e:
+    name: "🎯 E2E Tests"
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e-tests')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run E2E tests
+      env:
+        YOUTRACK_URL: ${{ secrets.YOUTRACK_URL }}
+        YOUTRACK_API_TOKEN: ${{ secrets.YOUTRACK_API_TOKEN }}
+      run: |
+        if [ -z "$YOUTRACK_URL" ] || [ -z "$YOUTRACK_API_TOKEN" ]; then
+          echo "⚠️ Skipping E2E tests: Real YouTrack credentials not configured"
+          echo "To enable E2E tests, add YOUTRACK_URL and YOUTRACK_API_TOKEN secrets"
+          exit 0
+        fi
+        python -m pytest tests/e2e/ -v --tb=short -m "e2e"
+
+  # ==============================
+  # DEV BUILD STAGE 
+  # ==============================
+  build-dev:
+    name: "🔨 Dev Build"
+    needs: [test-unit, test-integration, test-docker]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Extract version
+      id: get_version
+      run: |
+        VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
+        COMMIT_SHA=${GITHUB_SHA::8}
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_OUTPUT
+        echo "🔨 Building dev version: ${VERSION}_wip"
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.GITHUB_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push dev images
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}_wip
+          ${{ env.DOCKER_HUB_REPOSITORY }}:dev-${{ steps.get_version.outputs.COMMIT_SHA }}
+          ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:${{ steps.get_version.outputs.VERSION }}_wip
+          ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:dev-${{ steps.get_version.outputs.COMMIT_SHA }}
+        labels: |
+          org.opencontainers.image.title=YouTrack MCP (Dev Build)
+          org.opencontainers.image.description=YouTrack Model Context Protocol Server - Development Build
+          org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}_wip
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Dev build summary
+      run: |
+        echo "🔨 Dev build completed!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Docker Images:**" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}_wip\`" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ env.DOCKER_HUB_REPOSITORY }}:dev-${{ steps.get_version.outputs.COMMIT_SHA }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "docker pull ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}_wip" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # ==============================
+  # MANUAL PRODUCTION BUILD STAGE
+  # ==============================
+  build-production:
+    name: "🚀 Production Build"
+    needs: [test-unit, test-integration, test-docker]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Determine version
+      id: version
+      run: |
+        CURRENT_VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
+        echo "Current version: $CURRENT_VERSION"
+        
+        if [[ "${{ github.event.inputs.release_type }}" == "custom" ]]; then
+          if [[ -z "${{ github.event.inputs.custom_version }}" ]]; then
+            echo "❌ Custom version is required when release_type is 'custom'"
+            exit 1
+          fi
+          NEW_VERSION="${{ github.event.inputs.custom_version }}"
+        else
+          NEW_VERSION=$(python scripts/version_bump.py ${{ github.event.inputs.release_type }} --dry-run)
+        fi
+        
+        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "🚀 Will build production version: $NEW_VERSION"
+
+    - name: Update version
+      run: |
+        python scripts/version_bump.py ${{ steps.version.outputs.NEW_VERSION }}
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.GITHUB_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push production images
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.version.outputs.NEW_VERSION }}
+          ${{ env.DOCKER_HUB_REPOSITORY }}:latest
+          ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:${{ steps.version.outputs.NEW_VERSION }}
+          ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:latest
+        labels: |
+          org.opencontainers.image.title=YouTrack MCP
+          org.opencontainers.image.description=YouTrack Model Context Protocol Server
+          org.opencontainers.image.version=${{ steps.version.outputs.NEW_VERSION }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Create GitHub Release
+      if: github.event.inputs.create_release == 'true'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.version.outputs.NEW_VERSION }}
+        release_name: Release v${{ steps.version.outputs.NEW_VERSION }}
+        body: |
+          ## 🚀 Release v${{ steps.version.outputs.NEW_VERSION }}
+          
+          ### 🐳 Docker Images
+          - `${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.version.outputs.NEW_VERSION }}`
+          - `${{ env.DOCKER_HUB_REPOSITORY }}:latest`
+          - `${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:${{ steps.version.outputs.NEW_VERSION }}`
+          - `${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:latest`
+          
+          ### 📦 Installation
+          ```bash
+          # Docker Hub
+          docker pull ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.version.outputs.NEW_VERSION }}
+          
+          # GitHub Container Registry  
+          docker pull ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:${{ steps.version.outputs.NEW_VERSION }}
+          ```
+          
+          ### 🔧 Claude Desktop Configuration
+          ```json
+          "youtrack": {
+            "command": "docker",
+            "args": [
+              "run", "--rm", "-i",
+              "--env-file", ".env",
+              "${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.version.outputs.NEW_VERSION }}"
+            ]
+          }
+          ```
+        draft: false
+        prerelease: false
+
+  # ==============================
+  # NPM PACKAGE PUBLISHING
+  # ==============================
+  publish-npm:
+    name: "📦 Publish NPM"
+    needs: [build-production]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_packages == 'true'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Get version
+      id: get_version
+      run: |
+        VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Update package.json version
+      run: |
+        if [ -f "package.json" ]; then
+          sed -i.bak "s/\"version\": \".*\"/\"version\": \"${{ steps.get_version.outputs.VERSION }}\"/" package.json
+          echo "✅ Updated package.json version to ${{ steps.get_version.outputs.VERSION }}"
+        else
+          echo "❌ package.json not found"
+          exit 1
+        fi
+
+    - name: Install npm dependencies
+      run: npm ci
+
+    - name: Build npm package
+      run: npm run build
+
+    - name: Test npm package
+      run: npm test
+
+    - name: Publish to npmjs.org
+      run: npm publish --access public
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Set up Node.js for GitHub Packages
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@${{ github.repository_owner }}'
+
+    - name: Update package.json for GitHub Packages
+      run: |
+        sed -i.bak "s/\"name\": \"youtrack-mcp-tonyzorin\"/\"name\": \"@${{ github.repository_owner }}\/youtrack-mcp\"/" package.json
+
+    - name: Publish to GitHub Packages
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==============================
+  # PR BUILD INFO
+  # ==============================
+  pr-info:
+    name: "📝 PR Info"
+    needs: [test-unit, test-integration, test-docker]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - name: PR Summary
+      run: |
+        echo "✅ All tests passed for PR #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔨 Merge to \`main\` for automatic dev build" >> $GITHUB_STEP_SUMMARY
+        echo "- 🚀 Use 'Actions' → 'CI/CD Pipeline' → 'Run workflow' for production release" >> $GITHUB_STEP_SUMMARY 
