@@ -432,20 +432,18 @@ class TestIssuesCustomFields(unittest.TestCase):
         self.issues_client = IssuesClient(self.mock_client)
 
     def test_update_issue_custom_fields_success(self):
-        """Test successful custom field update."""
-        # Mock get_issue response
+        """Test successful custom field update using Commands API."""
+        # Mock get_issue response for getting updated issue at the end
         mock_issue = Mock()
         mock_issue.project = {"id": "0-0"}
         self.mock_client.get.return_value = mock_issue
 
-        # Mock post response
-        mock_updated_issue = Mock()
-        mock_updated_issue.model_validate.return_value = {"id": "DEMO-123", "summary": "Test"}
-        self.mock_client.post.return_value = {"id": "DEMO-123", "summary": "Test"}
+        # Mock post response for Commands API
+        self.mock_client.post.return_value = {"success": True}
 
-        # Mock Issue.model_validate
+        # Mock Issue.model_validate for the returned updated issue
         with patch('youtrack_mcp.api.issues.Issue') as mock_issue_class:
-            mock_issue_class.model_validate.return_value = mock_updated_issue
+            mock_issue_class.model_validate.return_value = mock_issue
 
             # Test the method
             result = self.issues_client.update_issue_custom_fields(
@@ -454,15 +452,17 @@ class TestIssuesCustomFields(unittest.TestCase):
                 validate=False  # Skip validation for this test
             )
 
-            # Verify the API call
+            # Verify the Commands API call
             self.mock_client.post.assert_called_once()
             call_args = self.mock_client.post.call_args
-            self.assertEqual(call_args[0][0], "issues/DEMO-123")
+            self.assertEqual(call_args[0][0], "commands")
             
-            # Check custom fields data structure
+            # Check Commands API data structure
             posted_data = call_args[1]["data"]
-            self.assertIn("customFields", posted_data)
-            self.assertEqual(len(posted_data["customFields"]), 2)
+            self.assertIn("query", posted_data)
+            self.assertIn("issues", posted_data)
+            self.assertEqual(posted_data["query"], "Priority High Assignee john.doe")
+            self.assertEqual(posted_data["issues"], [{"idReadable": "DEMO-123"}])
 
     def test_update_issue_custom_fields_empty_fields(self):
         """Test update with empty custom fields returns current issue."""

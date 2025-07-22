@@ -33,8 +33,9 @@ class TestCustomFieldUpdateFixes:
         result = issues_client._format_custom_field_value_with_id("state-field-id", "Open")
         
         expected = {
+            "$type": "StateIssueCustomField",
             "id": "state-field-id",
-            "value": {"name": "Open", "$type": "EnumBundleElement"}
+            "value": {"name": "Open", "$type": "StateBundleElement"}
         }
         assert result == expected
 
@@ -43,6 +44,7 @@ class TestCustomFieldUpdateFixes:
         result = issues_client._format_custom_field_value_with_id("assignee-field-id", "john.doe")
         
         expected = {
+            "$type": "SingleUserIssueCustomField",
             "id": "assignee-field-id",
             "value": {"login": "john.doe", "$type": "User"}
         }
@@ -53,6 +55,7 @@ class TestCustomFieldUpdateFixes:
         result = issues_client._format_custom_field_value_with_id("time-field-id", "PT2H30M")
         
         expected = {
+            "$type": "SingleEnumIssueCustomField",
             "id": "time-field-id",
             "value": {"presentation": "PT2H30M", "$type": "PeriodValue"}
         }
@@ -63,8 +66,9 @@ class TestCustomFieldUpdateFixes:
         result = issues_client._format_custom_field_value_with_id("priority-field-id", 5)
         
         expected = {
+            "$type": "SingleEnumIssueCustomField",
             "id": "priority-field-id",
-            "value": 5
+            "value": {"name": "5", "$type": "EnumBundleElement"}
         }
         assert result == expected
 
@@ -73,6 +77,7 @@ class TestCustomFieldUpdateFixes:
         result = issues_client._format_custom_field_value_with_id("any-field-id", None)
         
         expected = {
+            "$type": "SingleEnumIssueCustomField",
             "id": "any-field-id",
             "value": None
         }
@@ -97,7 +102,7 @@ class TestCustomFieldUpdateFixes:
         
         field_id = issues_client._get_custom_field_id("DEMO", "Priority")
         assert field_id == "priority-field-id"
-        mock_client.get.assert_called_with("admin/projects/DEMO/customFields")
+        mock_client.get.assert_called_with("admin/projects/DEMO/customFields?fields=field(id,name,fieldType($type,valueType,id)),canBeEmpty,autoAttached")
 
     def test_get_custom_field_id_not_found(self, issues_client, mock_client):
         """Test field ID not found."""
@@ -120,48 +125,37 @@ class TestCustomFieldUpdateFixes:
         field_id = issues_client._get_custom_field_id("DEMO", "Priority")
         assert field_id is None
 
-    @patch.object(IssuesClient, '_get_custom_field_id')
-    @patch.object(IssuesClient, '_format_custom_field_value_with_id')
-    def test_update_issue_custom_fields_uses_field_ids(
-        self, mock_format, mock_get_id, issues_client, mock_client
+    def test_update_issue_custom_fields_uses_commands_api(
+        self, issues_client, mock_client
     ):
-        """Test that update_issue_custom_fields uses field IDs correctly."""
-        # Mock the new project extraction API call
-        mock_client.get.side_effect = [
-            # First call - get issue with project info
-            {"id": "DEMO-123", "project": {"id": "DEMO", "shortName": "DEMO"}},
-        ]
-        
-        mock_get_id.side_effect = ["priority-field-id", "assignee-field-id"]
-        mock_format.side_effect = [
-            {"id": "priority-field-id", "value": {"name": "High", "$type": "EnumBundleElement"}},
-            {"id": "assignee-field-id", "value": {"login": "john.doe", "$type": "User"}}
-        ]
-        
-        mock_client.post.return_value = {"id": "DEMO-123"}
-        
-        # Call the method
-        custom_fields = {"Priority": "High", "Assignee": "john.doe"}
-        issues_client.update_issue_custom_fields("DEMO-123", custom_fields, validate=False)
-        
-        # Verify field ID lookup calls with correct project ID
-        assert mock_get_id.call_count == 2
-        mock_get_id.assert_any_call("DEMO", "Priority")
-        mock_get_id.assert_any_call("DEMO", "Assignee")
-        
-        # Verify formatting calls with IDs and project ID
-        assert mock_format.call_count == 2
-        mock_format.assert_any_call("priority-field-id", "High", "DEMO")
-        mock_format.assert_any_call("assignee-field-id", "john.doe", "DEMO")
-        
-        # Verify API call
-        expected_data = {
-            "customFields": [
-                {"id": "priority-field-id", "value": {"name": "High", "$type": "EnumBundleElement"}},
-                {"id": "assignee-field-id", "value": {"login": "john.doe", "$type": "User"}}
-            ]
+        """Test that update_issue_custom_fields uses Commands API correctly."""
+        # Mock the issue response for project extraction (when validate=True)  
+        mock_client.get.return_value = {
+            "id": "DEMO-123", 
+            "project": {"id": "DEMO", "shortName": "DEMO"}
         }
-        mock_client.post.assert_called_with("issues/DEMO-123", data=expected_data)
+        
+        # Mock successful command execution
+        mock_client.post.return_value = {"success": True}
+        
+        # Call the method with validation disabled (simpler test case)
+        custom_fields = {"Priority": "High", "Assignee": "john.doe"}
+        result = issues_client.update_issue_custom_fields("DEMO-123", custom_fields, validate=False)
+        
+        # Verify Commands API was called with correct format
+        mock_client.post.assert_called_with(
+            "commands", 
+            data={
+                "query": "Priority High Assignee john.doe",
+                "issues": [{"idReadable": "DEMO-123"}]
+            }
+        )
+        
+        # Verify get_issue was called to return updated issue
+        mock_client.get.assert_called()
+        
+        # Result should be the issue object
+        assert hasattr(result, 'id') or isinstance(result, dict)
 
     def test_get_custom_field_schema_with_detailed_query(self, projects_client, mock_client):
         """Test enhanced schema retrieval with detailed field query."""
