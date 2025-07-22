@@ -21,8 +21,8 @@ except ImportError:
     logger = logging.getLogger(__name__)
     logger.warning("nest_asyncio not available, event loop nesting may cause issues")
 
-# App version - easy to find and update
-APP_VERSION = os.getenv("APP_VERSION", "1.0.1")
+# App version - now imported from version.py to ensure consistency
+from youtrack_mcp.version import __version__ as APP_VERSION
 
 
 from fastapi import FastAPI, Request
