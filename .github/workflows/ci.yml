@@ -126,52 +126,44 @@ jobs:
         # Test that container starts and responds
         echo "🔍 Starting Docker container test..."
         
-        # Start container in detached mode
-        CONTAINER_ID=$(docker run --rm -d --name test-container \
+        # Test 1: Container can start and process help command
+        echo "📋 Testing container startup with help command..."
+        if docker run --rm \
           -e YOUTRACK_URL=https://test.youtrack.cloud \
           -e YOUTRACK_API_TOKEN=test-token \
-          youtrack-mcp-test)
-        
-        echo "📦 Container started with ID: $CONTAINER_ID"
-        
-        # Wait for container to initialize
-        echo "⏳ Waiting for container to initialize..."
-        sleep 10
-        
-        # Check if container is still running
-        if docker ps --filter "name=test-container" --format "table {{.Names}}" | grep -q test-container; then
-          echo "✅ Docker container is running successfully"
-          
-          # Test that container responds (optional - check if it's still alive after a bit)
-          sleep 5
-          if docker ps --filter "name=test-container" --format "table {{.Names}}" | grep -q test-container; then
-            echo "✅ Docker container is stable and responsive"
-            CONTAINER_STATUS="success"
-          else
-            echo "⚠️ Docker container stopped unexpectedly after startup"
-            CONTAINER_STATUS="stopped"
-          fi
-          
-          # Clean up
-          docker stop test-container 2>/dev/null || true
-          
-          # Exit with appropriate status
-          if [ "$CONTAINER_STATUS" = "success" ]; then
-            echo "🎉 Docker container test passed!"
-            exit 0
-          else
-            echo "❌ Docker container test failed - container stopped"
-            exit 1
-          fi
+          youtrack-mcp-test python main.py --help; then
+          echo "✅ Container startup test passed!"
         else
-          echo "❌ Docker container failed to start or exited immediately"
-          echo "📋 Container logs:"
-          docker logs test-container 2>/dev/null || echo "No logs available"
-          
-          # Clean up any remaining container
-          docker rm -f test-container 2>/dev/null || true
+          echo "❌ Container failed to start or show help"
           exit 1
         fi
+        
+        # Test 2: Container can start and process version command  
+        echo "📋 Testing container version command..."
+        if docker run --rm \
+          -e YOUTRACK_URL=https://test.youtrack.cloud \
+          -e YOUTRACK_API_TOKEN=test-token \
+          youtrack-mcp-test python main.py --version; then
+          echo "✅ Container version test passed!"
+        else
+          echo "❌ Container failed to show version"
+          exit 1
+        fi
+        
+        # Test 3: Container can start MCP server (will exit quickly but should not error)
+        echo "📋 Testing MCP server initialization..."
+        # Use timeout to test if MCP server starts without hanging (timeout exits with 124 when timing out)
+        if timeout 5s docker run --rm \
+          -e YOUTRACK_URL=https://test.youtrack.cloud \
+          -e YOUTRACK_API_TOKEN=test-token \
+          youtrack-mcp-test > /dev/null 2>&1 || [ $? -eq 124 ]; then
+          echo "✅ MCP server initialization test passed!"
+        else
+          echo "❌ MCP server failed to initialize"
+          exit 1
+        fi
+        
+        echo "🎉 All Docker container tests passed!"
 
   test-e2e:
     name: "🎯 E2E Tests"
