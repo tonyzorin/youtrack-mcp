@@ -124,21 +124,52 @@ jobs:
     - name: Test Docker container
       run: |
         # Test that container starts and responds
-        docker run --rm -d --name test-container \
+        echo "🔍 Starting Docker container test..."
+        
+        # Start container in detached mode
+        CONTAINER_ID=$(docker run --rm -d --name test-container \
           -e YOUTRACK_URL=https://test.youtrack.cloud \
           -e YOUTRACK_API_TOKEN=test-token \
-          youtrack-mcp-test &
+          youtrack-mcp-test)
         
-        # Wait for container to start
-        sleep 5
+        echo "📦 Container started with ID: $CONTAINER_ID"
         
-        # Test that container is running
-        if docker ps | grep -q test-container; then
-          echo "✅ Docker container started successfully"
-          docker stop test-container
+        # Wait for container to initialize
+        echo "⏳ Waiting for container to initialize..."
+        sleep 10
+        
+        # Check if container is still running
+        if docker ps --filter "name=test-container" --format "table {{.Names}}" | grep -q test-container; then
+          echo "✅ Docker container is running successfully"
+          
+          # Test that container responds (optional - check if it's still alive after a bit)
+          sleep 5
+          if docker ps --filter "name=test-container" --format "table {{.Names}}" | grep -q test-container; then
+            echo "✅ Docker container is stable and responsive"
+            CONTAINER_STATUS="success"
+          else
+            echo "⚠️ Docker container stopped unexpectedly after startup"
+            CONTAINER_STATUS="stopped"
+          fi
+          
+          # Clean up
+          docker stop test-container 2>/dev/null || true
+          
+          # Exit with appropriate status
+          if [ "$CONTAINER_STATUS" = "success" ]; then
+            echo "🎉 Docker container test passed!"
+            exit 0
+          else
+            echo "❌ Docker container test failed - container stopped"
+            exit 1
+          fi
         else
-          echo "❌ Docker container failed to start"
-          docker logs test-container
+          echo "❌ Docker container failed to start or exited immediately"
+          echo "📋 Container logs:"
+          docker logs test-container 2>/dev/null || echo "No logs available"
+          
+          # Clean up any remaining container
+          docker rm -f test-container 2>/dev/null || true
           exit 1
         fi
 
@@ -369,6 +400,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for version
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -376,33 +414,98 @@ jobs:
         node-version: '18'
         registry-url: 'https://registry.npmjs.org'
 
-    - name: Get version
+    - name: Check NPM secrets
+      run: |
+        if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+          echo "❌ NPM_TOKEN secret is not set"
+          echo "Please add NPM_TOKEN secret in repository settings"
+          echo "Get token from: https://www.npmjs.com/settings/tokens"
+          exit 1
+        else
+          echo "✅ NPM_TOKEN secret is configured"
+        fi
+
+    - name: Get version from Git
       id: get_version
       run: |
+        # Get the version that was set during build-production step
         VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "📝 Publishing version: $VERSION"
 
-    - name: Update package.json version
+    - name: Synchronize package.json version
       run: |
-        if [ -f "package.json" ]; then
-          sed -i.bak "s/\"version\": \".*\"/\"version\": \"${{ steps.get_version.outputs.VERSION }}\"/" package.json
-          echo "✅ Updated package.json version to ${{ steps.get_version.outputs.VERSION }}"
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        echo "🔄 Synchronizing package.json to version $VERSION"
+        
+        # Update package.json version to match Python version
+        sed -i.bak "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+        
+        # Verify the update worked
+        NPM_VERSION=$(node -p "require('./package.json').version")
+        if [ "$NPM_VERSION" = "$VERSION" ]; then
+          echo "✅ package.json version updated to $VERSION"
         else
-          echo "❌ package.json not found"
+          echo "❌ Version mismatch: package.json=$NPM_VERSION, expected=$VERSION"
           exit 1
         fi
 
-    - name: Install npm dependencies
-      run: npm ci
+    - name: Install NPM dependencies
+      run: |
+        echo "📦 Installing NPM dependencies..."
+        npm ci
 
-    - name: Build npm package
-      run: npm run build
+    - name: Build NPM package
+      run: |
+        echo "🔨 Building NPM package..."
+        npm run build
+        
+        echo "📋 Build contents:"
+        ls -la dist/
+        echo ""
+        echo "🐍 Python files:"
+        ls -la dist/python/
 
-    - name: Test npm package
-      run: npm test
+    - name: Test NPM package
+      run: |
+        echo "🧪 Testing NPM package..."
+        npm test
+
+    - name: Package validation
+      run: |
+        echo "🔍 Validating package before publishing..."
+        
+        # Check that all required files exist
+        required_files=(
+          "dist/index.js"
+          "dist/bin/youtrack-mcp.js" 
+          "dist/python/main.py"
+          "dist/python/youtrack_mcp"
+        )
+        
+        for file in "${required_files[@]}"; do
+          if [ -f "$file" ] || [ -d "$file" ]; then
+            echo "✅ $file"
+          else
+            echo "❌ Missing: $file"
+            exit 1
+          fi
+        done
+        
+        # Test CLI works
+        echo "🎯 Testing CLI..."
+        node dist/bin/youtrack-mcp.js --help || {
+          echo "❌ CLI test failed"
+          exit 1
+        }
+        
+        echo "✅ Package validation passed"
 
     - name: Publish to npmjs.org
-      run: npm publish --access public
+      run: |
+        echo "🚀 Publishing to npmjs.org..."
+        echo "Package: youtrack-mcp-tonyzorin@${{ steps.get_version.outputs.VERSION }}"
+        npm publish --access public
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -413,28 +516,48 @@ jobs:
         registry-url: 'https://npm.pkg.github.com'
         scope: '@${{ github.repository_owner }}'
 
-    - name: Update package.json for GitHub Packages
+    - name: Prepare for GitHub Packages
       run: |
+        echo "📦 Preparing for GitHub Packages..."
+        
+        # Create a scoped package for GitHub Packages
+        cp package.json package.json.backup
         sed -i.bak "s/\"name\": \"youtrack-mcp-tonyzorin\"/\"name\": \"@${{ github.repository_owner }}\/youtrack-mcp\"/" package.json
+        
+        echo "Updated package name for GitHub Packages:"
+        grep '"name"' package.json
 
     - name: Publish to GitHub Packages
-      run: npm publish
+      run: |
+        echo "🚀 Publishing to GitHub Packages..."
+        echo "Package: @${{ github.repository_owner }}/youtrack-mcp@${{ steps.get_version.outputs.VERSION }}"
+        npm publish
       env:
         NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ==============================
-  # PR BUILD INFO
-  # ==============================
-  pr-info:
-    name: "📝 PR Info"
-    needs: [test-unit, test-integration, test-docker]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-    - name: PR Summary
+    - name: NPM publish summary
       run: |
-        echo "✅ All tests passed for PR #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+        echo "✅ NPM packages published successfully!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
-        echo "- 🔨 Merge to \`main\` for automatic dev build" >> $GITHUB_STEP_SUMMARY
-        echo "- 🚀 Use 'Actions' → 'CI/CD Pipeline' → 'Run workflow' for production release" >> $GITHUB_STEP_SUMMARY 
+        echo "**Published Packages:**" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 [npmjs.org](https://www.npmjs.com/package/youtrack-mcp-tonyzorin): \`youtrack-mcp-tonyzorin@${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 [GitHub Packages](https://github.com/${{ github.repository_owner }}/youtrack-mcp/pkgs/npm/youtrack-mcp): \`@${{ github.repository_owner }}/youtrack-mcp@${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Installation:**" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "# npmjs.org (public)" >> $GITHUB_STEP_SUMMARY
+        echo "npm install -g youtrack-mcp-tonyzorin@${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# GitHub Packages (scoped)" >> $GITHUB_STEP_SUMMARY
+        echo "npm install -g @${{ github.repository_owner }}/youtrack-mcp@${{ steps.get_version.outputs.VERSION }} --registry=https://npm.pkg.github.com" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "# Run directly" >> $GITHUB_STEP_SUMMARY
+        echo "npx youtrack-mcp-tonyzorin" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Or install globally and run" >> $GITHUB_STEP_SUMMARY
+        echo "npm install -g youtrack-mcp-tonyzorin" >> $GITHUB_STEP_SUMMARY
+        echo "youtrack-mcp-tonyzorin" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY 
