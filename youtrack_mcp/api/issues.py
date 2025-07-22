@@ -325,9 +325,17 @@ class IssuesClient:
                 raise YouTrackAPIError(f"Custom field validation failed: {'; '.join(validation_errors)}")
 
         # Transform custom fields to YouTrack API format
+        # CRITICAL: YouTrack API requires field IDs for updates, not names!
         custom_fields_data = []
         for field_name, field_value in custom_fields.items():
-            field_data = self._format_custom_field_value(field_name, field_value)
+            # Get field ID from project schema
+            field_id = self._get_custom_field_id(project_id, field_name)
+            if not field_id:
+                logger.warning(f"Could not find field ID for '{field_name}' in project {project_id}")
+                # Try using the field name as fallback
+                field_id = field_name
+            
+            field_data = self._format_custom_field_value_with_id(field_id, field_value)
             custom_fields_data.append(field_data)
 
         # Update the issue with custom fields
@@ -862,24 +870,118 @@ class IssuesClient:
 
     def _format_custom_field_value(self, field_name: str, field_value: Any) -> Dict[str, Any]:
         """Format custom field value for YouTrack API."""
+        # YouTrack API expects different formats for different field types
+        # The key issue: we need to use field ID, not name, and proper value format
+        
+        if field_value is None:
+            return {
+                "name": field_name,
+                "value": None
+            }
+        
+        # For most string-based fields (State, Enum, etc.)
         if isinstance(field_value, str):
             return {
                 "name": field_name,
                 "value": {"name": field_value}
             }
-        elif isinstance(field_value, dict):
+        # For user fields, expect login format
+        elif isinstance(field_value, dict) and "login" in field_value:
             return {
                 "name": field_name,
-                "value": field_value
+                "value": {"login": field_value["login"]}
             }
+        # For user fields as string (login)
+        elif isinstance(field_value, str) and field_name.lower() in ["assignee", "reporter"]:
+            return {
+                "name": field_name,
+                "value": {"login": field_value}
+            }
+        # For numeric fields (Period, Integer, Float)
         elif isinstance(field_value, (int, float)):
             return {
                 "name": field_name,
                 "value": field_value
             }
+        # For period fields (time tracking)
+        elif isinstance(field_value, str) and field_value.startswith("PT"):
+            return {
+                "name": field_name,
+                "value": {"presentation": field_value}
+            }
+        # For complex objects (already formatted)
+        elif isinstance(field_value, dict):
+            return {
+                "name": field_name,
+                "value": field_value
+            }
+        # Default fallback
         else:
             return {
                 "name": field_name,
+                "value": {"name": str(field_value)}
+            }
+
+    def _get_custom_field_id(self, project_id: str, field_name: str) -> Optional[str]:
+        """Get the field ID for a custom field by name."""
+        try:
+            fields = self.client.get(f"admin/projects/{project_id}/customFields")
+            for field in fields:
+                if field.get("field", {}).get("name") == field_name:
+                    return field.get("field", {}).get("id")
+            return None
+        except Exception as e:
+            logger.warning(f"Error getting field ID for '{field_name}': {str(e)}")
+            return None
+
+    def _format_custom_field_value_with_id(self, field_id: str, field_value: Any) -> Dict[str, Any]:
+        """Format custom field value with field ID for YouTrack API."""
+        # YouTrack API format: {"id": "field-id", "value": {...}}
+        
+        if field_value is None:
+            return {
+                "id": field_id,
+                "value": None
+            }
+        
+        # For most string-based fields (State, Enum, etc.)
+        if isinstance(field_value, str):
+            # Check if this looks like a user field
+            if any(keyword in field_id.lower() for keyword in ["assignee", "reporter", "user"]):
+                return {
+                    "id": field_id,
+                    "value": {"login": field_value}
+                }
+            # Check if this is a period field
+            elif field_value.startswith("PT"):
+                return {
+                    "id": field_id,
+                    "value": {"presentation": field_value}
+                }
+            else:
+                return {
+                    "id": field_id,
+                    "value": {"name": field_value}
+                }
+        
+        # For numeric fields
+        elif isinstance(field_value, (int, float)):
+            return {
+                "id": field_id,
+                "value": field_value
+            }
+        
+        # For complex objects (already formatted)
+        elif isinstance(field_value, dict):
+            return {
+                "id": field_id,
+                "value": field_value
+            }
+        
+        # Default fallback
+        else:
+            return {
+                "id": field_id,
                 "value": {"name": str(field_value)}
             }
 

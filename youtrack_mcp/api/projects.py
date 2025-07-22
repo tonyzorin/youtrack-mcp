@@ -374,13 +374,15 @@ class ProjectsClient:
             Custom field schema with type information and constraints
         """
         try:
-            fields = self.get_custom_fields(project_id)
+            # Use detailed fields query to get complete information
+            fields_query = "field(id,name,fieldType($type,valueType,id)),canBeEmpty,autoAttached"
+            fields = self.client.get(f"admin/projects/{project_id}/customFields?fields={fields_query}")
+            
             for field in fields:
                 if field.get("field", {}).get("name") == field_name:
                     field_schema = field.get("field", {})
-                    
-                    # Enhance with additional type information
                     field_type = field_schema.get("fieldType", {})
+                    
                     enhanced_schema = {
                         "name": field_name,
                         "type": field_type.get("valueType", "string"),
@@ -392,15 +394,22 @@ class ProjectsClient:
                         "bundle_id": field_type.get("id")
                     }
                     
+                    logger.info(f"Found schema for field '{field_name}': {enhanced_schema}")
+                    
                     # Add allowed values for enum/state fields
                     if field_type.get("valueType") in ["enum", "state"]:
-                        enhanced_schema["allowed_values"] = self.get_custom_field_allowed_values(project_id, field_name)
+                        try:
+                            enhanced_schema["allowed_values"] = self.get_custom_field_allowed_values(project_id, field_name)
+                        except Exception as e:
+                            logger.warning(f"Could not get allowed values for {field_name}: {str(e)}")
+                            enhanced_schema["allowed_values"] = []
                     
                     return enhanced_schema
             
+            logger.warning(f"Field '{field_name}' not found in project {project_id} custom fields")
             return None
         except Exception as e:
-            logger.error(f"Error getting custom field schema: {str(e)}")
+            logger.error(f"Error getting custom field schema for '{field_name}': {str(e)}")
             return None
 
     def get_custom_field_allowed_values(
@@ -417,62 +426,100 @@ class ProjectsClient:
             List of allowed values with details
         """
         try:
-            # First get the field schema
-            field_schema = self.get_custom_field_schema(project_id, field_name)
-            if not field_schema:
+            # Get field information directly with detailed query
+            fields_query = "field(id,name,fieldType($type,valueType,id)),canBeEmpty,autoAttached"
+            fields = self.client.get(f"admin/projects/{project_id}/customFields?fields={fields_query}")
+            
+            field_info = None
+            for field in fields:
+                if field.get("field", {}).get("name") == field_name:
+                    field_info = field
+                    break
+            
+            if not field_info:
+                logger.warning(f"Field '{field_name}' not found in project {project_id}")
                 return []
             
-            bundle_type = field_schema.get("bundle_type", "")
-            bundle_id = field_schema.get("bundle_id")
+            field_schema = field_info.get("field", {})
+            field_type = field_schema.get("fieldType", {})
+            bundle_type = field_type.get("$type", "")
+            bundle_id = field_type.get("id")
+            
+            logger.info(f"Field '{field_name}' bundle type: {bundle_type}, bundle ID: {bundle_id}")
             
             if not bundle_id:
+                logger.warning(f"No bundle ID found for field '{field_name}'")
                 return []
             
-            # Get bundle values based on type
+            # Get bundle values based on type with detailed queries
             if "EnumBundle" in bundle_type:
-                bundle_data = self.client.get(f"admin/customFieldSettings/bundles/enum/{bundle_id}")
-                values = bundle_data.get("values", [])
-                return [
-                    {
-                        "name": value.get("name", ""),
-                        "description": value.get("description", ""),
-                        "id": value.get("id"),
-                        "color": value.get("color", {})
-                    }
-                    for value in values
-                ]
+                try:
+                    bundle_data = self.client.get(f"admin/customFieldSettings/bundles/enum/{bundle_id}?fields=values(id,name,description,color)")
+                    values = bundle_data.get("values", [])
+                    logger.info(f"Found {len(values)} enum values for field '{field_name}'")
+                    return [
+                        {
+                            "name": value.get("name", ""),
+                            "description": value.get("description", ""),
+                            "id": value.get("id"),
+                            "color": value.get("color", {})
+                        }
+                        for value in values
+                    ]
+                except Exception as e:
+                    logger.error(f"Error getting enum bundle {bundle_id}: {str(e)}")
+                    return []
             
-            elif "StateBundle" in bundle_type:
-                bundle_data = self.client.get(f"admin/customFieldSettings/bundles/state/{bundle_id}")
-                values = bundle_data.get("values", [])
-                return [
-                    {
-                        "name": value.get("name", ""),
-                        "description": value.get("description", ""),
-                        "id": value.get("id"),
-                        "resolved": value.get("isResolved", False),
-                        "color": value.get("color", {})
-                    }
-                    for value in values
-                ]
+            elif "StateBundle" in bundle_type or "StateMachineBundle" in bundle_type:
+                try:
+                    # Try different endpoints for state bundles
+                    bundle_endpoint = f"admin/customFieldSettings/bundles/state/{bundle_id}"
+                    try:
+                        bundle_data = self.client.get(f"{bundle_endpoint}?fields=values(id,name,description,isResolved,color)")
+                    except:
+                        # Fallback to simpler query
+                        bundle_data = self.client.get(bundle_endpoint)
+                    
+                    values = bundle_data.get("values", [])
+                    logger.info(f"Found {len(values)} state values for field '{field_name}'")
+                    return [
+                        {
+                            "name": value.get("name", ""),
+                            "description": value.get("description", ""),
+                            "id": value.get("id"),
+                            "resolved": value.get("isResolved", False),
+                            "color": value.get("color", {})
+                        }
+                        for value in values
+                    ]
+                except Exception as e:
+                    logger.error(f"Error getting state bundle {bundle_id}: {str(e)}")
+                    return []
             
             elif "UserBundle" in bundle_type:
-                # For user fields, get available users
-                users_data = self.client.get("users?fields=id,login,name,email")
-                return [
-                    {
-                        "name": user.get("name", ""),
-                        "login": user.get("login", ""),
-                        "id": user.get("id"),
-                        "email": user.get("email", "")
-                    }
-                    for user in users_data
-                ]
+                try:
+                    # For user fields, get available users
+                    users_data = self.client.get("users?fields=id,login,name,email")
+                    logger.info(f"Found {len(users_data)} users for field '{field_name}'")
+                    return [
+                        {
+                            "name": user.get("name", ""),
+                            "login": user.get("login", ""),
+                            "id": user.get("id"),
+                            "email": user.get("email", "")
+                        }
+                        for user in users_data
+                    ]
+                except Exception as e:
+                    logger.error(f"Error getting users: {str(e)}")
+                    return []
             
-            return []
+            else:
+                logger.info(f"Field '{field_name}' type '{bundle_type}' doesn't support allowed values")
+                return []
             
         except Exception as e:
-            logger.error(f"Error getting custom field allowed values: {str(e)}")
+            logger.error(f"Error getting custom field allowed values for '{field_name}': {str(e)}")
             return []
 
     def get_all_custom_fields_schemas(

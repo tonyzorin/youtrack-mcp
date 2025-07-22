@@ -613,9 +613,10 @@ class TestIssuesCustomFields(unittest.TestCase):
         value = {"login": "john.doe", "name": "John Doe"}
         result = self.issues_client._format_custom_field_value("Assignee", value)
         
+        # Our new logic extracts login for user fields (Assignee)
         expected = {
             "name": "Assignee", 
-            "value": value
+            "value": {"login": "john.doe"}
         }
         self.assertEqual(result, expected)
 

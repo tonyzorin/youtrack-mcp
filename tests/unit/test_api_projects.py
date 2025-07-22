@@ -381,7 +381,8 @@ class TestProjectsCustomFields(unittest.TestCase):
             }
         ]
         
-        self.projects_client.get_custom_fields = Mock(return_value=mock_fields)
+        # Mock the direct API call our method now uses
+        self.mock_client.get.return_value = mock_fields
         self.projects_client.get_custom_field_allowed_values = Mock(return_value=[
             {"name": "High", "id": "val-1"},
             {"name": "Medium", "id": "val-2"}
@@ -420,12 +421,20 @@ class TestProjectsCustomFields(unittest.TestCase):
 
     def test_get_custom_field_allowed_values_enum_field(self):
         """Test getting allowed values for enum field."""
-        mock_schema = {
-            "bundle_type": "EnumBundle",
-            "bundle_id": "bundle-123"
-        }
-        
-        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        # Mock field schema response
+        mock_fields = [
+            {
+                "field": {
+                    "id": "priority-field-id",
+                    "name": "Priority",
+                    "fieldType": {
+                        "$type": "EnumBundle",
+                        "valueType": "enum",
+                        "id": "bundle-123"
+                    }
+                }
+            }
+        ]
         
         mock_bundle_data = {
             "values": [
@@ -434,7 +443,9 @@ class TestProjectsCustomFields(unittest.TestCase):
                 {"name": "Low", "description": "Low priority", "id": "val-3", "color": {"bg": "#00ff00"}}
             ]
         }
-        self.mock_client.get.return_value = mock_bundle_data
+        
+        # Our method makes two API calls: first for field schema, then for bundle data
+        self.mock_client.get.side_effect = [mock_fields, mock_bundle_data]
 
         result = self.projects_client.get_custom_field_allowed_values("0-0", "Priority")
 
@@ -445,12 +456,20 @@ class TestProjectsCustomFields(unittest.TestCase):
 
     def test_get_custom_field_allowed_values_state_field(self):
         """Test getting allowed values for state field."""
-        mock_schema = {
-            "bundle_type": "StateBundle",
-            "bundle_id": "bundle-456"
-        }
-        
-        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        # Mock field schema response
+        mock_fields = [
+            {
+                "field": {
+                    "id": "state-field-id",
+                    "name": "State",
+                    "fieldType": {
+                        "$type": "StateBundle",
+                        "valueType": "state",
+                        "id": "bundle-456"
+                    }
+                }
+            }
+        ]
         
         mock_bundle_data = {
             "values": [
@@ -459,7 +478,9 @@ class TestProjectsCustomFields(unittest.TestCase):
                 {"name": "Closed", "description": "Closed state", "id": "state-3", "isResolved": True}
             ]
         }
-        self.mock_client.get.return_value = mock_bundle_data
+        
+        # Our method makes two API calls: first for field schema, then for bundle data
+        self.mock_client.get.side_effect = [mock_fields, mock_bundle_data]
 
         result = self.projects_client.get_custom_field_allowed_values("0-0", "State")
 
@@ -470,18 +491,28 @@ class TestProjectsCustomFields(unittest.TestCase):
 
     def test_get_custom_field_allowed_values_user_field(self):
         """Test getting allowed values for user field."""
-        mock_schema = {
-            "bundle_type": "UserBundle",
-            "bundle_id": "bundle-789"
-        }
-        
-        self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        # Mock field schema response
+        mock_fields = [
+            {
+                "field": {
+                    "id": "assignee-field-id",
+                    "name": "Assignee",
+                    "fieldType": {
+                        "$type": "UserBundle",
+                        "valueType": "user",
+                        "id": "bundle-789"
+                    }
+                }
+            }
+        ]
         
         mock_users_data = [
             {"id": "user-1", "login": "john.doe", "name": "John Doe", "email": "john@example.com"},
             {"id": "user-2", "login": "jane.smith", "name": "Jane Smith", "email": "jane@example.com"}
         ]
-        self.mock_client.get.return_value = mock_users_data
+        
+        # Our method makes two API calls: first for field schema, then for users data
+        self.mock_client.get.side_effect = [mock_fields, mock_users_data]
 
         result = self.projects_client.get_custom_field_allowed_values("0-0", "Assignee")
 
