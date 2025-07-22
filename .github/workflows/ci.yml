@@ -175,6 +175,7 @@ jobs:
 
   test-e2e:
     name: "🎯 E2E Tests"
+    needs: [build-dev]
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e-tests')
     steps:
@@ -191,7 +192,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Run E2E tests
+    - name: Run E2E tests with built image
       env:
         YOUTRACK_URL: ${{ secrets.YOUTRACK_URL }}
         YOUTRACK_API_TOKEN: ${{ secrets.YOUTRACK_API_TOKEN }}
@@ -201,6 +202,13 @@ jobs:
           echo "To enable E2E tests, add YOUTRACK_URL and YOUTRACK_API_TOKEN secrets"
           exit 0
         fi
+        
+        # Get version for testing the built dev image
+        VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
+        echo "🎯 Testing dev image: tonyzorin/youtrack-mcp:${VERSION}_wip"
+        
+        # Test using the actual built Docker image
+        export YOUTRACK_MCP_IMAGE="tonyzorin/youtrack-mcp:${VERSION}_wip"
         python -m pytest tests/e2e/ -v --tb=short -m "e2e"
 
   # ==============================
@@ -278,7 +286,7 @@ jobs:
   # ==============================
   build-production:
     name: "🚀 Production Build"
-    needs: [test-unit, test-integration, test-docker]
+    needs: [build-dev]
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
     steps:
