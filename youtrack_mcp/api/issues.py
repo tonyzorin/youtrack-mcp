@@ -951,7 +951,9 @@ class IssuesClient:
     def _get_custom_field_id(self, project_id: str, field_name: str) -> Optional[str]:
         """Get the field ID for a custom field by name."""
         try:
-            fields = self.client.get(f"admin/projects/{project_id}/customFields")
+            # Use detailed fields query to get complete field information
+            fields_query = "field(id,name,fieldType($type,valueType,id)),canBeEmpty,autoAttached"
+            fields = self.client.get(f"admin/projects/{project_id}/customFields?fields={fields_query}")
             for field in fields:
                 if field.get("field", {}).get("name") == field_name:
                     return field.get("field", {}).get("id")
@@ -981,103 +983,119 @@ class IssuesClient:
 
     def _format_custom_field_value_with_id(self, field_id: str, field_value: Any, project_id: str = None) -> Dict[str, Any]:
         """Format custom field value with field ID for YouTrack API."""
-        # YouTrack API format: {"id": "field-id", "value": {...}}
+        # YouTrack API format: Complete IssueCustomField object with proper $type
         
-        if field_value is None:
-            return {
-                "id": field_id,
-                "value": None
-            }
-        
-        # Get field type to determine correct $type for value
+        # Get field type information to determine the correct IssueCustomField $type
         field_type_info = self._get_field_type_info(project_id, field_id) if project_id else {}
         bundle_type = field_type_info.get("bundle_type", "")
+        value_type = field_type_info.get("value_type", "")
         
-        # For most string-based fields (State, Enum, etc.)
-        if isinstance(field_value, str):
-            # Check if this looks like a user field
-            if any(keyword in field_id.lower() for keyword in ["assignee", "reporter", "user"]) or "UserBundle" in bundle_type:
-                return {
-                    "id": field_id,
-                    "value": {
-                        "login": field_value,
-                        "$type": "User"
-                    }
-                }
-            # Check if this is a period field
-            elif field_value.startswith("PT"):
-                return {
-                    "id": field_id,
-                    "value": {
-                        "presentation": field_value,
-                        "$type": "PeriodValue"
-                    }
-                }
-            # State fields
-            elif "StateBundle" in bundle_type or "StateMachine" in bundle_type:
-                return {
-                    "id": field_id,
-                    "value": {
-                        "name": field_value,
-                        "$type": "StateMachineValue"
-                    }
-                }
-            # Enum fields
-            elif "EnumBundle" in bundle_type:
-                return {
-                    "id": field_id,
-                    "value": {
-                        "name": field_value,
-                        "$type": "EnumBundleElement"
-                    }
-                }
+        # Determine the IssueCustomField $type based on the bundle type and value type
+        issue_field_type = self._get_issue_custom_field_type(bundle_type, value_type, field_id)
+        
+        # Format the value based on type
+        formatted_value = self._format_field_value(field_value, bundle_type, value_type, field_id)
+        
+        return {
+            "id": field_id,
+            "value": formatted_value,
+            "$type": issue_field_type
+        }
+    
+    def _get_issue_custom_field_type(self, bundle_type: str, value_type: str, field_id: str) -> str:
+        """Determine the correct IssueCustomField $type based on field information."""
+        
+        # Check for user fields first (special case)
+        if any(keyword in field_id.lower() for keyword in ["assignee", "reporter", "user"]) or "UserBundle" in bundle_type:
+            return "SingleUserIssueCustomField"
+        
+        # Map based on value type and bundle type
+        if value_type == "enum":
+            return "SingleEnumIssueCustomField"
+        elif value_type == "state":
+            return "StateIssueCustomField"
+        elif value_type == "user":
+            return "SingleUserIssueCustomField"
+        elif value_type == "period":
+            return "PeriodIssueCustomField"
+        elif value_type in ["integer", "float", "string", "date"]:
+            return "SimpleIssueCustomField"
+        elif value_type == "text":
+            return "TextIssueCustomField"
+        elif "StateBundle" in bundle_type or "StateMachine" in bundle_type:
+            return "StateIssueCustomField"
+        elif "EnumBundle" in bundle_type:
+            return "SingleEnumIssueCustomField"
+        elif "UserBundle" in bundle_type:
+            return "SingleUserIssueCustomField"
+        elif "PeriodBundle" in bundle_type:
+            return "PeriodIssueCustomField"
+        else:
+            # Default fallback based on common field names
+            if "priority" in field_id.lower() or "type" in field_id.lower():
+                return "SingleEnumIssueCustomField"
+            elif "state" in field_id.lower():
+                return "StateIssueCustomField"
             else:
-                # Default string value (try EnumBundleElement as fallback)
+                return "SingleEnumIssueCustomField"  # Most common type
+    
+    def _format_field_value(self, field_value: Any, bundle_type: str, value_type: str, field_id: str) -> Any:
+        """Format the field value based on type information."""
+        
+        if field_value is None:
+            return None
+        
+        # For user fields
+        if any(keyword in field_id.lower() for keyword in ["assignee", "reporter", "user"]) or "UserBundle" in bundle_type or value_type == "user":
+            if isinstance(field_value, str):
                 return {
-                    "id": field_id,
-                    "value": {
-                        "name": field_value,
-                        "$type": "EnumBundleElement"
-                    }
+                    "login": field_value,
+                    "$type": "User"
+                }
+            elif isinstance(field_value, dict) and "login" in field_value:
+                return {
+                    "login": field_value["login"],
+                    "$type": "User"
                 }
         
-        # For numeric fields
-        elif isinstance(field_value, (int, float)):
+        # For period fields
+        elif value_type == "period" or (isinstance(field_value, str) and field_value.startswith("PT")):
             return {
-                "id": field_id,
-                "value": field_value
+                "presentation": str(field_value),
+                "$type": "PeriodValue"
             }
         
-        # For complex objects (already formatted with $type)
-        elif isinstance(field_value, dict):
-            # If it already has $type, use as-is
-            if "$type" in field_value:
-                return {
-                    "id": field_id,
-                    "value": field_value
-                }
-            # Otherwise add appropriate $type
-            else:
-                enhanced_value = dict(field_value)
-                if "login" in enhanced_value:
-                    enhanced_value["$type"] = "User"
-                elif "name" in enhanced_value and "EnumBundle" in bundle_type:
-                    enhanced_value["$type"] = "EnumBundleElement"
-                elif "name" in enhanced_value:
-                    enhanced_value["$type"] = "StateMachineValue"
-                return {
-                    "id": field_id,
-                    "value": enhanced_value
-                }
+        # For state fields
+        elif value_type == "state" or "StateBundle" in bundle_type or "StateMachine" in bundle_type or "state" in field_id.lower():
+            return {
+                "name": str(field_value),
+                "$type": "StateBundleElement"
+            }
         
-        # Default fallback
+        # For enum fields
+        elif value_type == "enum" or "EnumBundle" in bundle_type:
+            return {
+                "name": str(field_value),
+                "$type": "EnumBundleElement"
+            }
+        
+        # For numeric fields
+        elif value_type in ["integer", "float"] and isinstance(field_value, (int, float)):
+            return field_value
+        
+        # For text/string fields
+        elif value_type in ["string", "text"]:
+            return str(field_value)
+        
+        # For date fields
+        elif value_type == "date":
+            return field_value  # Assume it's already properly formatted
+        
+        # Default: treat as enum
         else:
             return {
-                "id": field_id,
-                "value": {
-                    "name": str(field_value),
-                    "$type": "EnumBundleElement"
-                }
+                "name": str(field_value),
+                "$type": "EnumBundleElement"
             }
 
     def _extract_custom_field_value(self, field_value_data: Any) -> Any:
