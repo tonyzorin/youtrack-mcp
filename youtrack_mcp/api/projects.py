@@ -535,16 +535,48 @@ class ProjectsClient:
             Dictionary mapping field names to their schemas
         """
         try:
-            fields = self.get_custom_fields(project_id)
+            # Use the same detailed query that works in other methods
+            fields_query = "field(id,name,fieldType($type,valueType,id)),canBeEmpty,autoAttached"
+            fields = self.client.get(f"admin/projects/{project_id}/customFields?fields={fields_query}")
             schemas = {}
             
-            for field in fields:
-                field_name = field.get("field", {}).get("name")
-                if field_name:
-                    schema = self.get_custom_field_schema(project_id, field_name)
-                    if schema:
-                        schemas[field_name] = schema
+            logger.info(f"Got {len(fields)} custom fields for project {project_id}")
             
+            for field in fields:
+                # Extract field name from the correct structure
+                field_info = field.get("field", {})
+                field_name = field_info.get("name")
+                
+                if field_name:
+                    logger.info(f"Processing field: {field_name}")
+                    # Build schema directly from the field data we already have
+                    field_type = field_info.get("fieldType", {})
+                    
+                    enhanced_schema = {
+                        "name": field_name,
+                        "type": field_type.get("valueType", "string"),
+                        "bundle_type": field_type.get("$type", ""),
+                        "required": field.get("canBeEmpty", True) == False,
+                        "multi_value": field_info.get("isMultiValue", False),
+                        "auto_attach": field.get("autoAttached", False),
+                        "field_id": field_info.get("id"),
+                        "bundle_id": field_type.get("id")
+                    }
+                    
+                    # Add allowed values for enum/state fields
+                    if field_type.get("valueType") in ["enum", "state"]:
+                        try:
+                            enhanced_schema["allowed_values"] = self.get_custom_field_allowed_values(project_id, field_name)
+                        except Exception as e:
+                            logger.warning(f"Could not get allowed values for {field_name}: {str(e)}")
+                            enhanced_schema["allowed_values"] = []
+                    
+                    schemas[field_name] = enhanced_schema
+                    logger.info(f"Added schema for field '{field_name}': {enhanced_schema}")
+                else:
+                    logger.warning(f"Field missing name: {field}")
+            
+            logger.info(f"Returning {len(schemas)} schemas for project {project_id}")
             return schemas
         except Exception as e:
             logger.error(f"Error getting all custom field schemas: {str(e)}")
@@ -557,17 +589,18 @@ class ProjectsClient:
         field_value: Any
     ) -> Dict[str, Any]:
         """
-        Validate a custom field value against the project's schema.
-
+        Validate a custom field value against project schema.
+        
         Args:
             project_id: The project ID
             field_name: The custom field name
             field_value: The value to validate
-
+            
         Returns:
-            Validation result with details
+            Dictionary with validation result
         """
         try:
+            # Get field schema directly using the same approach as issues.py
             field_schema = self.get_custom_field_schema(project_id, field_name)
             if not field_schema:
                 return {
@@ -576,28 +609,34 @@ class ProjectsClient:
                     "suggestion": "Check field name spelling and project configuration"
                 }
             
-            field_type = field_schema.get("type", "string")
+            field_type = field_schema.get("type", "")  # This is the valueType
+            bundle_type = field_schema.get("bundle_type", "")  # This is the $type
             
-            # Required field validation
-            if field_schema.get("required", False) and (field_value is None or field_value == ""):
-                return {
-                    "valid": False,
-                    "error": f"Field '{field_name}' is required",
-                    "suggestion": "Provide a value for this required field"
-                }
-            
-            # Type-specific validation
-            if field_type in ["enum", "state"]:
-                allowed_values = [v.get("name") for v in field_schema.get("allowed_values", [])]
-                if str(field_value) not in allowed_values:
+            # Type-specific validation using the same logic as issues.py
+            if field_type == "state" or "StateBundle" in bundle_type or "StateMachine" in bundle_type:
+                # State field - validate against available states
+                allowed_values = self.get_custom_field_allowed_values(project_id, field_name)
+                allowed_names = [v.get("name", "") for v in allowed_values if isinstance(v, dict)]
+                if str(field_value) not in allowed_names:
                     return {
                         "valid": False,
-                        "error": f"Invalid value '{field_value}' for field '{field_name}'",
-                        "suggestion": f"Use one of: {', '.join(allowed_values)}"
+                        "error": f"Invalid state value '{field_value}' for field '{field_name}'",
+                        "suggestion": f"Use one of: {', '.join(allowed_names)}" if allowed_names else "Check field configuration"
                     }
             
-            elif field_type == "user":
-                # Check if user exists
+            elif field_type == "enum" or "EnumBundle" in bundle_type:
+                # Enum field - validate against enum values
+                allowed_values = self.get_custom_field_allowed_values(project_id, field_name)
+                allowed_names = [v.get("name", "") for v in allowed_values if isinstance(v, dict)]
+                if str(field_value) not in allowed_names:
+                    return {
+                        "valid": False,
+                        "error": f"Invalid enum value '{field_value}' for field '{field_name}'",
+                        "suggestion": f"Use one of: {', '.join(allowed_names)}" if allowed_names else "Check field configuration"
+                    }
+            
+            elif field_type == "user" or "UserBundle" in bundle_type:
+                # User field - validate user exists
                 try:
                     self.client.get(f"users/{field_value}")
                 except:
@@ -620,6 +659,15 @@ class ProjectsClient:
                         "suggestion": f"Provide a valid {field_type} number"
                     }
             
+            elif field_type == "period":
+                # Period field validation
+                if not isinstance(field_value, str) or not field_value.startswith("PT"):
+                    return {
+                        "valid": False,
+                        "error": f"Invalid period format: {field_value}",
+                        "suggestion": "Use ISO 8601 duration format like 'PT2H30M' for 2 hours 30 minutes"
+                    }
+            
             # Multi-value field validation
             if field_schema.get("multi_value", False) and not isinstance(field_value, list):
                 return {
@@ -628,6 +676,7 @@ class ProjectsClient:
                     "suggestion": "Provide value as an array, e.g., ['value1', 'value2']"
                 }
             
+            # If we reach here, validation passed
             return {
                 "valid": True,
                 "field": field_name,
@@ -636,8 +685,9 @@ class ProjectsClient:
             }
             
         except Exception as e:
+            logger.error(f"Error validating field '{field_name}': {str(e)}")
             return {
                 "valid": False,
                 "error": f"Validation error: {str(e)}",
-                "suggestion": "Check field configuration and project setup"
+                "suggestion": "Check field name and project configuration"
             }
