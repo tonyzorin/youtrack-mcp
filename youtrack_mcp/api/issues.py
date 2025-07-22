@@ -307,9 +307,35 @@ class IssuesClient:
         if not custom_fields:
             return self.get_issue(issue_id)
 
-        # Get current issue to determine project
-        current_issue = self.get_issue(issue_id)
-        project_id = current_issue.project.get("id") if current_issue.project else None
+        # Get current issue to determine project - ensure we get project info
+        try:
+            # Get issue with explicit project field to ensure we have project ID
+            fields = "id,idReadable,project(id,shortName)"
+            issue_response = self.client.get(f"issues/{issue_id}?fields={fields}")
+            project_id = issue_response.get("project", {}).get("id") if issue_response.get("project") else None
+            
+            if not project_id:
+                # Fallback: try to extract project from issue ID format (e.g., DEMO-123 -> DEMO)
+                if "-" in issue_id and not issue_id.replace("-", "").isdigit():
+                    project_short_name = issue_id.split("-")[0]
+                    logger.info(f"Extracting project short name '{project_short_name}' from issue ID '{issue_id}'")
+                    # Get project ID from short name
+                    try:
+                        projects_response = self.client.get(f"admin/projects?fields=id,shortName")
+                        for proj in projects_response:
+                            if proj.get("shortName") == project_short_name:
+                                project_id = proj.get("id")
+                                logger.info(f"Found project ID '{project_id}' for short name '{project_short_name}'")
+                                break
+                    except Exception as e:
+                        logger.warning(f"Could not find project by short name '{project_short_name}': {str(e)}")
+            
+            if not project_id:
+                logger.error(f"Could not determine project ID for issue '{issue_id}'. Issue response: {issue_response}")
+                
+        except Exception as e:
+            logger.error(f"Error getting issue project info: {str(e)}")
+            project_id = None
 
         if validate and project_id:
             # Validate each field before updating
@@ -335,7 +361,7 @@ class IssuesClient:
                 # Try using the field name as fallback
                 field_id = field_name
             
-            field_data = self._format_custom_field_value_with_id(field_id, field_value)
+            field_data = self._format_custom_field_value_with_id(field_id, field_value, project_id)
             custom_fields_data.append(field_data)
 
         # Update the issue with custom fields
@@ -934,7 +960,26 @@ class IssuesClient:
             logger.warning(f"Error getting field ID for '{field_name}': {str(e)}")
             return None
 
-    def _format_custom_field_value_with_id(self, field_id: str, field_value: Any) -> Dict[str, Any]:
+    def _get_field_type_info(self, project_id: str, field_id: str) -> Dict[str, Any]:
+        """Get field type information for proper $type formatting."""
+        try:
+            fields_query = "field(id,name,fieldType($type,valueType,id)),canBeEmpty,autoAttached"
+            fields = self.client.get(f"admin/projects/{project_id}/customFields?fields={fields_query}")
+            
+            for field in fields:
+                if field.get("field", {}).get("id") == field_id:
+                    field_type = field.get("field", {}).get("fieldType", {})
+                    return {
+                        "bundle_type": field_type.get("$type", ""),
+                        "value_type": field_type.get("valueType", ""),
+                        "bundle_id": field_type.get("id")
+                    }
+            return {}
+        except Exception as e:
+            logger.warning(f"Error getting field type info for field ID '{field_id}': {str(e)}")
+            return {}
+
+    def _format_custom_field_value_with_id(self, field_id: str, field_value: Any, project_id: str = None) -> Dict[str, Any]:
         """Format custom field value with field ID for YouTrack API."""
         # YouTrack API format: {"id": "field-id", "value": {...}}
         
@@ -944,24 +989,56 @@ class IssuesClient:
                 "value": None
             }
         
+        # Get field type to determine correct $type for value
+        field_type_info = self._get_field_type_info(project_id, field_id) if project_id else {}
+        bundle_type = field_type_info.get("bundle_type", "")
+        
         # For most string-based fields (State, Enum, etc.)
         if isinstance(field_value, str):
             # Check if this looks like a user field
-            if any(keyword in field_id.lower() for keyword in ["assignee", "reporter", "user"]):
+            if any(keyword in field_id.lower() for keyword in ["assignee", "reporter", "user"]) or "UserBundle" in bundle_type:
                 return {
                     "id": field_id,
-                    "value": {"login": field_value}
+                    "value": {
+                        "login": field_value,
+                        "$type": "User"
+                    }
                 }
             # Check if this is a period field
             elif field_value.startswith("PT"):
                 return {
                     "id": field_id,
-                    "value": {"presentation": field_value}
+                    "value": {
+                        "presentation": field_value,
+                        "$type": "PeriodValue"
+                    }
                 }
-            else:
+            # State fields
+            elif "StateBundle" in bundle_type or "StateMachine" in bundle_type:
                 return {
                     "id": field_id,
-                    "value": {"name": field_value}
+                    "value": {
+                        "name": field_value,
+                        "$type": "StateMachineValue"
+                    }
+                }
+            # Enum fields
+            elif "EnumBundle" in bundle_type:
+                return {
+                    "id": field_id,
+                    "value": {
+                        "name": field_value,
+                        "$type": "EnumBundleElement"
+                    }
+                }
+            else:
+                # Default string value (try EnumBundleElement as fallback)
+                return {
+                    "id": field_id,
+                    "value": {
+                        "name": field_value,
+                        "$type": "EnumBundleElement"
+                    }
                 }
         
         # For numeric fields
@@ -971,18 +1048,36 @@ class IssuesClient:
                 "value": field_value
             }
         
-        # For complex objects (already formatted)
+        # For complex objects (already formatted with $type)
         elif isinstance(field_value, dict):
-            return {
-                "id": field_id,
-                "value": field_value
-            }
+            # If it already has $type, use as-is
+            if "$type" in field_value:
+                return {
+                    "id": field_id,
+                    "value": field_value
+                }
+            # Otherwise add appropriate $type
+            else:
+                enhanced_value = dict(field_value)
+                if "login" in enhanced_value:
+                    enhanced_value["$type"] = "User"
+                elif "name" in enhanced_value and "EnumBundle" in bundle_type:
+                    enhanced_value["$type"] = "EnumBundleElement"
+                elif "name" in enhanced_value:
+                    enhanced_value["$type"] = "StateMachineValue"
+                return {
+                    "id": field_id,
+                    "value": enhanced_value
+                }
         
         # Default fallback
         else:
             return {
                 "id": field_id,
-                "value": {"name": str(field_value)}
+                "value": {
+                    "name": str(field_value),
+                    "$type": "EnumBundleElement"
+                }
             }
 
     def _extract_custom_field_value(self, field_value_data: Any) -> Any:

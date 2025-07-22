@@ -108,7 +108,16 @@ def process_parameters(
                 "{"
             ) and args_value.strip().endswith("}"):
                 try:
-                    args_dict = json.loads(args_value)
+                    # Clean up common JSON formatting issues
+                    cleaned_json = args_value.strip()
+                    # Remove extra closing braces (common MCP issue)
+                    if cleaned_json.count('}') > cleaned_json.count('{'):
+                        logger.info(f"Fixing JSON with extra closing braces: {cleaned_json}")
+                        # Remove extra } from the end
+                        while cleaned_json.endswith('}}') and cleaned_json.count('}') > cleaned_json.count('{'):
+                            cleaned_json = cleaned_json[:-1]
+                    
+                    args_dict = json.loads(cleaned_json)
                     if isinstance(args_dict, dict):
                         # Add each key-value pair to kwargs
                         for k, v in args_dict.items():
@@ -140,7 +149,16 @@ def process_parameters(
                 "{"
             ) and kwargs_value.strip().endswith("}"):
                 try:
-                    kwargs_dict = json.loads(kwargs_value)
+                    # Clean up common JSON formatting issues
+                    cleaned_json = kwargs_value.strip()
+                    # Remove extra closing braces (common MCP issue)
+                    if cleaned_json.count('}') > cleaned_json.count('{'):
+                        logger.info(f"Fixing JSON with extra closing braces: {cleaned_json}")
+                        # Remove extra } from the end
+                        while cleaned_json.endswith('}}') and cleaned_json.count('}') > cleaned_json.count('{'):
+                            cleaned_json = cleaned_json[:-1]
+                    
+                    kwargs_dict = json.loads(cleaned_json)
                     if isinstance(kwargs_dict, dict):
                         # Add each key-value pair to kwargs
                         for k, v in kwargs_dict.items():
