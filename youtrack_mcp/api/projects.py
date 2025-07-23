@@ -440,63 +440,80 @@ class ProjectsClient:
                 logger.warning(f"Field '{field_name}' not found in project {project_id}")
                 return []
             
+            # Extract correct field information
             field_schema = field_info.get("field", {})
             field_type = field_schema.get("fieldType", {})
-            bundle_type = field_type.get("$type", "")
-            bundle_id = field_type.get("id")
+            value_type = field_type.get("valueType", "")  # enum, state, user, etc.
+            bundle_id = field_type.get("id")  # enum[1], state[1], etc.
+            project_field_type = field_info.get("$type", "")  # EnumProjectCustomField, etc.
             
-            logger.info(f"Field '{field_name}' bundle type: {bundle_type}, bundle ID: {bundle_id}")
+            logger.info(f"Field '{field_name}' - valueType: {value_type}, bundleId: {bundle_id}, projectFieldType: {project_field_type}")
             
             if not bundle_id:
                 logger.warning(f"No bundle ID found for field '{field_name}'")
                 return []
             
-            # Get bundle values based on type with detailed queries
-            if "EnumBundle" in bundle_type:
+            # Get bundle values based on valueType
+            if value_type == "enum":
                 try:
-                    bundle_data = self.client.get(f"admin/customFieldSettings/bundles/enum/{bundle_id}?fields=values(id,name,description,color)")
-                    values = bundle_data.get("values", [])
-                    logger.info(f"Found {len(values)} enum values for field '{field_name}'")
-                    return [
-                        {
-                            "name": value.get("name", ""),
-                            "description": value.get("description", ""),
-                            "id": value.get("id"),
-                            "color": value.get("color", {})
-                        }
-                        for value in values
-                    ]
+                    # Get all enum bundles and find the right one by index
+                    # enum[1] means the first enum bundle (0-based index)
+                    all_bundles = self.client.get("admin/customFieldSettings/bundles/enum?fields=id,name,values(id,name,description,color)")
+                    
+                    # Extract index from bundle_id like "enum[1]"
+                    if "[" in bundle_id and "]" in bundle_id:
+                        bundle_index = int(bundle_id.split("[")[1].split("]")[0]) - 1  # Convert to 0-based index
+                        if 0 <= bundle_index < len(all_bundles):
+                            target_bundle = all_bundles[bundle_index]
+                            values = target_bundle.get("values", [])
+                            logger.info(f"Found {len(values)} enum values for field '{field_name}' from bundle '{target_bundle.get('name')}'")
+                            return [
+                                {
+                                    "name": value.get("name", ""),
+                                    "description": value.get("description", ""),
+                                    "id": value.get("id"),
+                                    "color": value.get("color", {})
+                                }
+                                for value in values
+                            ]
+                        else:
+                            logger.error(f"Bundle index {bundle_index} out of range for {len(all_bundles)} enum bundles")
+                            return []
                 except Exception as e:
                     logger.error(f"Error getting enum bundle {bundle_id}: {str(e)}")
                     return []
             
-            elif "StateBundle" in bundle_type or "StateMachineBundle" in bundle_type:
+            elif value_type == "state":
                 try:
-                    # Try different endpoints for state bundles
-                    bundle_endpoint = f"admin/customFieldSettings/bundles/state/{bundle_id}"
-                    try:
-                        bundle_data = self.client.get(f"{bundle_endpoint}?fields=values(id,name,description,isResolved,color)")
-                    except:
-                        # Fallback to simpler query
-                        bundle_data = self.client.get(bundle_endpoint)
+                    # Get all state bundles and find the right one by index
+                    # state[1] means the first state bundle (0-based index)
+                    all_bundles = self.client.get("admin/customFieldSettings/bundles/state?fields=id,name,values(id,name,description,isResolved,color)")
                     
-                    values = bundle_data.get("values", [])
-                    logger.info(f"Found {len(values)} state values for field '{field_name}'")
-                    return [
-                        {
-                            "name": value.get("name", ""),
-                            "description": value.get("description", ""),
-                            "id": value.get("id"),
-                            "resolved": value.get("isResolved", False),
-                            "color": value.get("color", {})
-                        }
-                        for value in values
-                    ]
+                    # Extract index from bundle_id like "state[1]"
+                    if "[" in bundle_id and "]" in bundle_id:
+                        bundle_index = int(bundle_id.split("[")[1].split("]")[0]) - 1  # Convert to 0-based index
+                        if 0 <= bundle_index < len(all_bundles):
+                            target_bundle = all_bundles[bundle_index]
+                            values = target_bundle.get("values", [])
+                            logger.info(f"Found {len(values)} state values for field '{field_name}' from bundle '{target_bundle.get('name')}'")
+                            return [
+                                {
+                                    "name": value.get("name", ""),
+                                    "description": value.get("description", ""),
+                                    "id": value.get("id"),
+                                    "resolved": value.get("isResolved", False),
+                                    "color": value.get("color", {})
+                                }
+                                for value in values
+                            ]
+                        else:
+                            logger.error(f"Bundle index {bundle_index} out of range for {len(all_bundles)} state bundles")
+                            return []
                 except Exception as e:
                     logger.error(f"Error getting state bundle {bundle_id}: {str(e)}")
                     return []
             
-            elif "UserBundle" in bundle_type:
+            elif value_type == "user":
                 try:
                     # For user fields, get available users
                     users_data = self.client.get("users?fields=id,login,name,email")
@@ -514,13 +531,81 @@ class ProjectsClient:
                     logger.error(f"Error getting users: {str(e)}")
                     return []
             
+            elif value_type == "ownedField":
+                try:
+                    # For subsystem/owned fields, get subsystems for this project
+                    subsystems_data = self.client.get(f"admin/projects/{project_id}/subsystems?fields=id,name,description")
+                    logger.info(f"Found {len(subsystems_data)} subsystems for field '{field_name}'")
+                    return [
+                        {
+                            "name": subsystem.get("name", ""),
+                            "description": subsystem.get("description", ""),
+                            "id": subsystem.get("id")
+                        }
+                        for subsystem in subsystems_data
+                    ]
+                except Exception as e:
+                    logger.error(f"Error getting subsystems: {str(e)}")
+                    return []
+            
+            elif value_type == "version":
+                try:
+                    # For version fields, get versions for this project
+                    versions_data = self.client.get(f"admin/projects/{project_id}/versions?fields=id,name,description,released,releaseDate")
+                    logger.info(f"Found {len(versions_data)} versions for field '{field_name}'")
+                    return [
+                        {
+                            "name": version.get("name", ""),
+                            "description": version.get("description", ""),
+                            "id": version.get("id"),
+                            "released": version.get("released", False),
+                            "releaseDate": version.get("releaseDate")
+                        }
+                        for version in versions_data
+                    ]
+                except Exception as e:
+                    logger.error(f"Error getting versions: {str(e)}")
+                    return []
+            
+            elif value_type == "build":
+                try:
+                    # For build fields, get builds for this project
+                    builds_data = self.client.get(f"admin/projects/{project_id}/builds?fields=id,name,description")
+                    logger.info(f"Found {len(builds_data)} builds for field '{field_name}'")
+                    return [
+                        {
+                            "name": build.get("name", ""),
+                            "description": build.get("description", ""),
+                            "id": build.get("id")
+                        }
+                        for build in builds_data
+                    ]
+                except Exception as e:
+                    logger.error(f"Error getting builds: {str(e)}")
+                    return []
+            
             else:
-                logger.info(f"Field '{field_name}' type '{bundle_type}' doesn't support allowed values")
+                logger.info(f"Field '{field_name}' type '{value_type}' doesn't support allowed values")
                 return []
             
         except Exception as e:
             logger.error(f"Error getting custom field allowed values for '{field_name}': {str(e)}")
             return []
+
+    def get_available_custom_field_values(
+        self, project_id: str, field_name: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Alias for get_custom_field_allowed_values for backward compatibility.
+        
+        Args:
+            project_id: The project ID
+            field_name: The custom field name
+
+        Returns:
+            List of allowed values with details
+        """
+        return self.get_custom_field_allowed_values(project_id, field_name)
 
     def get_all_custom_fields_schemas(
         self, project_id: str
@@ -609,11 +694,11 @@ class ProjectsClient:
                     "suggestion": "Check field name spelling and project configuration"
                 }
             
-            field_type = field_schema.get("type", "")  # This is the valueType
+            value_type = field_schema.get("type", "")  # This is the valueType from API
             bundle_type = field_schema.get("bundle_type", "")  # This is the $type
             
-            # Type-specific validation using the same logic as issues.py
-            if field_type == "state" or "StateBundle" in bundle_type or "StateMachine" in bundle_type:
+            # Type-specific validation using the correct valueType
+            if value_type == "state":
                 # State field - validate against available states
                 allowed_values = self.get_custom_field_allowed_values(project_id, field_name)
                 allowed_names = [v.get("name", "") for v in allowed_values if isinstance(v, dict)]
@@ -624,7 +709,7 @@ class ProjectsClient:
                         "suggestion": f"Use one of: {', '.join(allowed_names)}" if allowed_names else "Check field configuration"
                     }
             
-            elif field_type == "enum" or "EnumBundle" in bundle_type:
+            elif value_type == "enum":
                 # Enum field - validate against enum values
                 allowed_values = self.get_custom_field_allowed_values(project_id, field_name)
                 allowed_names = [v.get("name", "") for v in allowed_values if isinstance(v, dict)]
@@ -635,46 +720,61 @@ class ProjectsClient:
                         "suggestion": f"Use one of: {', '.join(allowed_names)}" if allowed_names else "Check field configuration"
                     }
             
-            elif field_type == "user" or "UserBundle" in bundle_type:
-                # User field - validate user exists
-                try:
-                    self.client.get(f"users/{field_value}")
-                except:
+            elif value_type == "user":
+                # User field - validate against available users
+                allowed_values = self.get_custom_field_allowed_values(project_id, field_name)
+                allowed_logins = [v.get("login", "") for v in allowed_values if isinstance(v, dict)]
+                allowed_names = [v.get("name", "") for v in allowed_values if isinstance(v, dict)]
+                if str(field_value) not in allowed_logins and str(field_value) not in allowed_names:
                     return {
                         "valid": False,
                         "error": f"User '{field_value}' not found",
-                        "suggestion": "Use valid user login or ID"
+                        "suggestion": f"Use valid user login: {', '.join(allowed_logins[:5])}" if allowed_logins else "Check user exists"
                     }
             
-            elif field_type in ["integer", "float"]:
-                try:
-                    if field_type == "integer":
-                        int(field_value)
-                    else:
-                        float(field_value)
-                except (ValueError, TypeError):
+            elif value_type == "ownedField":
+                # Subsystem field - validate against available subsystems
+                allowed_values = self.get_custom_field_allowed_values(project_id, field_name)
+                allowed_names = [v.get("name", "") for v in allowed_values if isinstance(v, dict)]
+                if str(field_value) not in allowed_names:
                     return {
                         "valid": False,
-                        "error": f"Invalid {field_type} value: {field_value}",
-                        "suggestion": f"Provide a valid {field_type} number"
+                        "error": f"Invalid subsystem '{field_value}' for field '{field_name}'",
+                        "suggestion": f"Use one of: {', '.join(allowed_names)}" if allowed_names else "Create subsystem first"
                     }
             
-            elif field_type == "period":
-                # Period field validation
-                if not isinstance(field_value, str) or not field_value.startswith("PT"):
+            elif value_type == "version":
+                # Version field - validate against available versions
+                allowed_values = self.get_custom_field_allowed_values(project_id, field_name)
+                allowed_names = [v.get("name", "") for v in allowed_values if isinstance(v, dict)]
+                if str(field_value) not in allowed_names:
                     return {
                         "valid": False,
-                        "error": f"Invalid period format: {field_value}",
-                        "suggestion": "Use ISO 8601 duration format like 'PT2H30M' for 2 hours 30 minutes"
+                        "error": f"Invalid version '{field_value}' for field '{field_name}'",
+                        "suggestion": f"Use one of: {', '.join(allowed_names)}" if allowed_names else "Create version first"
                     }
             
-            # Multi-value field validation
-            if field_schema.get("multi_value", False) and not isinstance(field_value, list):
-                return {
-                    "valid": False,
-                    "error": f"Field '{field_name}' expects multiple values (array)",
-                    "suggestion": "Provide value as an array, e.g., ['value1', 'value2']"
-                }
+            elif value_type == "build":
+                # Build field - validate against available builds
+                allowed_values = self.get_custom_field_allowed_values(project_id, field_name)
+                allowed_names = [v.get("name", "") for v in allowed_values if isinstance(v, dict)]
+                if str(field_value) not in allowed_names:
+                    return {
+                        "valid": False,
+                        "error": f"Invalid build '{field_value}' for field '{field_name}'",
+                        "suggestion": f"Use one of: {', '.join(allowed_names)}" if allowed_names else "Create build first"
+                    }
+            
+            elif value_type == "period":
+                # Period field - validate format (e.g., "4h", "30m", "1h45m")
+                import re
+                period_pattern = r'^\d+[mhwd]$|^\d+h\d+m$'  # Simple pattern for periods
+                if not re.match(period_pattern, str(field_value)):
+                    return {
+                        "valid": False,
+                        "error": f"Invalid period format '{field_value}' for field '{field_name}'",
+                        "suggestion": "Use format like '4h', '30m', '1h45m', or '2d'"
+                    }
             
             # If we reach here, validation passed
             return {
@@ -689,5 +789,5 @@ class ProjectsClient:
             return {
                 "valid": False,
                 "error": f"Validation error: {str(e)}",
-                "suggestion": "Check field name and project configuration"
+                "suggestion": "Check field configuration and API connectivity"
             }
