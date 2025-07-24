@@ -641,6 +641,10 @@ class TestProjectsCustomFields(unittest.TestCase):
         }
         
         self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        # Mock the allowed values that the validation logic actually calls
+        self.projects_client.get_custom_field_allowed_values = Mock(return_value=[
+            {"name": "High"}, {"name": "Medium"}, {"name": "Low"}
+        ])
 
         result = self.projects_client.validate_custom_field_for_project("0-0", "Priority", "High")
 
@@ -661,11 +665,15 @@ class TestProjectsCustomFields(unittest.TestCase):
         }
         
         self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        # Mock the allowed values that the validation logic actually calls
+        self.projects_client.get_custom_field_allowed_values = Mock(return_value=[
+            {"name": "High"}, {"name": "Medium"}, {"name": "Low"}
+        ])
 
         result = self.projects_client.validate_custom_field_for_project("0-0", "Priority", "VeryHigh")
 
         self.assertFalse(result["valid"])
-        self.assertIn("Invalid value", result["error"])
+        self.assertIn("Invalid enum value", result["error"])
         self.assertIn("High, Medium, Low", result["suggestion"])
 
     def test_validate_custom_field_for_project_required_field_empty(self):
@@ -678,6 +686,10 @@ class TestProjectsCustomFields(unittest.TestCase):
         }
         
         self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        # Mock the allowed values that the validation logic actually calls
+        self.projects_client.get_custom_field_allowed_values = Mock(return_value=[
+            {"name": "High"}, {"name": "Medium"}, {"name": "Low"}
+        ])
 
         result = self.projects_client.validate_custom_field_for_project("0-0", "Priority", "")
 
@@ -694,7 +706,11 @@ class TestProjectsCustomFields(unittest.TestCase):
         }
         
         self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
-        self.mock_client.get.return_value = {"id": "user-1", "login": "john.doe"}
+        # Mock the allowed values that the validation logic actually calls
+        self.projects_client.get_custom_field_allowed_values = Mock(return_value=[
+            {"login": "john.doe", "name": "John Doe", "id": "user-1"},
+            {"login": "jane.smith", "name": "Jane Smith", "id": "user-2"}
+        ])
 
         result = self.projects_client.validate_custom_field_for_project("0-0", "Assignee", "john.doe")
 
@@ -774,6 +790,10 @@ class TestProjectsCustomFields(unittest.TestCase):
         }
         
         self.projects_client.get_custom_field_schema = Mock(return_value=mock_schema)
+        # Mock the allowed values that the validation logic actually calls
+        self.projects_client.get_custom_field_allowed_values = Mock(return_value=[
+            {"name": "single-value"}, {"name": "other-tag"}
+        ])
 
         result = self.projects_client.validate_custom_field_for_project("0-0", "Tags", "single-value")
 

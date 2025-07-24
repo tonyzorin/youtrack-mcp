@@ -724,6 +724,14 @@ class ProjectsClient:
             value_type = field_schema.get("type", "")  # This is the valueType from API
             bundle_type = field_schema.get("bundle_type", "")  # This is the $type
             
+            # Check if field is required and value is empty
+            if field_schema.get("required", False) and (field_value is None or str(field_value).strip() == ""):
+                return {
+                    "valid": False,
+                    "error": f"Field '{field_name}' is required and cannot be empty",
+                    "suggestion": "Provide a valid value for this required field"
+                }
+            
             # Type-specific validation using the correct valueType
             if value_type == "state":
                 # State field - validate against available states
