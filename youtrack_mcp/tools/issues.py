@@ -22,6 +22,7 @@ class IssueTools:
         """Initialize the issue tools."""
         self.client = YouTrackClient()
         self.issues_api = IssuesClient(self.client)
+        self.projects_api = ProjectsClient(self.client)
 
     @sync_wrapper
     def get_issue(self, issue_id: str) -> str:
@@ -123,8 +124,7 @@ class IssueTools:
                 # Try to get the project ID from the short name (e.g., "DEMO")
                 try:
                     logger.info(f"Looking up project ID for: {project}")
-                    projects_api = ProjectsClient(self.client)
-                    project_obj = projects_api.get_project_by_name(project)
+                    project_obj = self.projects_api.get_project_by_name(project)
                     if project_obj:
                         logger.info(
                             f"Found project {project_obj.name} with ID {project_obj.id}"
@@ -385,6 +385,12 @@ class IssueTools:
                     "new_priority": "Target priority like 'Critical', 'Major', 'Normal', 'Minor'"
                 }
             },
+            "get_help": {
+                "description": "Get interactive help with live YouTrack data and working examples. Unlike static tool descriptions, this provides dynamic help based on your actual YouTrack configuration, showing real project IDs, available values, and copy-paste ready examples.",
+                "parameter_descriptions": {
+                    "topic": "Help topic - 'all', 'state', 'priority', 'fields', 'projects', 'examples'. Defaults to 'all'"
+                }
+            }
         }
 
     @sync_wrapper
@@ -935,10 +941,7 @@ class IssueTools:
                 })
 
             # Get available values using projects API
-            from youtrack_mcp.api.projects import ProjectsClient
-            projects_api = ProjectsClient(self.client)
-            
-            allowed_values = projects_api.get_custom_field_allowed_values(project_id, field_name)
+            allowed_values = self.projects_api.get_custom_field_allowed_values(project_id, field_name)
 
             response = {
                 "status": "success",
@@ -1273,4 +1276,169 @@ class IssueTools:
                 "issue_id": issue_id,
                 "target_priority": new_priority,
                 "suggestion": "Check issue ID format and verify it exists in YouTrack"
+            })
+
+    @sync_wrapper
+    def get_help(self, topic: str = "all") -> str:
+        """
+        Get interactive help with live YouTrack data and working examples.
+        
+        Unlike static tool descriptions, this provides dynamic help based on your 
+        actual YouTrack configuration, showing real project IDs, available values,
+        and copy-paste ready examples.
+        
+        Args:
+            topic: Help topic - "all", "state", "priority", "fields", "projects", "examples"
+        
+        Returns:
+            Comprehensive help with live data from your YouTrack instance
+        """
+        try:
+            help_content = {
+                "help_topic": topic,
+                "youtrack_help": {},
+                "quick_examples": {},
+                "available_functions": {}
+            }
+            
+            if topic in ["all", "projects"]:
+                # Get real project information
+                try:
+                    projects = self.get_projects()
+                    if isinstance(projects, str):
+                        projects_data = json.loads(projects)
+                        if isinstance(projects_data, list) and projects_data:
+                            sample_project = projects_data[0]
+                            help_content["youtrack_help"]["projects"] = {
+                                "available_projects": [p.get("shortName", "N/A") for p in projects_data[:5]],
+                                "sample_project_id": sample_project.get("shortName", "DEMO"),
+                                "example_usage": f'create_issue(project_id="{sample_project.get("shortName", "DEMO")}", summary="Your issue title")'
+                            }
+                except Exception as e:
+                    help_content["youtrack_help"]["projects"] = {
+                        "error": f"Could not fetch projects: {e}",
+                        "example_usage": 'create_issue(project_id="DEMO", summary="Your issue title")'
+                    }
+            
+            if topic in ["all", "state", "fields"]:
+                # Get real custom field information
+                try:
+                    # Try to get available states from a sample project
+                    projects = self.get_projects()
+                    if isinstance(projects, str):
+                        projects_data = json.loads(projects)
+                        if isinstance(projects_data, list) and projects_data:
+                            sample_project_id = projects_data[0].get("shortName", "DEMO")
+                            
+                            # Get custom fields for this project
+                            fields = self.projects_api.get_custom_fields(sample_project_id)
+                            if isinstance(fields, list):
+                                state_field = next((f for f in fields if f.get("name") == "State"), None)
+                                priority_field = next((f for f in fields if f.get("name") == "Priority"), None)
+                                
+                                if state_field:
+                                    state_values = self.projects_api.get_available_custom_field_values("State", sample_project_id)
+                                    help_content["youtrack_help"]["states"] = {
+                                        "available_states": state_values[:6] if isinstance(state_values, list) else ["Open", "In Progress", "Fixed"],
+                                        "example_usage": f'update_issue_state("{sample_project_id}-123", "In Progress")'
+                                    }
+                                
+                                if priority_field:
+                                    priority_values = self.projects_api.get_available_custom_field_values("Priority", sample_project_id)
+                                    help_content["youtrack_help"]["priorities"] = {
+                                        "available_priorities": priority_values[:6] if isinstance(priority_values, list) else ["Critical", "Major", "Normal"],
+                                        "example_usage": f'update_issue_priority("{sample_project_id}-123", "Critical")'
+                                    }
+                            
+                except Exception as e:
+                    help_content["youtrack_help"]["fields"] = {
+                        "error": f"Could not fetch field data: {e}",
+                        "note": "Use get_available_custom_field_values() to explore your field options"
+                    }
+            
+            if topic in ["all", "examples"]:
+                # Provide working examples with real or sample data
+                sample_project = help_content["youtrack_help"].get("projects", {}).get("sample_project_id", "DEMO")
+                sample_states = help_content["youtrack_help"].get("states", {}).get("available_states", ["Open", "In Progress", "Fixed"])
+                sample_priorities = help_content["youtrack_help"].get("priorities", {}).get("available_priorities", ["Critical", "Major", "Normal"])
+                
+                help_content["quick_examples"] = {
+                    "most_common_operations": {
+                        "move_to_in_progress": f'update_issue_state("{sample_project}-123", "{sample_states[1] if len(sample_states) > 1 else "In Progress"}")',
+                        "set_critical_priority": f'update_issue_priority("{sample_project}-123", "{sample_priorities[0] if sample_priorities else "Critical"}")',
+                        "create_new_issue": f'create_issue(project_id="{sample_project}", summary="Bug in login system")',
+                        "add_comment": f'add_comment("{sample_project}-123", "Working on this issue")'
+                    },
+                    "workflow_combinations": {
+                        "escalate_issue": [
+                            f'update_issue_priority("{sample_project}-123", "{sample_priorities[0] if sample_priorities else "Critical"}")',
+                            f'update_issue_state("{sample_project}-123", "{sample_states[1] if len(sample_states) > 1 else "In Progress"}")',
+                            f'add_comment("{sample_project}-123", "Escalated to critical priority")'
+                        ],
+                        "complete_issue": [
+                            f'update_issue_state("{sample_project}-123", "{sample_states[-1] if sample_states else "Fixed"}")',
+                            f'add_comment("{sample_project}-123", "Issue resolved and tested")'
+                        ]
+                    }
+                }
+            
+            if topic in ["all", "functions"]:
+                # List available functions with brief descriptions
+                help_content["available_functions"] = {
+                    "issue_management": {
+                        "create_issue": "Create new issues",
+                        "get_issue": "Get issue details", 
+                        "search_issues": "Search for issues",
+                        "get_project_issues": "Get all issues in a project"
+                    },
+                    "state_and_priority": {
+                        "update_issue_state": "🎯 Change issue state (recommended)",
+                        "update_issue_priority": "🚨 Change issue priority (recommended)",
+                        "update_custom_fields": "Update any custom fields"
+                    },
+                    "comments_and_links": {
+                        "add_comment": "Add comments to issues",
+                        "add_dependency": "Create issue dependencies",
+                        "add_relates_link": "Link related issues"
+                    },
+                    "exploration": {
+                        "get_projects": "List available projects",
+                        "get_available_custom_field_values": "See available field values",
+                        "diagnose_workflow_restrictions": "Analyze workflow restrictions"
+                    }
+                }
+            
+            # Add quick tips
+            help_content["quick_tips"] = {
+                "proven_formats": {
+                    "states": "Use simple strings: 'In Progress', not {'name': 'In Progress'}",
+                    "priorities": "Use simple strings: 'Critical', not {'name': 'Critical'}",
+                    "users": "Use login names: 'admin', not {'login': 'admin'}"
+                },
+                "troubleshooting": {
+                    "workflow_errors": "Use diagnose_workflow_restrictions() to understand blocked transitions",
+                    "field_values": "Use get_available_custom_field_values() to see valid options",
+                    "permissions": "Ensure you have edit permissions for the project"
+                }
+            }
+            
+            return format_json_response(help_content)
+            
+        except Exception as e:
+            logger.exception(f"Error generating help for topic: {topic}")
+            return format_json_response({
+                "error": str(e),
+                "basic_help": {
+                    "most_common_functions": [
+                        "update_issue_state(issue_id, new_state)",
+                        "update_issue_priority(issue_id, new_priority)", 
+                        "create_issue(project_id, summary)",
+                        "add_comment(issue_id, text)"
+                    ],
+                    "exploration_functions": [
+                        "get_projects()",
+                        "get_available_custom_field_values(field_name)",
+                        "diagnose_workflow_restrictions(issue_id)"
+                    ]
+                }
             })
