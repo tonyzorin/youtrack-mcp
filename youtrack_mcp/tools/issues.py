@@ -378,6 +378,13 @@ class IssueTools:
                     "new_state": "Target state name like 'In Progress', 'Fixed', 'Open', 'Closed'"
                 }
             },
+            "update_issue_priority": {
+                "description": "Update an issue's priority using the proven working REST API approach. Optimized for reliable priority changes like 'Normal → Critical'. Example: update_issue_priority(issue_id='DEMO-123', new_priority='Critical')",
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'",
+                    "new_priority": "Target priority like 'Critical', 'Major', 'Normal', 'Minor'"
+                }
+            },
         }
 
     @sync_wrapper
@@ -1183,5 +1190,87 @@ class IssueTools:
                 "error": str(e),
                 "issue_id": issue_id,
                 "target_state": new_state,
+                "suggestion": "Check issue ID format and verify it exists in YouTrack"
+            })
+
+    @sync_wrapper
+    def update_issue_priority(self, issue_id: str, new_priority: str) -> str:
+        """
+        Update an issue's priority using the proven working REST API approach.
+        
+        🎯 PROVEN WORKING FORMAT (based on successful testing):
+        - Uses simple string values: "Critical", "Major", "Normal", "Minor"
+        - NO complex objects or ID references needed
+        
+        ✅ EXAMPLES THAT WORK:
+        - update_issue_priority("DEMO-123", "Critical")
+        - update_issue_priority("PROJECT-456", "Major") 
+        - update_issue_priority("TASK-789", "Normal")
+        
+        🔧 WHAT HAPPENS UNDER THE HOOD:
+        - Direct Field Update API with format {"customFields": [{"name": "Priority", "value": "Critical"}]}
+        - Simple string values proven to work reliably
+        - Smart error handling with field-specific guidance
+        
+        FORMAT: update_issue_priority(issue_id="DEMO-123", new_priority="Critical")
+        
+        Args:
+            issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
+            new_priority: The target priority (e.g., "Critical", "Major", "Normal", "Minor")
+            
+        Returns:
+            JSON string with the updated issue information and success details
+            
+        Common Priorities: "Critical", "Major", "Normal", "Minor", "Show-stopper"
+        """
+        try:
+            if not issue_id or not new_priority:
+                return format_json_response({
+                    "error": "Both issue ID and new priority are required"
+                })
+            
+            logger.info(f"Updating issue {issue_id} priority to '{new_priority}' using proven simple string format")
+            
+            # Use the proven simple string format for custom field updates
+            result = self.update_custom_fields(
+                issue_id=issue_id,
+                custom_fields={"Priority": new_priority}
+            )
+            
+            # Parse the result to provide priority-specific feedback
+            result_data = json.loads(result) if isinstance(result, str) else result
+            
+            if result_data.get("status") == "success":
+                return format_json_response({
+                    "status": "success",
+                    "message": f"Successfully updated issue {issue_id} priority to '{new_priority}'",
+                    "issue_id": issue_id,
+                    "new_priority": new_priority,
+                    "api_method": "Direct Field Update API",
+                    "updated_fields": result_data.get("updated_fields", ["Priority"]),
+                    "issue_data": result_data.get("issue_data", {})
+                })
+            else:
+                # Handle error case with priority-specific guidance
+                error_msg = result_data.get("error", "Unknown error")
+                return format_json_response({
+                    "error": f"Priority update failed: {error_msg}",
+                    "issue_id": issue_id,
+                    "target_priority": new_priority,
+                    "troubleshooting": [
+                        "Check if the priority value exists in your YouTrack project",
+                        "Verify you have permissions to change issue priorities",
+                        "Common priority values: Critical, Major, Normal, Minor",
+                        "Use get_available_custom_field_values() to see available priorities"
+                    ],
+                    "field_help": f"Use get_available_custom_field_values('Priority') to see valid options"
+                })
+                
+        except Exception as e:
+            logger.exception(f"Error updating priority for issue {issue_id}")
+            return format_json_response({
+                "error": str(e),
+                "issue_id": issue_id,
+                "target_priority": new_priority,
                 "suggestion": "Check issue ID format and verify it exists in YouTrack"
             })

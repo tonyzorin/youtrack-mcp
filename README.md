@@ -16,6 +16,30 @@ update_issue_state("TASK-789", "Closed")
 # update_custom_fields(issue_id, {"State": {"id": "154-2"}})         # FAILS
 ```
 
+### **🚨 Priority Updates (Very Common)**
+```python
+# ✅ PROVEN WORKING FORMAT - Use simple strings
+update_issue_priority("DEMO-123", "Critical")
+update_issue_priority("PROJECT-456", "Major") 
+update_issue_priority("TASK-789", "Normal")
+
+# ❌ DON'T USE - Complex objects fail
+# update_custom_fields(issue_id, {"Priority": {"name": "Critical"}})  # FAILS
+# update_custom_fields(issue_id, {"Priority": {"id": "152-1"}})       # FAILS
+```
+
+### **⚡ Quick Combined Operations**
+```python
+# Common workflow: Update priority AND move to In Progress
+update_issue_priority("DEMO-123", "Critical")
+update_issue_state("DEMO-123", "In Progress") 
+add_comment("DEMO-123", "Escalated to critical priority")
+
+# Triage workflow: Set priority and assign
+update_issue_priority("DEMO-123", "Major")
+update_custom_fields("DEMO-123", {"Assignee": "admin"})
+```
+
 ### **📝 Other Custom Fields**
 ```python
 # ✅ Working formats for different field types:
