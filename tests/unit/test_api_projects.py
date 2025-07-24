@@ -560,11 +560,12 @@ class TestProjectsCustomFields(unittest.TestCase):
         """Test getting all custom field schemas for a project."""
         mock_fields = [
             {"field": {"name": "Priority"}},
-            {"field": {"name": "Assignee"}},
+            {"field": {"name": "Assignee"}}, 
             {"field": {"name": "State"}}
         ]
         
-        self.projects_client.get_custom_fields = Mock(return_value=mock_fields)
+        # Mock the actual API call instead of the wrapper method
+        self.mock_client.get.return_value = mock_fields
         
         # Mock individual schema calls
         mock_schemas = {
