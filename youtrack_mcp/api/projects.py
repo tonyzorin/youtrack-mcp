@@ -456,12 +456,11 @@ class ProjectsClient:
             # Get bundle values based on valueType
             if value_type == "enum":
                 try:
-                    # Get all enum bundles and find the right one by index
-                    # enum[1] means the first enum bundle (0-based index)
-                    all_bundles = self.client.get("admin/customFieldSettings/bundles/enum?fields=id,name,values(id,name,description,color)")
-                    
-                    # Extract index from bundle_id like "enum[1]"
+                    # Handle both indexed format (enum[1]) and direct bundle ID (enum-bundle-123)
                     if "[" in bundle_id and "]" in bundle_id:
+                        # Index-based format: enum[1] means the first enum bundle (0-based index)
+                        all_bundles = self.client.get("admin/customFieldSettings/bundles/enum?fields=id,name,values(id,name,description,color)")
+                        
                         bundle_index = int(bundle_id.split("[")[1].split("]")[0]) - 1  # Convert to 0-based index
                         if 0 <= bundle_index < len(all_bundles):
                             target_bundle = all_bundles[bundle_index]
@@ -479,18 +478,31 @@ class ProjectsClient:
                         else:
                             logger.error(f"Bundle index {bundle_index} out of range for {len(all_bundles)} enum bundles")
                             return []
+                    else:
+                        # Direct bundle ID format: get specific bundle
+                        bundle_data = self.client.get(f"admin/customFieldSettings/bundles/enum/{bundle_id}?fields=values(id,name,description,color)")
+                        values = bundle_data.get("values", [])
+                        logger.info(f"Found {len(values)} enum values for field '{field_name}' from bundle '{bundle_data.get('name', 'unknown')}'")
+                        return [
+                            {
+                                "name": value.get("name", ""),
+                                "description": value.get("description", ""),
+                                "id": value.get("id"),
+                                "color": value.get("color", {})
+                            }
+                            for value in values
+                        ]
                 except Exception as e:
                     logger.error(f"Error getting enum bundle {bundle_id}: {str(e)}")
                     return []
             
             elif value_type == "state":
                 try:
-                    # Get all state bundles and find the right one by index
-                    # state[1] means the first state bundle (0-based index)
-                    all_bundles = self.client.get("admin/customFieldSettings/bundles/state?fields=id,name,values(id,name,description,isResolved,color)")
-                    
-                    # Extract index from bundle_id like "state[1]"
+                    # Handle both indexed format (state[1]) and direct bundle ID (state-bundle-123)
                     if "[" in bundle_id and "]" in bundle_id:
+                        # Index-based format: state[1] means the first state bundle (0-based index)
+                        all_bundles = self.client.get("admin/customFieldSettings/bundles/state?fields=id,name,values(id,name,description,isResolved,color)")
+                        
                         bundle_index = int(bundle_id.split("[")[1].split("]")[0]) - 1  # Convert to 0-based index
                         if 0 <= bundle_index < len(all_bundles):
                             target_bundle = all_bundles[bundle_index]
@@ -509,6 +521,21 @@ class ProjectsClient:
                         else:
                             logger.error(f"Bundle index {bundle_index} out of range for {len(all_bundles)} state bundles")
                             return []
+                    else:
+                        # Direct bundle ID format: get specific bundle
+                        bundle_data = self.client.get(f"admin/customFieldSettings/bundles/state/{bundle_id}?fields=values(id,name,description,isResolved,color)")
+                        values = bundle_data.get("values", [])
+                        logger.info(f"Found {len(values)} state values for field '{field_name}' from bundle '{bundle_data.get('name', 'unknown')}'")
+                        return [
+                            {
+                                "name": value.get("name", ""),
+                                "description": value.get("description", ""),
+                                "id": value.get("id"),
+                                "resolved": value.get("isResolved", False),
+                                "color": value.get("color", {})
+                            }
+                            for value in values
+                        ]
                 except Exception as e:
                     logger.error(f"Error getting state bundle {bundle_id}: {str(e)}")
                     return []
@@ -587,7 +614,7 @@ class ProjectsClient:
             else:
                 logger.info(f"Field '{field_name}' type '{value_type}' doesn't support allowed values")
                 return []
-            
+        
         except Exception as e:
             logger.error(f"Error getting custom field allowed values for '{field_name}': {str(e)}")
             return []
