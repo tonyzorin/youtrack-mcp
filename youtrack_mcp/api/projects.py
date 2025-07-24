@@ -803,6 +803,36 @@ class ProjectsClient:
                         "suggestion": "Use format like '4h', '30m', '1h45m', or '2d'"
                     }
             
+            elif value_type == "integer":
+                # Integer field - validate that value can be converted to int
+                try:
+                    int(field_value)
+                except (ValueError, TypeError):
+                    return {
+                        "valid": False,
+                        "error": f"Invalid integer value '{field_value}' for field '{field_name}'",
+                        "suggestion": "Provide a valid integer number"
+                    }
+            
+            elif value_type == "float":
+                # Float field - validate that value can be converted to float
+                try:
+                    float(field_value)
+                except (ValueError, TypeError):
+                    return {
+                        "valid": False,
+                        "error": f"Invalid float value '{field_value}' for field '{field_name}'",
+                        "suggestion": "Provide a valid decimal number"
+                    }
+            
+            # Multi-value field validation (if applicable, after type-specific)
+            if field_schema.get("multi_value", False) and not isinstance(field_value, list):
+                return {
+                    "valid": False,
+                    "error": f"Field '{field_name}' expects multiple values (array)",
+                    "suggestion": "Provide value as an array, e.g., ['value1', 'value2']"
+                }
+            
             # If we reach here, validation passed
             return {
                 "valid": True,

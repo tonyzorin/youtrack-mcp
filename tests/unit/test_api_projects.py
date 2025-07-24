@@ -559,25 +559,49 @@ class TestProjectsCustomFields(unittest.TestCase):
     def test_get_all_custom_fields_schemas_success(self):
         """Test getting all custom field schemas for a project."""
         mock_fields = [
-            {"field": {"name": "Priority"}},
-            {"field": {"name": "Assignee"}}, 
-            {"field": {"name": "State"}}
+            {
+                "field": {
+                    "id": "priority-field-id",
+                    "name": "Priority",
+                    "fieldType": {
+                        "$type": "EnumBundle",
+                        "valueType": "enum",
+                        "id": "enum-bundle-123"
+                    }
+                },
+                "canBeEmpty": False,
+                "autoAttached": False
+            },
+            {
+                "field": {
+                    "id": "assignee-field-id", 
+                    "name": "Assignee",
+                    "fieldType": {
+                        "$type": "UserBundle",
+                        "valueType": "user",
+                        "id": "user-bundle-456"
+                    }
+                },
+                "canBeEmpty": True,
+                "autoAttached": False
+            },
+            {
+                "field": {
+                    "id": "state-field-id",
+                    "name": "State", 
+                    "fieldType": {
+                        "$type": "StateBundle",
+                        "valueType": "state",
+                        "id": "state-bundle-789"
+                    }
+                },
+                "canBeEmpty": False,
+                "autoAttached": True
+            }
         ]
         
-        # Mock the actual API call instead of the wrapper method
+        # Mock the API call with the detailed fields response
         self.mock_client.get.return_value = mock_fields
-        
-        # Mock individual schema calls
-        mock_schemas = {
-            "Priority": {"name": "Priority", "type": "enum"},
-            "Assignee": {"name": "Assignee", "type": "user"},
-            "State": {"name": "State", "type": "state"}
-        }
-        
-        def mock_get_schema(project_id, field_name):
-            return mock_schemas.get(field_name)
-        
-        self.projects_client.get_custom_field_schema = Mock(side_effect=mock_get_schema)
 
         result = self.projects_client.get_all_custom_fields_schemas("0-0")
 
@@ -585,7 +609,16 @@ class TestProjectsCustomFields(unittest.TestCase):
         self.assertIn("Priority", result)
         self.assertIn("Assignee", result)
         self.assertIn("State", result)
+        
+        # Check that the field types match what our implementation returns (valueType)
         self.assertEqual(result["Priority"]["type"], "enum")
+        self.assertEqual(result["Assignee"]["type"], "user")
+        self.assertEqual(result["State"]["type"], "state")
+        
+        # Check additional schema properties
+        self.assertEqual(result["Priority"]["required"], True)  # canBeEmpty: False means required
+        self.assertEqual(result["Assignee"]["required"], False)  # canBeEmpty: True means not required
+        self.assertEqual(result["State"]["auto_attach"], True)
 
     def test_get_all_custom_fields_schemas_api_error(self):
         """Test getting all schemas with API error."""
