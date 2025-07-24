@@ -4,7 +4,6 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
-import which from 'which';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,16 +22,9 @@ class YouTrackMCPServer {
   }
 
   setupPaths() {
-    // Find the Python installation
-    try {
-      this.pythonPath = which.sync('python3');
-    } catch (e) {
-      try {
-        this.pythonPath = which.sync('python');
-      } catch (e2) {
-        throw new Error('Python not found. Please install Python 3.8+ to use YouTrack MCP server.');
-      }
-    }
+    // Use python3 by default, fall back to python
+    // The actual existence check will happen when we try to run it
+    this.pythonPath = 'python3';
 
     // Find the server main.py file
     const possiblePaths = [

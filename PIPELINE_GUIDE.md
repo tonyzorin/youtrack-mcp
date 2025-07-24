@@ -23,6 +23,7 @@ The pipeline consists of **3 main stages**:
 
 ### Running Tests Locally
 
+#### Python Tests
 ```bash
 # All tests
 pytest
@@ -39,6 +40,21 @@ pytest --cov=youtrack_mcp --cov-report=html
 export YOUTRACK_URL="https://your-instance.youtrack.cloud"
 export YOUTRACK_API_TOKEN="your-token"
 pytest -m e2e
+```
+
+#### NPM Package Tests
+```bash
+# Build and test NPM package
+npm run build               # Build Node.js wrapper
+npm test                   # Test package functionality
+
+# Test CLI locally
+node dist/bin/youtrack-mcp.js --help
+node dist/bin/youtrack-mcp.js --version
+
+# Test package installation
+npm pack                   # Create .tgz file
+npm install -g ./youtrack-mcp-tonyzorin-*.tgz
 ```
 
 ### Test Organization
@@ -118,17 +134,54 @@ Publish Packages: ✓
 
 ## 📦 Multi-Registry Support
 
-### Docker Hub (Primary)
+### Docker Registries
+
+#### Docker Hub (Primary)
 ```bash
 docker pull tonyzorin/youtrack-mcp:latest
 docker pull tonyzorin/youtrack-mcp:1.11.6
 ```
 
-### GitHub Container Registry (Backup)
+#### GitHub Container Registry (Backup)
 ```bash
 docker pull ghcr.io/tonyzorin/youtrack-mcp:latest
 docker pull ghcr.io/tonyzorin/youtrack-mcp:1.11.6
 ```
+
+### NPM Registries
+
+#### npmjs.org (Public)
+```bash
+# Install globally
+npm install -g youtrack-mcp-tonyzorin
+
+# Or use directly with npx
+npx youtrack-mcp-tonyzorin
+
+# Specific version
+npm install -g youtrack-mcp-tonyzorin@1.11.6
+```
+
+#### GitHub Packages (Scoped)
+```bash
+# Configure registry
+npm config set @tonyzorin:registry https://npm.pkg.github.com
+
+# Install globally
+npm install -g @tonyzorin/youtrack-mcp
+
+# Or with explicit registry
+npm install -g @tonyzorin/youtrack-mcp --registry=https://npm.pkg.github.com
+```
+
+### Package Types
+
+| Type | Registry | Name | Use Case |
+|------|----------|------|-----------|
+| **Docker** | Docker Hub | `tonyzorin/youtrack-mcp` | Container environments, Claude Desktop |
+| **Docker** | GitHub Container Registry | `ghcr.io/tonyzorin/youtrack-mcp` | GitHub ecosystem, backup |
+| **NPM** | npmjs.org | `youtrack-mcp-tonyzorin` | Node.js environments, CLI usage |
+| **NPM** | GitHub Packages | `@tonyzorin/youtrack-mcp` | Private/scoped installs |
 
 ## 🔧 Workflow Details
 

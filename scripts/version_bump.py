@@ -20,7 +20,8 @@ def get_current_version():
     raise ValueError("Could not find version in version.py")
 
 def update_version(new_version):
-    """Update the version in version.py"""
+    """Update the version in version.py and package.json"""
+    # Update Python version
     version_file = Path(__file__).parent.parent / "youtrack_mcp" / "version.py"
     with open(version_file, 'r') as f:
         content = f.read()
@@ -34,7 +35,26 @@ def update_version(new_version):
     with open(version_file, 'w') as f:
         f.write(new_content)
     
-    print(f"Updated version to {new_version}")
+    print(f"Updated Python version to {new_version}")
+    
+    # Update NPM package.json version
+    package_json_file = Path(__file__).parent.parent / "package.json"
+    if package_json_file.exists():
+        with open(package_json_file, 'r') as f:
+            package_content = f.read()
+        
+        new_package_content = re.sub(
+            r'"version": "[^"]+"',
+            f'"version": "{new_version}"',
+            package_content
+        )
+        
+        with open(package_json_file, 'w') as f:
+            f.write(new_package_content)
+        
+        print(f"Updated NPM package.json version to {new_version}")
+    else:
+        print("⚠️  package.json not found, skipping NPM version update")
 
 def bump_version(version, bump_type):
     """Bump version based on type (major, minor, patch)"""
