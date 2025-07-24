@@ -289,29 +289,28 @@ class IssuesClient:
         issue_id: str,
         custom_fields: Dict[str, Any],
         validate: bool = True,
-        use_commands: bool = True,
+        use_commands: bool = False,  # Changed default to False - direct API works better
     ) -> Dict[str, Any]:
         """
-        Update custom fields for an issue with enhanced state machine support.
-        
-        Based on comprehensive YouTrack API analysis, this method:
-        1. Detects state machine workflows vs direct field updates
-        2. Uses event-based transitions for state machines
-        3. Falls back to command-based approach for reliability
-        4. Implements proper error handling for workflow restrictions
-        
+        Update multiple custom fields on an issue using proven working approach.
+
+        Based on successful testing with this YouTrack instance:
+        - Direct Field Update API works reliably for state transitions  
+        - Command API may be blocked by workflow restrictions
+        - Uses direct API as primary method with command fallback
+
         Args:
             issue_id: The issue identifier
             custom_fields: Dictionary of field names and values to update
             validate: Whether to validate field values before updating
-            use_commands: Whether to use command-based updates (recommended)
+            use_commands: Whether to try command-based approach as fallback (default: False)
             
         Returns:
             Updated issue data
         """
         try:
             # First, get current issue state to detect state machine workflows
-            issue_data = self.get_issue_detailed(issue_id)
+            issue_data = self.get_issue(issue_id)
             
             # Check if we're updating State field and if it uses state machines
             state_field_update = None
@@ -341,7 +340,7 @@ class IssuesClient:
                 self._update_other_custom_fields(issue_id, other_fields, validate, use_commands)
             
             # Return updated issue data
-            return self.get_issue_detailed(issue_id)
+            return self.get_issue(issue_id)
             
         except Exception as e:
             logger.exception(f"Error updating custom fields for issue {issue_id}")
@@ -349,65 +348,76 @@ class IssuesClient:
     
     def _handle_state_transition(self, issue_id: str, target_state: str, use_commands: bool = True) -> bool:
         """
-        Handle state transitions with state machine workflow support.
+        Handle state transitions with proven working approach for this YouTrack instance.
         
-        Implements the comprehensive approach from technical analysis:
-        1. Query available transitions and detect state machine workflows
-        2. Use event-based transitions for state machines
-        3. Use command-based updates for workflow compliance
-        4. Fallback to direct field updates when appropriate
+        Based on successful testing, this method prioritizes:
+        1. Direct Field Update API (proven to work for state transitions)
+        2. Command-based approach as fallback
+        3. Event-based transitions for state machine workflows
         
         Args:
             issue_id: The issue identifier
             target_state: Target state name
-            use_commands: Whether to use command-based approach
+            use_commands: Whether to try command-based approach as fallback
             
         Returns:
             True if transition succeeded, False otherwise
         """
         try:
-            if use_commands:
-                # Command-based approach - most reliable per analysis
-                command_data = {
-                    "query": f"State {target_state}",
-                    "issues": [{"id": issue_id}]
-                }
-                
-                logger.info(f"Applying state transition command 'State {target_state}' to issue {issue_id}")
-                self.client.post("commands", data=command_data)
+            # Method 1: Direct Field Update (PROVEN TO WORK in testing)
+            logger.info(f"Attempting direct field update for issue {issue_id} to state '{target_state}'")
+            success = self._apply_direct_state_update(issue_id, target_state)
+            
+            if success:
+                logger.info(f"Direct field update succeeded for issue {issue_id}")
                 return True
-                
-            else:
-                # Direct field update approach with state machine detection
-                # First, check if this is a state machine workflow
+            
+            # Method 2: Fallback to command-based approach if enabled
+            if use_commands:
+                logger.info(f"Direct update failed, trying command-based approach for issue {issue_id}")
                 try:
-                    # Query possible transitions (as recommended in analysis)
-                    issue_fields = self.client.get(f"issues/{issue_id}/customFields?fields=name,possibleEvents(id,presentation),value(name),$type")
+                    command_data = {
+                        "query": f"State \"{target_state}\"",
+                        "issues": [{"id": issue_id}]
+                    }
                     
-                    state_field = None
-                    for field in issue_fields:
-                        if field.get('name', '').lower() == 'state':
-                            state_field = field
-                            break
+                    logger.info(f"Applying state transition command 'State \"{target_state}\"' to issue {issue_id}")
+                    self.client.post("commands", data=command_data)
+                    logger.info(f"Command-based transition succeeded for issue {issue_id}")
+                    return True
                     
-                    if state_field:
-                        field_type = state_field.get('$type', '')
-                        possible_events = state_field.get('possibleEvents', [])
-                        
-                        # Check if this is a state machine workflow
-                        if field_type == 'StateMachineIssueCustomField' and possible_events:
-                            # Use event-based transition
-                            logger.info(f"Detected state machine workflow for issue {issue_id}")
-                            return self._apply_state_machine_transition(issue_id, target_state, possible_events)
-                        else:
-                            # Use direct field update
-                            return self._apply_direct_state_update(issue_id, target_state)
+                except Exception as cmd_error:
+                    logger.warning(f"Command-based approach failed: {cmd_error}")
+            
+            # Method 3: Try state machine detection and event-based transitions
+            logger.info(f"Trying state machine event-based approach for issue {issue_id}")
+            try:
+                # Query possible transitions (as recommended in analysis)
+                issue_fields = self.client.get(f"issues/{issue_id}/customFields?fields=name,possibleEvents(id,presentation),value(name),$type")
+                
+                state_field = None
+                for field in issue_fields:
+                    if field.get('name', '').lower() == 'state':
+                        state_field = field
+                        break
+                
+                if state_field:
+                    field_type = state_field.get('$type', '')
+                    possible_events = state_field.get('possibleEvents', [])
                     
-                except Exception as e:
-                    logger.warning(f"Could not detect state machine workflow: {e}")
-                    # Fallback to direct update
-                    return self._apply_direct_state_update(issue_id, target_state)
-                    
+                    # Check if this is a state machine workflow
+                    if field_type == 'StateMachineIssueCustomField' and possible_events:
+                        # Use event-based transition
+                        logger.info(f"Detected state machine workflow for issue {issue_id}")
+                        return self._apply_state_machine_transition(issue_id, target_state, possible_events)
+                
+            except Exception as sm_error:
+                logger.warning(f"State machine detection failed: {sm_error}")
+            
+            # All methods failed
+            logger.error(f"All state transition methods failed for issue {issue_id} to state '{target_state}'")
+            return False
+                     
         except Exception as e:
             logger.error(f"State transition failed for issue {issue_id} to state '{target_state}': {e}")
             return False
@@ -489,26 +499,18 @@ class IssuesClient:
     
     def _update_other_custom_fields(self, issue_id: str, custom_fields: Dict[str, Any], validate: bool, use_commands: bool) -> None:
         """
-        Update non-state custom fields using existing logic.
+        Update non-state custom fields using proven working approach.
+        
+        Based on testing results, prioritizes direct field updates over commands.
         
         Args:
             issue_id: The issue identifier
             custom_fields: Dictionary of field names and values
             validate: Whether to validate field values  
-            use_commands: Whether to use command-based updates
+            use_commands: Whether to try command-based approach as fallback
         """
-        if use_commands:
-            # Use command-based approach for other fields
-            for field_name, field_value in custom_fields.items():
-                command_data = {
-                    "query": f"{field_name} {field_value}",
-                    "issues": [{"id": issue_id}]
-                }
-                
-                logger.info(f"Applying command '{field_name} {field_value}' to issue {issue_id}")
-                self.client.post("commands", data=command_data)
-        else:
-            # Use direct field update approach (existing logic)
+        # Method 1: Direct field update approach (primary method)
+        try:
             # Build update data with proper field types
             update_data = {"customFields": []}
             
@@ -520,7 +522,34 @@ class IssuesClient:
                 # Add appropriate $type based on field type if needed
                 update_data["customFields"].append(field_data)
             
+            logger.info(f"Updating custom fields for issue {issue_id} using direct API")
             self.client.post(f"issues/{issue_id}", data=update_data)
+            logger.info(f"Direct field update succeeded for issue {issue_id}")
+            
+        except Exception as direct_error:
+            logger.warning(f"Direct field update failed: {direct_error}")
+            
+            # Method 2: Fallback to command-based approach if enabled
+            if use_commands:
+                logger.info(f"Trying command-based approach as fallback for issue {issue_id}")
+                try:
+                    for field_name, field_value in custom_fields.items():
+                        command_data = {
+                            "query": f"{field_name} {field_value}",
+                            "issues": [{"id": issue_id}]
+                        }
+                        
+                        logger.info(f"Applying command '{field_name} {field_value}' to issue {issue_id}")
+                        self.client.post("commands", data=command_data)
+                        
+                    logger.info(f"Command-based updates succeeded for issue {issue_id}")
+                    
+                except Exception as cmd_error:
+                    logger.error(f"Both direct and command approaches failed for issue {issue_id}: {cmd_error}")
+                    raise YouTrackAPIError(f"Failed to update custom fields: {cmd_error}")
+            else:
+                # Re-raise the original error if commands not enabled
+                raise YouTrackAPIError(f"Direct field update failed: {direct_error}")
 
     def get_issue_custom_fields(self, issue_id: str) -> Dict[str, Any]:
         """

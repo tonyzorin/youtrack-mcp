@@ -971,7 +971,7 @@ class IssueTools:
                 })
             
             # Get current issue state and field information
-            issue_data = self.issues_api.get_issue_detailed(issue_id)
+            issue_data = self.issues_api.get_issue(issue_id)
             
             # Query state field with possible transitions
             try:
