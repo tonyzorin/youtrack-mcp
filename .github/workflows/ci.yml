@@ -197,10 +197,10 @@ jobs:
         
         # Get version for testing the built dev image
         VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
-        echo "🎯 Testing dev image: tonyzorin/youtrack-mcp:${VERSION}_wip"
+        echo "🎯 Testing dev image: tonyzorin/youtrack-mcp:${VERSION}-wip"
         
         # Test using the actual built Docker image
-        export YOUTRACK_MCP_IMAGE="tonyzorin/youtrack-mcp:${VERSION}_wip"
+        export YOUTRACK_MCP_IMAGE="tonyzorin/youtrack-mcp:${VERSION}-wip"
         python -m pytest tests/e2e/ -v --tb=short -m "e2e"
 
   # ==============================
@@ -225,7 +225,7 @@ jobs:
         COMMIT_SHA=${GITHUB_SHA::8}
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_OUTPUT
-        echo "🔨 Building dev version: ${VERSION}_wip"
+        echo "🔨 Building dev version: ${VERSION}-wip"
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
@@ -247,14 +247,14 @@ jobs:
         platforms: linux/amd64,linux/arm64
         push: true
         tags: |
-          ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}_wip
-          ${{ env.DOCKER_HUB_REPOSITORY }}:dev-${{ steps.get_version.outputs.COMMIT_SHA }}
-          ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:${{ steps.get_version.outputs.VERSION }}_wip
-          ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:dev-${{ steps.get_version.outputs.COMMIT_SHA }}
+          ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}-wip
+          ${{ env.DOCKER_HUB_REPOSITORY }}:${{ github.sha }}
+          ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:${{ steps.get_version.outputs.VERSION }}-wip
+          ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:${{ github.sha }}
         labels: |
           org.opencontainers.image.title=YouTrack MCP (Dev Build)
           org.opencontainers.image.description=YouTrack Model Context Protocol Server - Development Build
-          org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}_wip
+          org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}-wip
           org.opencontainers.image.revision=${{ github.sha }}
           org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
         cache-from: type=gha
@@ -265,12 +265,12 @@ jobs:
         echo "🔨 Dev build completed!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Docker Images:**" >> $GITHUB_STEP_SUMMARY
-        echo "- \`${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}_wip\`" >> $GITHUB_STEP_SUMMARY
-        echo "- \`${{ env.DOCKER_HUB_REPOSITORY }}:dev-${{ steps.get_version.outputs.COMMIT_SHA }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}-wip\`" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ env.DOCKER_HUB_REPOSITORY }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-        echo "docker pull ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}_wip" >> $GITHUB_STEP_SUMMARY
+        echo "docker pull ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}-wip" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   # ==============================
