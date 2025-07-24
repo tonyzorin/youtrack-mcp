@@ -175,7 +175,10 @@ class ResourcesTools:
 
             # Extract path components - handle netloc as path for youtrack://projects format
             raw_path = parsed.path
-            if not parsed.path and parsed.netloc:
+            if parsed.netloc and parsed.path:
+                # For youtrack://projects/0-0, combine netloc (projects) + path (/0-0)
+                path = [parsed.netloc] + parsed.path.strip("/").split("/")
+            elif parsed.netloc and not parsed.path:
                 # For youtrack://projects, netloc contains the resource type
                 path = [parsed.netloc]
             else:
