@@ -365,6 +365,12 @@ class IssueTools:
                     "field_name": "Custom field name like 'Priority' or 'State'",
                 },
             },
+            "diagnose_workflow_restrictions": {
+                "description": "Diagnose workflow restrictions and available state transitions for an issue. Analyzes state machine workflows, permissions, and provides actionable recommendations. Example: diagnose_workflow_restrictions(issue_id='DEMO-123')",
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'"
+                }
+            },
         }
 
     @sync_wrapper
@@ -937,4 +943,138 @@ class IssueTools:
                 "error": str(e),
                 "project_id": project_id,
                 "field_name": field_name
+            })
+
+    @sync_wrapper
+    def diagnose_workflow_restrictions(self, issue_id: str) -> str:
+        """
+        Diagnose workflow restrictions and available state transitions for an issue.
+        
+        Based on comprehensive YouTrack API analysis, this function:
+        1. Detects state machine workflows vs direct field updates
+        2. Lists available transition events and their restrictions
+        3. Identifies permission and workflow guard conditions
+        4. Provides actionable recommendations for state transitions
+        
+        FORMAT: diagnose_workflow_restrictions(issue_id="DEMO-123")
+        
+        Args:
+            issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
+            
+        Returns:
+            JSON string with workflow analysis and recommendations
+        """
+        try:
+            if not issue_id:
+                return format_json_response({
+                    "error": "Issue ID is required"
+                })
+            
+            # Get current issue state and field information
+            issue_data = self.issues_api.get_issue_detailed(issue_id)
+            
+            # Query state field with possible transitions
+            try:
+                issue_fields = self.issues_api.client.get(
+                    f"issues/{issue_id}/customFields?fields=name,possibleEvents(id,presentation),value(name),$type"
+                )
+                
+                state_field = None
+                for field in issue_fields:
+                    if field.get('name', '').lower() == 'state':
+                        state_field = field
+                        break
+                
+                if not state_field:
+                    return format_json_response({
+                        "error": "No State field found for this issue",
+                        "issue_id": issue_id
+                    })
+                
+                current_state = state_field.get('value', {}).get('name', 'Unknown')
+                field_type = state_field.get('$type', '')
+                possible_events = state_field.get('possibleEvents', [])
+                
+                # Analyze workflow type
+                workflow_analysis = {
+                    "issue_id": issue_id,
+                    "current_state": current_state,
+                    "field_type": field_type,
+                    "workflow_type": "state_machine" if field_type == 'StateMachineIssueCustomField' else "direct_field",
+                    "available_transitions": [],
+                    "restrictions": [],
+                    "recommendations": []
+                }
+                
+                # Analyze available transitions
+                if possible_events:
+                    workflow_analysis["available_transitions"] = [
+                        {
+                            "event_id": event.get('id', ''),
+                            "presentation": event.get('presentation', ''),
+                            "description": f"Transition via event: {event.get('presentation', 'Unknown')}"
+                        }
+                        for event in possible_events
+                    ]
+                    
+                    if field_type == 'StateMachineIssueCustomField':
+                        workflow_analysis["restrictions"].append(
+                            "State machine workflow detected - requires event-based transitions"
+                        )
+                        workflow_analysis["recommendations"].extend([
+                            "Use event-based transitions instead of direct state updates",
+                            "Check guard conditions that may block specific transitions",
+                            "Verify user permissions for workflow transitions"
+                        ])
+                    else:
+                        workflow_analysis["recommendations"].append(
+                            "Direct state updates should work with proper field formatting"
+                        )
+                else:
+                    workflow_analysis["restrictions"].append(
+                        "No transition events available - may indicate permission restrictions"
+                    )
+                    workflow_analysis["recommendations"].extend([
+                        "Check user permissions for state field updates",
+                        "Verify workflow configuration allows transitions from current state",
+                        "Contact YouTrack administrator if transitions should be available"
+                    ])
+                
+                # Add general workflow guidance
+                workflow_analysis["technical_notes"] = {
+                    "command_api": "Use POST /api/commands with 'State NewState' for most reliable transitions",
+                    "direct_api": "Use POST /api/issues/{id} with StateIssueCustomField type for direct updates",
+                    "state_machine_api": "Use POST /api/issues/{id} with StateMachineIssueCustomField and event for workflows",
+                    "permission_check": "Verify 'Update Issue' or 'Update Issue Private Fields' permissions"
+                }
+                
+                # Add common troubleshooting
+                workflow_analysis["troubleshooting"] = [
+                    "If 'Open → In Progress' is blocked, check if assignment is required first",
+                    "If transitions fail with 500 errors, verify correct field type in request",
+                    "If no events are available, check user role and project permissions",
+                    "Use command-based approach (POST /api/commands) for maximum compatibility"
+                ]
+                
+                return format_json_response({
+                    "status": "success",
+                    "workflow_analysis": workflow_analysis
+                })
+                
+            except Exception as e:
+                return format_json_response({
+                    "error": f"Failed to analyze workflow: {str(e)}",
+                    "issue_id": issue_id,
+                    "suggestion": "Try checking issue permissions or contact YouTrack administrator"
+                })
+                
+        except Exception as e:
+            logger.exception(f"Error diagnosing workflow restrictions for issue {issue_id}")
+            return format_json_response({
+                "error": str(e),
+                "troubleshooting": [
+                    "Verify issue ID format and existence",
+                    "Check user permissions for the issue",
+                    "Ensure proper authentication token"
+                ]
             })
