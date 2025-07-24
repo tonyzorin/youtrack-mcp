@@ -1,4 +1,84 @@
-# YouTrack MCP Server
+# YouTrack MCP
+
+A Model Context Protocol (MCP) server that provides access to YouTrack functionality.
+
+## 🚀 Quick Reference - Common Operations
+
+### **🎯 State Transitions (Most Common)**
+```python
+# ✅ PROVEN WORKING FORMAT - Use simple strings
+update_issue_state("DEMO-123", "In Progress")
+update_issue_state("PROJECT-456", "Fixed")
+update_issue_state("TASK-789", "Closed")
+
+# ❌ DON'T USE - Complex objects fail
+# update_custom_fields(issue_id, {"State": {"name": "In Progress"}})  # FAILS
+# update_custom_fields(issue_id, {"State": {"id": "154-2"}})         # FAILS
+```
+
+### **📝 Other Custom Fields**
+```python
+# ✅ Working formats for different field types:
+
+# Priority (enum field)
+update_custom_fields("DEMO-123", {"Priority": "Critical"})
+
+# Assignee (user field) 
+update_custom_fields("DEMO-123", {"Assignee": "admin"})
+
+# Estimation (period field)
+update_custom_fields("DEMO-123", {"Estimation": "4h"})
+
+# Type (enum field)
+update_custom_fields("DEMO-123", {"Type": "Bug"})
+
+# Multiple fields at once
+update_custom_fields("DEMO-123", {
+    "Priority": "Critical",
+    "Assignee": "admin", 
+    "Type": "Bug"
+})
+```
+
+### **🔍 Finding Issues**
+```python
+# Search by text
+search_issues("bug in login")
+
+# Search by project
+get_project_issues("DEMO")
+
+# Get specific issue
+get_issue("DEMO-123")
+```
+
+### **📋 Creating Issues**
+```python
+create_issue(
+    project_id="DEMO",
+    summary="Bug in login system",
+    description="Users cannot log in with special characters"
+)
+```
+
+### **🔗 Linking Issues**
+```python
+# Create dependency
+add_dependency("DEMO-123", "DEMO-124")
+
+# Create relates link
+add_relates_link("DEMO-123", "DEMO-125")
+```
+
+### **💬 Comments**
+```python
+add_comment("DEMO-123", "Fixed the login bug")
+get_issue_comments("DEMO-123")
+```
+
+---
+
+## Installation
 
 [![Docker Build and Push](https://github.com/tonyzorin/youtrack-mcp/actions/workflows/docker-build.yml/badge.svg)](https://github.com/tonyzorin/youtrack-mcp/actions/workflows/docker-build.yml)
 

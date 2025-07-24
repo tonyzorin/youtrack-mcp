@@ -1091,8 +1091,19 @@ class IssueTools:
         """
         Update an issue's state using the proven working REST API approach.
         
-        This function uses the Direct Field Update API method that was successfully 
-        tested and proven to work with state transitions like "Submitted → In Progress".
+        🎯 PROVEN WORKING FORMAT (based on successful testing):
+        - Uses simple string values: "In Progress", "Fixed", "Open"
+        - NO complex objects or ID references needed
+        
+        ✅ EXAMPLES THAT WORK:
+        - update_issue_state("DEMO-123", "In Progress")
+        - update_issue_state("PROJECT-456", "Fixed") 
+        - update_issue_state("TASK-789", "Closed")
+        
+        🔧 WHAT HAPPENS UNDER THE HOOD:
+        - Primary: Direct Field Update API with format {"customFields": [{"name": "State", "value": "In Progress"}]}
+        - Fallback: Commands API with "State In Progress" command
+        - Smart error handling with workflow restriction guidance
         
         FORMAT: update_issue_state(issue_id="DEMO-123", new_state="In Progress")
         
@@ -1101,7 +1112,9 @@ class IssueTools:
             new_state: The target state name (e.g., "In Progress", "Fixed", "Open")
             
         Returns:
-            JSON string with the updated issue information
+            JSON string with the updated issue information and success details
+            
+        Common States: "Open", "In Progress", "Fixed", "Closed", "Submitted"
         """
         try:
             if not issue_id or not new_state:

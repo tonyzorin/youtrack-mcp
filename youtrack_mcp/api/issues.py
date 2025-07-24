@@ -471,58 +471,59 @@ class IssuesClient:
     
     def _apply_direct_state_update(self, issue_id: str, target_state: str) -> bool:
         """
-        Apply direct state field update.
+        Apply direct state field update using proven working format.
         
-        Args:
-            issue_id: The issue identifier  
-            target_state: Target state name
-            
-        Returns:
-            True if update succeeded, False otherwise
+        Based on successful testing, the working format is:
+        {"customFields": [{"name": "State", "value": "In Progress"}]}
+        
+        NOT complex objects or ID references.
         """
         try:
+            # Use the proven simple string format that works
             update_data = {
                 "customFields": [{
-                    "$type": "StateIssueCustomField",
-                    "name": "State", 
-                    "value": {"name": target_state}
+                    "name": "State",
+                    "value": target_state  # Simple string value - this is what works!
                 }]
             }
             
+            logger.info(f"Applying direct state update to issue {issue_id}: State -> '{target_state}'")
             self.client.post(f"issues/{issue_id}", data=update_data)
-            logger.info(f"Applied direct state update to '{target_state}' for issue {issue_id}")
+            
+            logger.info(f"Direct state update successful for issue {issue_id}")
             return True
             
         except Exception as e:
-            logger.error(f"Direct state update failed: {e}")
+            logger.warning(f"Direct state update failed for issue {issue_id}: {e}")
             return False
     
     def _update_other_custom_fields(self, issue_id: str, custom_fields: Dict[str, Any], validate: bool, use_commands: bool) -> None:
         """
-        Update non-state custom fields using proven working approach.
+        Update non-state custom fields, prioritizing direct field updates.
         
-        Based on testing results, prioritizes direct field updates over commands.
+        Based on successful testing, uses simple values where possible:
+        - Strings: "Critical", "admin", "Bug"  
+        - NOT complex objects: {"name": "Critical", "id": "123"}
         
         Args:
-            issue_id: The issue identifier
+            issue_id: Issue identifier
             custom_fields: Dictionary of field names and values
             validate: Whether to validate field values  
             use_commands: Whether to try command-based approach as fallback
         """
         # Method 1: Direct field update approach (primary method)
         try:
-            # Build update data with proper field types
+            # Build update data with simple values (proven format)
             update_data = {"customFields": []}
             
             for field_name, field_value in custom_fields.items():
                 field_data = {
                     "name": field_name,
-                    "value": field_value
+                    "value": field_value  # Use simple values - this works best!
                 }
-                # Add appropriate $type based on field type if needed
                 update_data["customFields"].append(field_data)
             
-            logger.info(f"Updating custom fields for issue {issue_id} using direct API")
+            logger.info(f"Updating custom fields for issue {issue_id} using direct API with simple values")
             self.client.post(f"issues/{issue_id}", data=update_data)
             logger.info(f"Direct field update succeeded for issue {issue_id}")
             
