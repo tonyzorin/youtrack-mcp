@@ -146,10 +146,13 @@ class YouTrackClient:
         Returns:
             Full API URL
         """
-        if self.base_url.endswith("/api"):
-            return f"{self.base_url}/{endpoint}"
+        # Remove trailing slash from base_url for consistent URL construction
+        base = self.base_url.rstrip('/')
+        
+        if base.endswith("/api"):
+            return f"{base}/{endpoint}"
         else:
-            return f"{self.base_url}/api/{endpoint}"
+            return f"{base}/api/{endpoint}"
 
     def _handle_response(self, response: requests.Response) -> Dict[str, Any]:
         """
