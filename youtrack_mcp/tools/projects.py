@@ -557,6 +557,119 @@ class ProjectTools:
             logger.exception(f"Error processing update_project request")
             return format_json_response({"error": str(e)})
 
+    @sync_wrapper
+    def create_subsystem(self, project_id: str, name: str, description: str = "") -> str:
+        """
+        Create a subsystem for a project.
+
+        FORMAT: create_subsystem(project_id="DEMO", name="Backend", description="Backend components")
+
+        Args:
+            project_id: The project identifier (e.g., "DEMO", "0-0")
+            name: The subsystem name
+            description: Optional description
+
+        Returns:
+            JSON string with created subsystem information
+        """
+        try:
+            if not project_id or not name:
+                return format_json_response({
+                    "error": "Project ID and subsystem name are required"
+                })
+
+            data = {
+                "name": name,
+                "description": description
+            }
+
+            result = self.client.post(f"admin/projects/{project_id}/subsystems", data=data)
+            return format_json_response({
+                "status": "success",
+                "message": f"Created subsystem '{name}' in project {project_id}",
+                "subsystem": result
+            })
+
+        except Exception as e:
+            logger.exception(f"Error creating subsystem {name} in project {project_id}")
+            return format_json_response({"error": str(e)})
+
+    @sync_wrapper
+    def create_version(self, project_id: str, name: str, description: str = "", released: bool = False) -> str:
+        """
+        Create a version for a project.
+
+        FORMAT: create_version(project_id="DEMO", name="v1.0.0", description="First release")
+
+        Args:
+            project_id: The project identifier (e.g., "DEMO", "0-0")
+            name: The version name
+            description: Optional description
+            released: Whether the version is released (default: False)
+
+        Returns:
+            JSON string with created version information
+        """
+        try:
+            if not project_id or not name:
+                return format_json_response({
+                    "error": "Project ID and version name are required"
+                })
+
+            data = {
+                "name": name,
+                "description": description,
+                "released": released
+            }
+
+            result = self.client.post(f"admin/projects/{project_id}/versions", data=data)
+            return format_json_response({
+                "status": "success",
+                "message": f"Created version '{name}' in project {project_id}",
+                "version": result
+            })
+
+        except Exception as e:
+            logger.exception(f"Error creating version {name} in project {project_id}")
+            return format_json_response({"error": str(e)})
+
+    @sync_wrapper
+    def create_build(self, project_id: str, name: str, description: str = "") -> str:
+        """
+        Create a build for a project.
+
+        FORMAT: create_build(project_id="DEMO", name="build-123", description="Nightly build")
+
+        Args:
+            project_id: The project identifier (e.g., "DEMO", "0-0")
+            name: The build name
+            description: Optional description
+
+        Returns:
+            JSON string with created build information
+        """
+        try:
+            if not project_id or not name:
+                return format_json_response({
+                    "error": "Project ID and build name are required"
+                })
+
+            data = {
+                "name": name,
+                "description": description
+            }
+
+            result = self.client.post(f"admin/projects/{project_id}/builds", data=data)
+            return format_json_response({
+                "status": "success",
+                "message": f"Created build '{name}' in project {project_id}",
+                "build": result
+            })
+
+        except Exception as e:
+            logger.exception(f"Error creating build {name} in project {project_id}")
+            return format_json_response({"error": str(e)})
+
     def close(self) -> None:
         """Close the API client."""
         self.client.close()
@@ -646,6 +759,31 @@ class ProjectTools:
                     "project_id": "Project identifier like 'DEMO' or '0-0'",
                     "field_name": "Custom field name like 'Priority' or 'Assignee'",
                     "field_value": "Value to validate against field constraints"
+                },
+            },
+            "create_subsystem": {
+                "description": 'Create a subsystem for a project to enable subsystem custom fields. Example: create_subsystem(project_id="DEMO", name="Backend", description="Backend components")',
+                "parameter_descriptions": {
+                    "project_id": "Project identifier like 'DEMO' or '0-0'",
+                    "name": "Subsystem name like 'Backend' or 'Frontend'",
+                    "description": "Optional description of the subsystem"
+                },
+            },
+            "create_version": {
+                "description": 'Create a version for a project to enable version custom fields. Example: create_version(project_id="DEMO", name="v1.0.0", description="First release")',
+                "parameter_descriptions": {
+                    "project_id": "Project identifier like 'DEMO' or '0-0'",
+                    "name": "Version name like 'v1.0.0' or '2024.1'",
+                    "description": "Optional description of the version",
+                    "released": "Whether the version is released (default: False)"
+                },
+            },
+            "create_build": {
+                "description": 'Create a build for a project to enable build custom fields. Example: create_build(project_id="DEMO", name="build-123", description="Nightly build")',
+                "parameter_descriptions": {
+                    "project_id": "Project identifier like 'DEMO' or '0-0'",
+                    "name": "Build name like 'build-123' or 'release-1.0'",
+                    "description": "Optional description of the build"
                 },
             },
         }

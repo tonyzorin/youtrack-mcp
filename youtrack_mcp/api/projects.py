@@ -573,7 +573,24 @@ class ProjectsClient:
                     ]
                 except Exception as e:
                     logger.error(f"Error getting subsystems: {str(e)}")
-                    return []
+                    # Return comprehensive guidance instead of empty array
+                    return [
+                        {
+                            "name": "__CONFIGURATION_NEEDED__",
+                            "description": f"No subsystems configured for project {project_id}. To enable subsystem custom fields:",
+                            "id": "config-required",
+                            "type": "guidance",
+                            "action": "create_subsystems",
+                            "steps": [
+                                "1. Go to YouTrack project settings",
+                                "2. Navigate to 'Subsystems' section", 
+                                "3. Click 'New Subsystem'",
+                                "4. Enter subsystem name and description",
+                                "5. Save to enable subsystem custom fields"
+                            ],
+                            "alternative": "Use the create_subsystem() MCP tool if you have admin permissions"
+                        }
+                    ]
             
             elif value_type == "version":
                 try:
@@ -592,7 +609,33 @@ class ProjectsClient:
                     ]
                 except Exception as e:
                     logger.error(f"Error getting versions: {str(e)}")
-                    return []
+                    # Return comprehensive guidance instead of empty array
+                    return [
+                        {
+                            "name": "__CONFIGURATION_NEEDED__",
+                            "description": f"No versions configured for project {project_id}. To enable version custom fields:",
+                            "id": "config-required",
+                            "type": "guidance",
+                            "action": "create_versions",
+                            "steps": [
+                                "1. Go to YouTrack project settings",
+                                "2. Navigate to 'Versions' section",
+                                "3. Click 'New Version'", 
+                                "4. Enter version name (e.g., 'v1.0.0')",
+                                "5. Set release status and dates",
+                                "6. Save to enable version custom fields"
+                            ],
+                            "alternative": "Use the create_version() MCP tool if you have admin permissions",
+                            "examples": ["v1.0.0", "2024.1", "Sprint-1", "Release-Jan-2024"]
+                        },
+                        {
+                            "name": "__FALLBACK_OPTION__",
+                            "description": "Alternative: Use text fields or comments to track version information until versions are configured",
+                            "id": "fallback-text",
+                            "type": "workaround",
+                            "suggested_approach": "Use description field or comments to mention version information"
+                        }
+                    ]
             
             elif value_type == "build":
                 try:
@@ -609,7 +652,26 @@ class ProjectsClient:
                     ]
                 except Exception as e:
                     logger.error(f"Error getting builds: {str(e)}")
-                    return []
+                    # Return comprehensive guidance instead of empty array
+                    return [
+                        {
+                            "name": "__CONFIGURATION_NEEDED__",
+                            "description": f"No builds configured for project {project_id}. To enable build custom fields:",
+                            "id": "config-required", 
+                            "type": "guidance",
+                            "action": "create_builds",
+                            "steps": [
+                                "1. Go to YouTrack project settings",
+                                "2. Navigate to 'Builds' section",
+                                "3. Click 'New Build'",
+                                "4. Enter build name (e.g., 'build-123')",
+                                "5. Add description and metadata",
+                                "6. Save to enable build custom fields"
+                            ],
+                            "alternative": "Use the create_build() MCP tool if you have admin permissions",
+                            "examples": ["build-123", "nightly-2024-01-15", "release-1.0", "hotfix-001"]
+                        }
+                    ]
             
             else:
                 logger.info(f"Field '{field_name}' type '{value_type}' doesn't support allowed values")
