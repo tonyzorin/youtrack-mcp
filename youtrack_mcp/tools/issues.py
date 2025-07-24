@@ -371,6 +371,13 @@ class IssueTools:
                     "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'"
                 }
             },
+            "update_issue_state": {
+                "description": "Update an issue's state using the proven working REST API approach. Optimized for reliable state transitions like 'Submitted → In Progress'. Example: update_issue_state(issue_id='DEMO-123', new_state='In Progress')",
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'",
+                    "new_state": "Target state name like 'In Progress', 'Fixed', 'Open', 'Closed'"
+                }
+            },
         }
 
     @sync_wrapper
@@ -1077,4 +1084,91 @@ class IssueTools:
                     "Check user permissions for the issue",
                     "Ensure proper authentication token"
                 ]
+            })
+
+    @sync_wrapper
+    def update_issue_state(self, issue_id: str, new_state: str) -> str:
+        """
+        Update an issue's state using the proven working REST API approach.
+        
+        This function uses the Direct Field Update API method that was successfully 
+        tested and proven to work with state transitions like "Submitted → In Progress".
+        
+        FORMAT: update_issue_state(issue_id="DEMO-123", new_state="In Progress")
+        
+        Args:
+            issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
+            new_state: The target state name (e.g., "In Progress", "Fixed", "Open")
+            
+        Returns:
+            JSON string with the updated issue information
+        """
+        try:
+            if not issue_id or not new_state:
+                return format_json_response({
+                    "error": "Both issue ID and new state are required"
+                })
+            
+            logger.info(f"Updating issue {issue_id} state to '{new_state}' using proven Direct Field Update API")
+            
+            # Use the proven Direct Field Update API approach
+            success = self.issues_api._apply_direct_state_update(issue_id, new_state)
+            
+            if success:
+                # Get the updated issue to return current state
+                updated_issue = self.issues_api.get_issue(issue_id)
+                
+                return format_json_response({
+                    "status": "success",
+                    "message": f"Successfully updated issue {issue_id} state to '{new_state}'",
+                    "issue_id": issue_id,
+                    "new_state": new_state,
+                    "api_method": "Direct Field Update API",
+                    "issue_data": updated_issue
+                })
+            else:
+                # If direct method fails, try command-based approach as fallback
+                logger.info(f"Direct API failed, trying command-based approach for issue {issue_id}")
+                
+                try:
+                    command_data = {
+                        "query": f"State \"{new_state}\"",
+                        "issues": [{"id": issue_id}]
+                    }
+                    
+                    self.issues_api.client.post("commands", data=command_data)
+                    
+                    # Get the updated issue
+                    updated_issue = self.issues_api.get_issue(issue_id)
+                    
+                    return format_json_response({
+                        "status": "success",
+                        "message": f"Successfully updated issue {issue_id} state to '{new_state}' using fallback method",
+                        "issue_id": issue_id,
+                        "new_state": new_state,
+                        "api_method": "Commands API (fallback)",
+                        "issue_data": updated_issue
+                    })
+                    
+                except Exception as cmd_error:
+                    return format_json_response({
+                        "error": f"State transition failed with both methods: {str(cmd_error)}",
+                        "issue_id": issue_id,
+                        "target_state": new_state,
+                        "troubleshooting": [
+                            "Check if the target state exists in your YouTrack project",
+                            "Verify you have permissions to change issue states",
+                            "Some transitions may be blocked by workflow rules",
+                            "Try using diagnose_workflow_restrictions() to analyze restrictions"
+                        ],
+                        "workflow_help": f"Use diagnose_workflow_restrictions('{issue_id}') for detailed analysis"
+                    })
+                
+        except Exception as e:
+            logger.exception(f"Error updating state for issue {issue_id}")
+            return format_json_response({
+                "error": str(e),
+                "issue_id": issue_id,
+                "target_state": new_state,
+                "suggestion": "Check issue ID format and verify it exists in YouTrack"
             })
