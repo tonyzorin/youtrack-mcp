@@ -154,10 +154,12 @@ class TestCustomFieldUpdateFixes:
         custom_fields = kwargs['data']['customFields']
         assert len(custom_fields) == 2
         
-        # Priority field should be simple value (no bundle found in mock)
+        # Priority field should be enhanced enum object (fallback when no ID found)
         priority_field = next(f for f in custom_fields if f['name'] == 'Priority')
         assert priority_field['$type'] == 'SingleEnumIssueCustomField'
-        assert priority_field['value'] == 'High'
+        assert isinstance(priority_field['value'], dict)
+        assert priority_field['value']['$type'] == 'EnumBundleElement'
+        assert priority_field['value']['name'] == 'High'
         
         # Assignee field should be enhanced User object
         assignee_field = next(f for f in custom_fields if f['name'] == 'Assignee')  
