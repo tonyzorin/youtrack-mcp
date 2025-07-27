@@ -515,7 +515,11 @@ class IssuesClient:
         try:
             # Get project ID to fetch field schemas
             issue_data = self.get_issue(issue_id)
-            project_id = issue_data.get("project", {}).get("id")
+            
+            # Extract project ID from Issue object (project is a dict)
+            project_id = None
+            if hasattr(issue_data, 'project') and issue_data.project:
+                project_id = issue_data.project.get('id')
             
             if not project_id:
                 raise YouTrackAPIError("Could not determine project ID for custom field schema lookup")
