@@ -18,6 +18,7 @@ __all__ = [
     "Diagnostics",
     "CustomFields",
     "BasicOperations",
+    "Linking",
 ]
 
 # Import the completed modules
@@ -26,6 +27,7 @@ try:
     from .diagnostics import Diagnostics
     from .custom_fields import CustomFields
     from .basic_operations import BasicOperations
+    from .linking import Linking
 except ImportError:
     # During development, modules might not be ready yet
     pass 

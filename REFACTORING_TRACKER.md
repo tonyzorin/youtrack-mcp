@@ -21,11 +21,11 @@ youtrack_mcp/tools/issues/
 
 ## 📋 **Function Inventory & Refactoring Status**
 
-### **✅ COMPLETED: 17/28 functions**
+### **✅ COMPLETED: 24/28 functions**
 
 ### **🔄 IN PROGRESS: 0/28 functions**
 
-### **⏳ PENDING: 11/28 functions**
+### **⏳ PENDING: 4/28 functions**
 
 #### **dedicated_updates.py (5 functions) - ✅ COMPLETED + TESTED**
 - [x] `update_issue_state` - State transitions (newly enhanced) ✅ 
@@ -93,24 +93,32 @@ youtrack_mcp/tools/issues/
 - Project lookup and detailed issue retrieval
 - Tool definitions validation
 
-#### **linking.py (8 functions)**
-- [ ] `link_issues` - Generic issue linking
-- [ ] `get_issue_links` - Get all issue relationships
-- [ ] `get_available_link_types` - Get available link types
-- [ ] `add_dependency` - Create dependencies  
-- [ ] `remove_dependency` - Remove dependencies
-- [ ] `add_relates_link` - Add "relates" relationships
-- [ ] `add_duplicate_link` - Mark as duplicate
-- [ ] `get_available_link_types` - Available link types
+#### **linking.py (7 functions) - ✅ COMPLETED + TESTED**
+- [x] `link_issues` - Generic issue linking ✅
+- [x] `get_issue_links` - Get all issue relationships ✅
+- [x] `get_available_link_types` - Get available link types ✅
+- [x] `add_dependency` - Create dependencies ✅
+- [x] `remove_dependency` - Remove dependencies ✅
+- [x] `add_relates_link` - Add "relates" relationships ✅
+- [x] `add_duplicate_link` - Mark as duplicate ✅
+
+**✅ Includes comprehensive tests covering:**
+- Generic issue linking with various link types
+- Issue dependency management (depends on/blocks relationships)
+- Specialized relationship creation (relates, duplicates)
+- Link retrieval and available link types discovery
+- Dependency removal with command-based operations
+- Parametrized testing with multiple link types
+- Non-dict response handling for command operations
+- Tool definitions validation for all 7 functions
 
 #### **attachments.py (2 functions)**
 - [ ] `get_issue_raw` - Raw issue data
 - [ ] `get_attachment_content` - File attachments as base64
 
-#### **Utility Methods (3 functions)**
+#### **Utility Methods (2 functions)**
 - [ ] `get_tool_definitions` - Tool configuration
-- [ ] `close` - Cleanup method  
-- [ ] `__init__` - Initialization
+- [ ] `close` - Cleanup method
 
 ## 🧪 **Testing Strategy**
 
