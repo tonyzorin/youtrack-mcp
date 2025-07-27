@@ -280,8 +280,19 @@ def handle_signal(signum: int, frame) -> None:
         signum: Signal number
         frame: Current stack frame
     """
-    logging.info(f"Received signal {signum}, shutting down...")
-    sys.exit(0)
+    logger.info(f"Received signal {signum}, shutting down...")
+    
+    # Close server gracefully if it exists
+    global server
+    if server:
+        try:
+            server.close()
+        except Exception as e:
+            logger.warning(f"Error closing server: {e}")
+    
+    # Force exit to ensure container stops
+    logger.info("Forcing process termination...")
+    os._exit(0)
 
 def main():
     """Run the MCP server."""
@@ -312,6 +323,7 @@ def main():
         uvicorn.run(app, host=args.host, port=8000, log_level=args.log_level.lower())
     else:
         # Initialize MCP server with stdio transport
+        global server
         server = YouTrackMCPServer(transport="stdio")
         
         # Load all tools just once

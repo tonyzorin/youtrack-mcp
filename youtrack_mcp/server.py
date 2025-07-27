@@ -948,4 +948,8 @@ class YouTrackMCPServer:
     def stop(self) -> None:
         """Stop the MCP server."""
         logger.info("Stopping YouTrack MCP server")
+    
+    def close(self) -> None:
+        """Close the MCP server (alias for stop)."""
+        self.stop()
         # Server automatically stops when run() completes
