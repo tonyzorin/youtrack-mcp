@@ -21,11 +21,11 @@ youtrack_mcp/tools/issues/
 
 ## 📋 **Function Inventory & Refactoring Status**
 
-### **✅ COMPLETED: 12/28 functions**
+### **✅ COMPLETED: 17/28 functions**
 
 ### **🔄 IN PROGRESS: 0/28 functions**
 
-### **⏳ PENDING: 16/28 functions**
+### **⏳ PENDING: 11/28 functions**
 
 #### **dedicated_updates.py (5 functions) - ✅ COMPLETED + TESTED**
 - [x] `update_issue_state` - State transitions (newly enhanced) ✅ 
@@ -75,12 +75,23 @@ youtrack_mcp/tools/issues/
 - Model dump response handling
 - Tool definitions validation
 
-#### **basic_operations.py (5 functions)**
-- [ ] `get_issue` - Get issue information
-- [ ] `search_issues` - Search with YouTrack query language  
-- [ ] `create_issue` - Create new issues
-- [ ] `update_issue` - Update issue summary/description
-- [ ] `add_comment` - Add comments to issues
+#### **basic_operations.py (5 functions) - ✅ COMPLETED + TESTED**
+- [x] `get_issue` - Get issue information ✅
+- [x] `search_issues` - Search with YouTrack query language ✅
+- [x] `create_issue` - Create new issues ✅
+- [x] `update_issue` - Update issue summary/description ✅
+- [x] `add_comment` - Add comments to issues ✅
+
+**✅ Includes comprehensive tests covering:**
+- Issue retrieval with comprehensive field data
+- Issue search with YouTrack query language support
+- Issue creation with project validation (name/ID conversion)
+- Issue updates with flexible parameter handling
+- Comment addition with proper error handling
+- Missing parameter validation for all functions
+- API error handling with detailed feedback
+- Project lookup and detailed issue retrieval
+- Tool definitions validation
 
 #### **linking.py (8 functions)**
 - [ ] `link_issues` - Generic issue linking
