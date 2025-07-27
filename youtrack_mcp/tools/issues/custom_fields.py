@@ -312,9 +312,11 @@ class CustomFields:
                 }
             },
             "batch_update_custom_fields": {
-                "description": "Update custom fields for multiple issues in a single operation. Each update should specify issue_id and fields dictionary. Example: batch_update_custom_fields([{'issue_id': 'DEMO-123', 'fields': {'Priority': 'High'}}])",
+                "description": "Update custom fields for multiple issues in a single operation. Supports two formats: 1) List format with update dictionaries, 2) Bulk format with issue list and common fields. Examples: batch_update_custom_fields([{'issue_id': 'DEMO-123', 'fields': {'Priority': 'High'}}]) or batch_update_custom_fields(issues=['DEMO-123', 'DEMO-124'], custom_fields={'Priority': 'High'})",
                 "parameter_descriptions": {
-                    "updates": "List of update dictionaries with issue_id and fields keys"
+                    "issues": "List of issue IDs (for bulk format) - optional",
+                    "custom_fields": "Dictionary of fields to apply to all issues (for bulk format) - optional", 
+                    "updates": "List of update dictionaries with 'issue_id' and 'fields' keys (for list format) - optional"
                 }
             },
             "get_custom_fields": {

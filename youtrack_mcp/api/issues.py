@@ -575,13 +575,21 @@ class IssuesClient:
                     }
                 else:
                     # Enhanced approach with proper YouTrack objects and actual IDs
-                    if field_name.lower() in ['state']:
+                    # BUT: Keep Estimation simple to avoid regressions
+                    if field_name.lower() in ['estimation']:
+                        # Keep Estimation simple - it was working before
+                        field_data = {
+                            "$type": "PeriodIssueCustomField",
+                            "name": field_name,
+                            "value": field_value  # Simple string: "4h", "30m", etc.
+                        }
+                    elif field_name.lower() in ['state']:
                         field_data = self._create_state_field_object(project_id, field_name, field_value)
                     elif field_name.lower() in ['priority', 'type']:
                         field_data = self._create_enum_field_object(project_id, field_name, field_value)
                     elif field_name.lower() in ['assignee', 'reporter']:
                         field_data = self._create_user_field_object(field_name, field_value)
-                    elif field_name.lower() in ['estimation', 'spent time']:
+                    elif field_name.lower() in ['spent time']:
                         field_data = self._create_period_field_object(field_name, field_value)
                     else:
                         # Default to enum for unknown fields

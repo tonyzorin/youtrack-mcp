@@ -94,9 +94,18 @@ class IssueTools:
         """Update multiple custom fields on an issue."""
         return self.custom_fields.update_custom_fields(issue_id, custom_fields, validate)
     
-    def batch_update_custom_fields(self, updates: List[Dict[str, Any]]) -> str:
-        """Batch update custom fields across multiple issues."""
-        return self.custom_fields.batch_update_custom_fields(updates)
+    def batch_update_custom_fields(
+        self, 
+        issues: List[str] = None,
+        custom_fields: Dict[str, Any] = None,
+        updates: List[Dict[str, Any]] = None
+    ) -> str:
+        """Batch update custom fields across multiple issues with flexible formats."""
+        return self.custom_fields.batch_update_custom_fields(
+            issues=issues,
+            custom_fields=custom_fields, 
+            updates=updates
+        )
     
     def get_custom_fields(self, issue_id: str) -> str:
         """Get all custom fields for an issue."""
