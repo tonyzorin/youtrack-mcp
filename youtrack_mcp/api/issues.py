@@ -327,8 +327,8 @@ class IssuesClient:
                 field_name, target_state = state_field_update
                 success = self._handle_state_transition(issue_id, target_state, use_commands)
                 
+                # Only try command-based fallback if we haven't already tried it
                 if not success and not use_commands:
-                    # Fallback: try command-based approach (most reliable per analysis)
                     logger.info(f"Direct state update failed, trying command-based approach for issue {issue_id}")
                     success = self._handle_state_transition(issue_id, target_state, use_commands=True)
                 
@@ -346,19 +346,19 @@ class IssuesClient:
             logger.exception(f"Error updating custom fields for issue {issue_id}")
             raise YouTrackAPIError(f"Failed to update custom fields: {str(e)}")
     
-    def _handle_state_transition(self, issue_id: str, target_state: str, use_commands: bool = True) -> bool:
+    def _handle_state_transition(self, issue_id: str, target_state: str, use_commands: bool = False) -> bool:
         """
-        Handle state transitions with proven working approach for this YouTrack instance.
+        Handle state transitions using multiple approaches based on YouTrack configuration.
         
-        Based on successful testing, this method prioritizes:
-        1. Direct Field Update API (proven to work for state transitions)
-        2. Command-based approach as fallback
+        This method tries different approaches in order:
+        1. Direct Field Update API (works for some fields, may fail due to workflow restrictions)
+        2. Command-based approach (more reliable but can be blocked by permissions)
         3. Event-based transitions for state machine workflows
         
         Args:
             issue_id: The issue identifier
             target_state: Target state name
-            use_commands: Whether to try command-based approach as fallback
+            use_commands: Whether to prioritize command-based approach
             
         Returns:
             True if transition succeeded, False otherwise
@@ -590,6 +590,7 @@ class IssuesClient:
                     update_data["customFields"].append(field_data)
             
             logger.info(f"Updating custom fields for issue {issue_id} using proper YouTrack objects")
+            logger.info(f"Update payload: {json.dumps(update_data, indent=2)}")
             self.client.post(f"issues/{issue_id}", data=update_data)
             logger.info(f"Direct field update succeeded for issue {issue_id}")
             
@@ -606,8 +607,23 @@ class IssuesClient:
                 except Exception as cmd_error:
                     logger.warning(f"Command-based approach also failed: {cmd_error}")
             
-            # If both direct and command approaches fail, raise the original error
-            raise YouTrackAPIError(f"Direct field update failed: {direct_error}")
+            # If both direct and command approaches fail, raise the original error with full details
+            error_msg = f"Direct field update failed"
+            if hasattr(direct_error, 'response') and hasattr(direct_error.response, 'json'):
+                try:
+                    error_details = direct_error.response.json()
+                    if 'error_description' in error_details:
+                        error_msg += f": {error_details['error_description']}"
+                    elif 'error' in error_details:
+                        error_msg += f": {error_details['error']}"
+                    else:
+                        error_msg += f": {str(direct_error)}"
+                except:
+                    error_msg += f": {str(direct_error)}"
+            else:
+                error_msg += f": {str(direct_error)}"
+            
+            raise YouTrackAPIError(error_msg)
 
     def _create_enum_field_object(self, project_id: str, field_name: str, field_value: str) -> Dict[str, Any]:
         """Create proper EnumBundleElement object with actual ID."""
@@ -697,13 +713,13 @@ class IssuesClient:
             users_client = UsersClient(self.client)
             user_data = users_client.get_user(field_value)
             
-            if user_data and user_data.get('id'):
+            if user_data and hasattr(user_data, 'id') and user_data.id:
                 return {
                     "$type": "SingleUserIssueCustomField",
                     "name": field_name,
                     "value": {
                         "$type": "User",
-                        "id": user_data['id'],
+                        "id": user_data.id,
                         "login": field_value
                     }
                 }
