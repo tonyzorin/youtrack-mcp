@@ -143,15 +143,28 @@ class TestCustomFieldUpdateFixes:
         result = issues_client.update_issue_custom_fields("DEMO-123", custom_fields, validate=False)
         
         # Verify direct field update API was called with correct format (new implementation)
-        mock_client.post.assert_called_with(
-            "issues/DEMO-123",
-            data={
-                "customFields": [
-                    {"$type": "SingleEnumIssueCustomField", "name": "Priority", "value": "High"},
-                    {"$type": "SingleUserIssueCustomField", "name": "Assignee", "value": "john.doe"}
-                ]
-            }
-        )
+        # Verify the correct API call was made
+        mock_client.post.assert_called_once()
+        args, kwargs = mock_client.post.call_args
+        
+        # Check the endpoint
+        assert args[0] == "issues/DEMO-123"
+        
+        # Check the custom fields structure (enhanced objects)
+        custom_fields = kwargs['data']['customFields']
+        assert len(custom_fields) == 2
+        
+        # Priority field should be simple value (no bundle found in mock)
+        priority_field = next(f for f in custom_fields if f['name'] == 'Priority')
+        assert priority_field['$type'] == 'SingleEnumIssueCustomField'
+        assert priority_field['value'] == 'High'
+        
+        # Assignee field should be enhanced User object
+        assignee_field = next(f for f in custom_fields if f['name'] == 'Assignee')  
+        assert assignee_field['$type'] == 'SingleUserIssueCustomField'
+        assert isinstance(assignee_field['value'], dict)
+        assert assignee_field['value']['$type'] == 'User'
+        assert assignee_field['value']['login'] == 'john.doe'
         
         # Verify get_issue was called to return updated issue
         mock_client.get.assert_called()
