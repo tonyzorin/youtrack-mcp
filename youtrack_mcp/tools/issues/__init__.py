@@ -20,6 +20,7 @@ __all__ = [
     "BasicOperations",
     "Linking",
     "Attachments",
+    "Utilities",
 ]
 
 # Import the completed modules
@@ -30,6 +31,7 @@ try:
     from .basic_operations import BasicOperations
     from .linking import Linking
     from .attachments import Attachments
+    from .utilities import Utilities
 except ImportError:
     # During development, modules might not be ready yet
     pass 
