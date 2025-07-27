@@ -116,7 +116,8 @@ class TestDedicatedUpdates:
         }
         
         self.mock_issues_api._apply_direct_state_update.return_value = False
-        self.mock_issues_api.client.post.side_effect = YouTrackAPIError("assignee required")
+        # Use "Failed to transition" to trigger the workflow restriction detection
+        self.mock_issues_api.client.post.side_effect = YouTrackAPIError("Failed to transition: assignee required")
         self.mock_issues_api.get_issue.return_value = current_issue
         
         # Act
