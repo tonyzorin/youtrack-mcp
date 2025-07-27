@@ -656,18 +656,26 @@ class IssuesClient:
                     }
                 }
             else:
-                logger.warning(f"Could not find ID for enum value '{field_value}' in field '{field_name}', using simple value")
+                logger.warning(f"Could not find ID for enum value '{field_value}' in field '{field_name}', trying simple enum object")
+                # Try simple enum object format if ID lookup fails
                 return {
                     "$type": "SingleEnumIssueCustomField",
                     "name": field_name,
-                    "value": field_value
+                    "value": {
+                        "$type": "EnumBundleElement",
+                        "name": field_value
+                    }
                 }
         except Exception as e:
-            logger.warning(f"Error creating enum field object for '{field_name}': {e}, using simple value")
+            logger.warning(f"Error creating enum field object for '{field_name}': {e}, trying simple enum object")
+            # Fallback to simple enum object (no ID)
             return {
                 "$type": "SingleEnumIssueCustomField",
                 "name": field_name,
-                "value": field_value
+                "value": {
+                    "$type": "EnumBundleElement",
+                    "name": field_value
+                }
             }
 
     def _create_state_field_object(self, project_id: str, field_name: str, field_value: str) -> Dict[str, Any]:

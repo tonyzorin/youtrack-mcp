@@ -150,8 +150,19 @@ class CustomFields:
                     "final_updates": final_updates
                 })
 
+            # Normalize parameter names: custom_fields -> fields
+            normalized_updates = []
+            for update in final_updates:
+                normalized_update = update.copy()
+                # Handle both 'fields' and 'custom_fields' parameter names
+                if 'custom_fields' in normalized_update and 'fields' not in normalized_update:
+                    normalized_update['fields'] = normalized_update.pop('custom_fields')
+                normalized_updates.append(normalized_update)
+            
+            logger.info(f"Normalized {len(final_updates)} updates for batch processing")
+            
             # Process batch updates
-            results = self.issues_api.batch_update_custom_fields(final_updates)
+            results = self.issues_api.batch_update_custom_fields(normalized_updates)
 
             # Summarize results
             success_count = len([r for r in results if r.get("status") == "success"])
