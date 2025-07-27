@@ -5,6 +5,10 @@ import json
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
+# Skip this entire file - these tests are for the old monolithic IssueTools
+# New modular tests are in tests/unit/tools/issues/
+pytestmark = pytest.mark.skip(reason="Replaced by modular tests in tests/unit/tools/issues/")
+
 from youtrack_mcp.tools.issues import IssueTools
 from youtrack_mcp.api.client import YouTrackAPIError
 

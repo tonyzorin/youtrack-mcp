@@ -112,10 +112,16 @@ class TestAPIIntegration:
             "summary": "Test Issue"
         }
         
-        # Mock get_issue calls (used multiple times in the new implementation)
+        # Mock all get_issue calls and schema lookups for enhanced object creation
         mock_client.get.side_effect = [
-            {"id": "3-47", "idReadable": "DEMO-47", "project": {"id": "0-0"}},  # Initial get for state detection
-            {"id": "3-47", "idReadable": "DEMO-47", "project": {"id": "0-0"}}   # Final get for return value
+            # First: get_issue for state detection (in update_issue_custom_fields)
+            {"id": "3-47", "idReadable": "DEMO-47", "project": {"id": "0-0", "shortName": "DEMO"}},
+            # Second: get_issue for project ID extraction (in _update_other_custom_fields) 
+            {"id": "3-47", "idReadable": "DEMO-47", "project": {"id": "0-0", "shortName": "DEMO"}},
+            # Third: get_custom_fields_schemas call (for enhanced object creation)
+            [],  # Empty schemas (will trigger fallback to simple approach)
+            # Fourth: final get_issue for return value
+            {"id": "3-47", "idReadable": "DEMO-47", "project": {"id": "0-0", "shortName": "DEMO"}}
         ]
         
         # Mock custom field update call
@@ -138,4 +144,4 @@ class TestAPIIntegration:
         # Verify API calls were made correctly
         mock_client.session.post.assert_called_once()  # Issue creation
         mock_client.post.assert_called_once()  # Custom field update via direct API
-        assert mock_client.get.call_count == 2  # Called for state detection and return value 
+        assert mock_client.get.call_count >= 3  # Enhanced object creation makes additional calls for schema lookups 

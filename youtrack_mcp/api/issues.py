@@ -513,33 +513,83 @@ class IssuesClient:
         """
         # Method 1: Direct field update approach (primary method)
         try:
-            # YouTrack explicitly requires $type fields for custom field updates
-            # Use minimal $type with simple values based on field names
+            # Always get issue data to extract project ID for schema lookups
+            issue_data = self.get_issue(issue_id)
+            
+            # Validate fields if requested
+            if validate:
+                project_id = None
+                if hasattr(issue_data, 'project') and issue_data.project:
+                    if isinstance(issue_data.project, dict):
+                        project_id = issue_data.project.get('id')
+                    else:
+                        project_id = getattr(issue_data.project, 'id', None)
+                
+                if project_id:
+                    for field_name, field_value in custom_fields.items():
+                        is_valid = self._validate_custom_field_value(project_id, field_name, field_value)
+                        if not is_valid:
+                            raise YouTrackAPIError(f"Custom field validation failed for '{field_name}': '{field_value}' is not a valid value")
+                else:
+                    logger.warning("Could not get project ID for validation, skipping validation")
+            
+            # YouTrack requires proper object types with actual IDs for custom field updates
+            # Try to get project ID for schema lookups (optional for enhanced object creation)
+            project_id = None
+            
+            if hasattr(issue_data, 'project') and issue_data.project:
+                if isinstance(issue_data.project, dict):
+                    project_id = issue_data.project.get('id')
+                else:
+                    project_id = getattr(issue_data.project, 'id', None)
+            
+            # If we can't get project ID, fall back to simple $type approach
+            if not project_id:
+                logger.warning("Could not determine project ID for enhanced object creation, using simple $type approach")
+                use_simple_approach = True
+            else:
+                use_simple_approach = False
             
             update_data = {"customFields": []}
             
             for field_name, field_value in custom_fields.items():
-                # Determine minimal $type based on common field names
-                if field_name.lower() in ['state']:
-                    field_type = "StateIssueCustomField"
-                elif field_name.lower() in ['priority', 'type']:
-                    field_type = "SingleEnumIssueCustomField"
-                elif field_name.lower() in ['assignee', 'reporter']:
-                    field_type = "SingleUserIssueCustomField"
-                elif field_name.lower() in ['estimation', 'spent time']:
-                    field_type = "PeriodIssueCustomField"
+                # Determine field type and construct proper object with actual ID
+                if use_simple_approach:
+                    # Fallback to simple $type approach when project ID is not available
+                    if field_name.lower() in ['state']:
+                        field_type = "StateIssueCustomField"
+                    elif field_name.lower() in ['priority', 'type']:
+                        field_type = "SingleEnumIssueCustomField"
+                    elif field_name.lower() in ['assignee', 'reporter']:
+                        field_type = "SingleUserIssueCustomField"
+                    elif field_name.lower() in ['estimation', 'spent time']:
+                        field_type = "PeriodIssueCustomField"
+                    else:
+                        field_type = "SingleEnumIssueCustomField"
+                    
+                    field_data = {
+                        "$type": field_type,
+                        "name": field_name,
+                        "value": field_value
+                    }
                 else:
-                    # Default to enum for unknown fields
-                    field_type = "SingleEnumIssueCustomField"
+                    # Enhanced approach with proper YouTrack objects and actual IDs
+                    if field_name.lower() in ['state']:
+                        field_data = self._create_state_field_object(project_id, field_name, field_value)
+                    elif field_name.lower() in ['priority', 'type']:
+                        field_data = self._create_enum_field_object(project_id, field_name, field_value)
+                    elif field_name.lower() in ['assignee', 'reporter']:
+                        field_data = self._create_user_field_object(field_name, field_value)
+                    elif field_name.lower() in ['estimation', 'spent time']:
+                        field_data = self._create_period_field_object(field_name, field_value)
+                    else:
+                        # Default to enum for unknown fields
+                        field_data = self._create_enum_field_object(project_id, field_name, field_value)
                 
-                field_data = {
-                    "$type": field_type,
-                    "name": field_name,
-                    "value": field_value  # Keep values simple
-                }
-                update_data["customFields"].append(field_data)
+                if field_data:
+                    update_data["customFields"].append(field_data)
             
-            logger.info(f"Updating custom fields for issue {issue_id} using minimal $type fields")
+            logger.info(f"Updating custom fields for issue {issue_id} using proper YouTrack objects")
             self.client.post(f"issues/{issue_id}", data=update_data)
             logger.info(f"Direct field update succeeded for issue {issue_id}")
             
@@ -558,6 +608,127 @@ class IssuesClient:
             
             # If both direct and command approaches fail, raise the original error
             raise YouTrackAPIError(f"Direct field update failed: {direct_error}")
+
+    def _create_enum_field_object(self, project_id: str, field_name: str, field_value: str) -> Dict[str, Any]:
+        """Create proper EnumBundleElement object with actual ID."""
+        try:
+            # Get allowed values to find the actual ID
+            from youtrack_mcp.api.projects import ProjectsClient
+            projects_client = ProjectsClient(self.client)
+            allowed_values = projects_client.get_custom_field_allowed_values(project_id, field_name)
+            
+            # Find the matching value by name (case-insensitive)
+            value_id = None
+            for value in allowed_values:
+                if value.get('name', '').lower() == field_value.lower():
+                    value_id = value.get('id')
+                    break
+            
+            if value_id:
+                return {
+                    "$type": "SingleEnumIssueCustomField",
+                    "name": field_name,
+                    "value": {
+                        "$type": "EnumBundleElement",
+                        "id": value_id,
+                        "name": field_value
+                    }
+                }
+            else:
+                logger.warning(f"Could not find ID for enum value '{field_value}' in field '{field_name}', using simple value")
+                return {
+                    "$type": "SingleEnumIssueCustomField",
+                    "name": field_name,
+                    "value": field_value
+                }
+        except Exception as e:
+            logger.warning(f"Error creating enum field object for '{field_name}': {e}, using simple value")
+            return {
+                "$type": "SingleEnumIssueCustomField",
+                "name": field_name,
+                "value": field_value
+            }
+
+    def _create_state_field_object(self, project_id: str, field_name: str, field_value: str) -> Dict[str, Any]:
+        """Create proper StateBundleElement object with actual ID."""
+        try:
+            # Get allowed values to find the actual ID
+            from youtrack_mcp.api.projects import ProjectsClient
+            projects_client = ProjectsClient(self.client)
+            allowed_values = projects_client.get_custom_field_allowed_values(project_id, field_name)
+            
+            # Find the matching state by name (case-insensitive)
+            state_id = None
+            for value in allowed_values:
+                if value.get('name', '').lower() == field_value.lower():
+                    state_id = value.get('id')
+                    break
+            
+            if state_id:
+                return {
+                    "$type": "StateIssueCustomField",
+                    "name": field_name,
+                    "value": {
+                        "$type": "StateBundleElement",
+                        "id": state_id,
+                        "name": field_value
+                    }
+                }
+            else:
+                logger.warning(f"Could not find ID for state value '{field_value}' in field '{field_name}', using simple value")
+                return {
+                    "$type": "StateIssueCustomField",
+                    "name": field_name,
+                    "value": field_value
+                }
+        except Exception as e:
+            logger.warning(f"Error creating state field object for '{field_name}': {e}, using simple value")
+            return {
+                "$type": "StateIssueCustomField",
+                "name": field_name,
+                "value": field_value
+            }
+
+    def _create_user_field_object(self, field_name: str, field_value: str) -> Dict[str, Any]:
+        """Create proper User object with actual ID."""
+        try:
+            # Get user ID by login
+            from youtrack_mcp.api.users import UsersClient
+            users_client = UsersClient(self.client)
+            user_data = users_client.get_user(field_value)
+            
+            if user_data and user_data.get('id'):
+                return {
+                    "$type": "SingleUserIssueCustomField",
+                    "name": field_name,
+                    "value": {
+                        "$type": "User",
+                        "id": user_data['id'],
+                        "login": field_value
+                    }
+                }
+            else:
+                logger.warning(f"Could not find user ID for login '{field_value}', using simple value")
+                return {
+                    "$type": "SingleUserIssueCustomField",
+                    "name": field_name,
+                    "value": field_value
+                }
+        except Exception as e:
+            logger.warning(f"Error creating user field object for '{field_name}': {e}, using simple value")
+            return {
+                "$type": "SingleUserIssueCustomField",
+                "name": field_name,
+                "value": field_value
+            }
+
+    def _create_period_field_object(self, field_name: str, field_value: str) -> Dict[str, Any]:
+        """Create proper period field object."""
+        return {
+            "$type": "PeriodIssueCustomField",
+            "name": field_name,
+            "value": field_value
+        }
 
     def _apply_commands_update(self, issue_id: str, custom_fields: Dict[str, Any]) -> None:
         """

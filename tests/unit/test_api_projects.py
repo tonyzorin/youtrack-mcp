@@ -437,6 +437,8 @@ class TestProjectsCustomFields(unittest.TestCase):
         ]
         
         mock_bundle_data = {
+            "id": "bundle-123",
+            "name": "Priority Bundle",
             "values": [
                 {"name": "High", "description": "High priority", "id": "val-1", "color": {"bg": "#ff0000"}},
                 {"name": "Medium", "description": "Medium priority", "id": "val-2", "color": {"bg": "#ffff00"}},

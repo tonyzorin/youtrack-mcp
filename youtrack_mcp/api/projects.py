@@ -476,7 +476,7 @@ class ProjectsClient:
                                         "name": value.get("name", ""),
                                         "description": value.get("description", ""),
                                         "id": value.get("id"),
-                                        "bundle_name": target_bundle.get('name')
+                                        **{k: v for k, v in value.items() if k not in ["name", "description", "id"]}  # Include any additional fields like color
                                     }
                                     for value in values
                                 ]
@@ -495,7 +495,8 @@ class ProjectsClient:
                         {
                             "name": value.get("name", ""),
                             "description": value.get("description", ""),
-                            "id": value.get("id")
+                            "id": value.get("id"),
+                            **{k: v for k, v in value.items() if k not in ["name", "description", "id"]}  # Include any additional fields like color
                         }
                         for value in values
                     ]

@@ -142,12 +142,14 @@ class TestCustomFieldUpdateFixes:
         custom_fields = {"Priority": "High", "Assignee": "john.doe"}
         result = issues_client.update_issue_custom_fields("DEMO-123", custom_fields, validate=False)
         
-        # Verify Commands API was called with correct format
+        # Verify direct field update API was called with correct format (new implementation)
         mock_client.post.assert_called_with(
-            "commands", 
+            "issues/DEMO-123",
             data={
-                "query": "Priority High Assignee john.doe",
-                "issues": [{"idReadable": "DEMO-123"}]
+                "customFields": [
+                    {"$type": "SingleEnumIssueCustomField", "name": "Priority", "value": "High"},
+                    {"$type": "SingleUserIssueCustomField", "name": "Assignee", "value": "john.doe"}
+                ]
             }
         )
         
@@ -253,9 +255,9 @@ class TestCustomFieldUpdateFixes:
         
         assert values == expected_values
         
-        # Verify the bundle API call
+        # Verify the bundle API call (updated to match current implementation)
         assert mock_client.get.call_count == 2
-        mock_client.get.assert_any_call("admin/customFieldSettings/bundles/enum/enum-bundle-123?fields=values(id,name,description,color)")
+        mock_client.get.assert_any_call("admin/customFieldSettings/bundles/enum/enum-bundle-123?fields=id,name,values(id,name,description)")
 
     def test_get_custom_field_allowed_values_state_bundle(self, projects_client, mock_client):
         """Test getting allowed values for state bundle."""

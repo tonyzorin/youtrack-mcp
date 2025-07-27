@@ -432,16 +432,25 @@ class TestIssuesCustomFields(unittest.TestCase):
         self.issues_client = IssuesClient(self.mock_client)
 
     def test_update_issue_custom_fields_success(self):
-        """Test successful custom field update using Commands API."""
-        # Mock get_issue response for getting updated issue at the end
-        mock_issue = Mock()
-        mock_issue.project = {"id": "0-0"}
-        self.mock_client.get.return_value = mock_issue
+        """Test successful custom field update using direct field API."""
+        # Mock get_issue call (required for current implementation)
+        mock_get_issue_response = {
+            "id": "3-123",
+            "idReadable": "DEMO-123", 
+            "summary": "Test Issue",
+            "project": {"id": "0-0", "shortName": "DEMO"}
+        }
+        
+        # Mock successful update
+        mock_update_response = {"id": "3-123", "summary": "Test Issue"}
+        
+        # Configure client mock for multiple calls
+        self.mock_client.get.return_value = mock_get_issue_response
+        self.mock_client.post.return_value = mock_update_response
 
-        # Mock post response for Commands API
-        self.mock_client.post.return_value = {"success": True}
-
-        # Mock Issue.model_validate for the returned updated issue
+        # Create mock issue for return value
+        mock_issue = Issue(id="3-123", summary="Test Issue")
+        
         with patch('youtrack_mcp.api.issues.Issue') as mock_issue_class:
             mock_issue_class.model_validate.return_value = mock_issue
 
@@ -452,17 +461,100 @@ class TestIssuesCustomFields(unittest.TestCase):
                 validate=False  # Skip validation for this test
             )
 
-            # Verify the Commands API call
+            # Verify direct field update API call (new behavior)
             self.mock_client.post.assert_called_once()
             call_args = self.mock_client.post.call_args
-            self.assertEqual(call_args[0][0], "commands")
+            self.assertEqual(call_args[0][0], "issues/DEMO-123")
             
-            # Check Commands API data structure
+            # Check direct field update data structure
             posted_data = call_args[1]["data"]
-            self.assertIn("query", posted_data)
-            self.assertIn("issues", posted_data)
-            self.assertEqual(posted_data["query"], "Priority High Assignee john.doe")
-            self.assertEqual(posted_data["issues"], [{"idReadable": "DEMO-123"}])
+            self.assertIn("customFields", posted_data)
+            
+            # Verify customFields structure
+            custom_fields = posted_data["customFields"]
+            self.assertEqual(len(custom_fields), 2)
+            
+            # Check that fields have proper structure
+            field_names = [field["name"] for field in custom_fields]
+            self.assertIn("Priority", field_names)
+            self.assertIn("Assignee", field_names)
+            
+            # Check that each field has required properties
+            for field in custom_fields:
+                self.assertIn("$type", field)
+                self.assertIn("name", field)
+                self.assertIn("value", field)
+
+            # Verify the result
+            self.assertEqual(result, mock_issue)
+
+    def test_update_issue_custom_fields_with_enhanced_objects(self):
+        """Test custom field update with enhanced YouTrack objects when project ID is available."""
+        # Create a proper Issue model with project data
+        from youtrack_mcp.api.projects import Project
+        mock_project = Project(id="DEMO", shortName="DEMO", name="Demo Project")
+        mock_issue = Issue(
+            id="3-123", 
+            summary="Test Issue",
+            project={"id": "DEMO", "shortName": "DEMO"}  # This will allow project ID extraction
+        )
+        
+        # Mock get_issue to return the proper Issue model
+        with patch.object(self.issues_client, 'get_issue') as mock_get_issue:
+            mock_get_issue.return_value = mock_issue
+            
+            # Mock the helper methods for enhanced object creation
+            with patch.object(self.issues_client, '_create_enum_field_object') as mock_enum, \
+                 patch.object(self.issues_client, '_create_user_field_object') as mock_user:
+                
+                mock_enum.return_value = {
+                    "$type": "SingleEnumIssueCustomField",
+                    "name": "Priority",
+                    "value": {
+                        "$type": "EnumBundleElement",
+                        "id": "priority-high-id",
+                        "name": "High"
+                    }
+                }
+                
+                mock_user.return_value = {
+                    "$type": "SingleUserIssueCustomField", 
+                    "name": "Assignee",
+                    "value": {
+                        "$type": "User",
+                        "id": "user-123",
+                        "login": "john.doe"
+                    }
+                }
+                
+                # Mock successful API call
+                self.mock_client.post.return_value = {"id": "3-123", "summary": "Test Issue"}
+                
+                # Test enhanced object creation
+                result = self.issues_client.update_issue_custom_fields(
+                    issue_id="DEMO-123",
+                    custom_fields={"Priority": "High", "Assignee": "john.doe"},
+                    validate=False
+                )
+                
+                # Verify enhanced object creation methods were called
+                mock_enum.assert_called_once_with("DEMO", "Priority", "High")
+                mock_user.assert_called_once_with("Assignee", "john.doe")
+                
+                # Verify API was called with enhanced objects
+                self.mock_client.post.assert_called_once()
+                call_args = self.mock_client.post.call_args
+                posted_data = call_args[1]["data"]
+                
+                # Check that enhanced objects were used
+                self.assertIn("customFields", posted_data)
+                self.assertEqual(len(posted_data["customFields"]), 2)
+                
+                # Verify the enhanced object structure
+                priority_field = posted_data["customFields"][0]
+                self.assertEqual(priority_field["$type"], "SingleEnumIssueCustomField")
+                self.assertEqual(priority_field["value"]["$type"], "EnumBundleElement")
+                self.assertEqual(priority_field["value"]["id"], "priority-high-id")
 
     def test_update_issue_custom_fields_empty_fields(self):
         """Test update with empty custom fields returns current issue."""
