@@ -21,11 +21,11 @@ youtrack_mcp/tools/issues/
 
 ## 📋 **Function Inventory & Refactoring Status**
 
-### **✅ COMPLETED: 24/28 functions**
+### **✅ COMPLETED: 26/28 functions**
 
 ### **🔄 IN PROGRESS: 0/28 functions**
 
-### **⏳ PENDING: 4/28 functions**
+### **⏳ PENDING: 2/28 functions**
 
 #### **dedicated_updates.py (5 functions) - ✅ COMPLETED + TESTED**
 - [x] `update_issue_state` - State transitions (newly enhanced) ✅ 
@@ -112,9 +112,21 @@ youtrack_mcp/tools/issues/
 - Non-dict response handling for command operations
 - Tool definitions validation for all 7 functions
 
-#### **attachments.py (2 functions)**
-- [ ] `get_issue_raw` - Raw issue data
-- [ ] `get_attachment_content` - File attachments as base64
+#### **attachments.py (2 functions) - ✅ COMPLETED + TESTED**
+- [x] `get_issue_raw` - Raw issue data access ✅
+- [x] `get_attachment_content` - File attachments as base64 ✅
+
+**✅ Includes comprehensive tests covering:**
+- Raw issue data retrieval bypassing Pydantic models
+- Attachment content access with base64 encoding
+- Comprehensive attachment metadata retrieval (filename, mime type, size)
+- File size analysis and format conversion statistics
+- Error handling for missing attachments or invalid IDs
+- Empty file handling with division by zero protection
+- Special character filename support
+- Large file analysis with size increase calculations
+- JSON parsing validation and API error scenarios
+- Tool definitions validation
 
 #### **Utility Methods (2 functions)**
 - [ ] `get_tool_definitions` - Tool configuration

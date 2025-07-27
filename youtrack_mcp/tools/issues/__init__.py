@@ -19,6 +19,7 @@ __all__ = [
     "CustomFields",
     "BasicOperations",
     "Linking",
+    "Attachments",
 ]
 
 # Import the completed modules
@@ -28,6 +29,7 @@ try:
     from .custom_fields import CustomFields
     from .basic_operations import BasicOperations
     from .linking import Linking
+    from .attachments import Attachments
 except ImportError:
     # During development, modules might not be ready yet
     pass 
