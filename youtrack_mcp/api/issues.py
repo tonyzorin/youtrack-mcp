@@ -513,17 +513,46 @@ class IssuesClient:
         """
         # Method 1: Direct field update approach (primary method)
         try:
-            # Build update data with simple values (proven format)
+            # Get project ID to fetch field schemas
+            issue_data = self.get_issue(issue_id)
+            project_id = issue_data.get("project", {}).get("id")
+            
+            if not project_id:
+                raise YouTrackAPIError("Could not determine project ID for custom field schema lookup")
+            
+            # Get field schemas to determine correct $type for each field
+            from youtrack_mcp.api.projects import ProjectsClient
+            projects_client = ProjectsClient(self.client)
+            field_schemas = projects_client.get_all_custom_fields_schemas(project_id)
+            
+            # Build update data with proper $type fields
             update_data = {"customFields": []}
             
             for field_name, field_value in custom_fields.items():
+                # Find the field schema
+                field_schema = None
+                for schema in field_schemas:
+                    if schema.get("name", "").lower() == field_name.lower():
+                        field_schema = schema
+                        break
+                
+                if not field_schema:
+                    logger.warning(f"Could not find schema for field '{field_name}', using default $type")
+                    field_type = "SingleEnumIssueCustomField"  # Default fallback
+                else:
+                    # Determine the correct $type based on schema
+                    value_type = field_schema.get("valueType", "")
+                    bundle_type = field_schema.get("bundleType", "")
+                    field_type = self._determine_field_type(field_name, value_type, bundle_type)
+                
                 field_data = {
+                    "$type": field_type,
                     "name": field_name,
                     "value": field_value  # Use simple values - this works best!
                 }
                 update_data["customFields"].append(field_data)
             
-            logger.info(f"Updating custom fields for issue {issue_id} using direct API with simple values")
+            logger.info(f"Updating custom fields for issue {issue_id} using direct API with proper $type fields")
             self.client.post(f"issues/{issue_id}", data=update_data)
             logger.info(f"Direct field update succeeded for issue {issue_id}")
             
@@ -534,23 +563,34 @@ class IssuesClient:
             if use_commands:
                 logger.info(f"Trying command-based approach as fallback for issue {issue_id}")
                 try:
-                    for field_name, field_value in custom_fields.items():
-                        command_data = {
-                            "query": f"{field_name} {field_value}",
-                            "issues": [{"id": issue_id}]
-                        }
-                        
-                        logger.info(f"Applying command '{field_name} {field_value}' to issue {issue_id}")
-                        self.client.post("commands", data=command_data)
-                        
-                    logger.info(f"Command-based updates succeeded for issue {issue_id}")
-            
+                    # Use the command approach that was working before
+                    self._apply_commands_update(issue_id, custom_fields)
+                    logger.info(f"Command-based update succeeded for issue {issue_id}")
+                    return
                 except Exception as cmd_error:
-                    logger.error(f"Both direct and command approaches failed for issue {issue_id}: {cmd_error}")
-                    raise YouTrackAPIError(f"Failed to update custom fields: {cmd_error}")
-            else:
-                # Re-raise the original error if commands not enabled
-                raise YouTrackAPIError(f"Direct field update failed: {direct_error}")
+                    logger.warning(f"Command-based approach also failed: {cmd_error}")
+            
+            # If both direct and command approaches fail, raise the original error
+            raise YouTrackAPIError(f"Direct field update failed: {direct_error}")
+
+    def _apply_commands_update(self, issue_id: str, custom_fields: Dict[str, Any]) -> None:
+        """
+        Apply custom field updates using the command-based approach.
+        This method is a fallback and might not be as reliable as direct field updates.
+        """
+        try:
+            command_data = {"query": "updateCustomFields"}
+            for field_name, field_value in custom_fields.items():
+                command_data["query"] += f" {field_name} {field_value}"
+            
+            command_data["issues"] = [{"id": issue_id}]
+            
+            logger.info(f"Applying command-based update for issue {issue_id} with query: {command_data['query']}")
+            self.client.post("commands", data=command_data)
+            logger.info(f"Command-based update succeeded for issue {issue_id}")
+        except Exception as e:
+            logger.warning(f"Command-based update failed: {e}")
+            raise
 
     def get_issue_custom_fields(self, issue_id: str) -> Dict[str, Any]:
         """
