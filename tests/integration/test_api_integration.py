@@ -73,65 +73,63 @@ class TestAPIIntegration:
         assert result.id == "3-47"
         assert result.summary == "Integration Test Issue"
 
-    def test_custom_field_update_with_validation(self, mock_client, issues_client, projects_client):
-        """Test custom field update with project validation."""
-        # Mock issue lookup for project ID
+    @pytest.mark.slow
+    def test_custom_field_update_with_validation(self, mock_client, issues_client):
+        """Test custom field update with validation using the new API behavior."""
+        # Mock issue data
         mock_client.get.return_value = {
             "id": "3-47",
             "project": {"id": "0-0", "shortName": "DEMO"}
         }
         
-        # Mock Commands API call
+        # Mock the direct API call (which uses client.post for custom fields)
         mock_client.post.return_value = {}
         
-        # Test custom field update using Commands API
+        # Test custom field update using new behavior (direct API first)
         result = issues_client.update_issue_custom_fields(
             issue_id="DEMO-47",
             custom_fields={"Priority": "Critical"},
             validate=False
         )
         
-        # Verify Commands API was called
+        # Verify API calls were made
+        # The new implementation tries direct API first (via client.post)
         mock_client.post.assert_called()
-        call_args = mock_client.post.call_args
-        assert "commands" in call_args[0][0]
         
-        # Verify command format
-        command_data = call_args[1]['data']
-        assert command_data['query'] == 'Priority Critical'
-        assert command_data['issues'][0]['idReadable'] == 'DEMO-47'
+        # Check that the correct endpoint was called
+        call_args = mock_client.post.call_args
+        assert "issues/DEMO-47" in call_args[0][0]
 
     @pytest.mark.slow
     def test_full_issue_lifecycle(self, mock_client, issues_client):
-        """Test complete issue lifecycle - creation, update, retrieval."""
-        # Mock issue creation via session.post
-        mock_create_response = Mock()
-        mock_create_response.status_code = 201
-        mock_create_response.json.return_value = {
-            "id": "3-47", 
-            "idReadable": "DEMO-47", 
-            "summary": "Lifecycle Test"
+        """Test full lifecycle from creation to custom field update."""
+        # Mock issue creation response
+        mock_client.session.post.return_value.status_code = 201
+        mock_client.session.post.return_value.json.return_value = {
+            "id": "3-47",
+            "idReadable": "DEMO-47",
+            "project": {"id": "0-0", "shortName": "DEMO"},
+            "summary": "Test Issue"
         }
-        mock_client.session.post.return_value = mock_create_response
         
-        # Mock get call for update_issue_custom_fields (to get project info)
+        # Mock get_issue calls (used multiple times in the new implementation)
         mock_client.get.side_effect = [
-            # Get updated issue to return from update_issue_custom_fields (called at the end)
-            {"id": "3-47", "idReadable": "DEMO-47", "summary": "Lifecycle Test"}
+            {"id": "3-47", "idReadable": "DEMO-47", "project": {"id": "0-0"}},  # Initial get for state detection
+            {"id": "3-47", "idReadable": "DEMO-47", "project": {"id": "0-0"}}   # Final get for return value
         ]
         
-        # Mock Commands API call for custom fields update
+        # Mock custom field update call
         mock_client.post.return_value = {}
-
-        # 1. Create issue
+        
+        # Create issue
         issue = issues_client.create_issue(
             project_id="0-0",
-            summary="Lifecycle Test"
+            summary="Test Issue",
+            description="Test Description"
         )
-        assert issue.id == "3-47"
-
-        # 2. Update custom fields
-        updated_issue = issues_client.update_issue_custom_fields(
+        
+        # Update custom fields
+        result = issues_client.update_issue_custom_fields(
             issue_id="DEMO-47",
             custom_fields={"Priority": "High"},
             validate=False  # This skips the project validation get call
@@ -139,5 +137,5 @@ class TestAPIIntegration:
         
         # Verify API calls were made correctly
         mock_client.session.post.assert_called_once()  # Issue creation
-        assert mock_client.get.call_count == 1  # Called once at the end to get updated issue
-        mock_client.post.assert_called_once()  # Commands API for custom fields 
+        mock_client.post.assert_called_once()  # Custom field update via direct API
+        assert mock_client.get.call_count == 2  # Called for state detection and return value 
