@@ -441,8 +441,8 @@ class ProjectsClient:
             # Extract field type information
             field_schema = field_info.get("field", {})
             field_type = field_schema.get("fieldType", {})
-            value_type = field_type.get("valueType", "")  # enum, state, user, etc.
-            bundle_id = field_type.get("id")  # enum[1], state[1], etc.
+            value_type = field_type.get("valueType", "") if isinstance(field_type, dict) else ""  # enum, state, user, etc.
+            bundle_id = field_type.get("id") if isinstance(field_type, dict) else None  # enum[1], state[1], etc.
             
             logger.info(f"Field '{field_name}' - valueType: {value_type}, bundleId: {bundle_id}")
             

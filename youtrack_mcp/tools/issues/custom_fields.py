@@ -97,29 +97,50 @@ class CustomFields:
     @sync_wrapper  
     def batch_update_custom_fields(
         self,
-        updates: List[Dict[str, Any]]
+        issues: List[str] = None,
+        custom_fields: Dict[str, Any] = None,
+        updates: List[Dict[str, Any]] = None
     ) -> str:
         """
         Update custom fields for multiple issues in a single operation.
 
-        FORMAT: batch_update_custom_fields([{"issue_id": "DEMO-123", "fields": {"Priority": "High"}}, {"issue_id": "DEMO-124", "fields": {"Assignee": "jane.doe"}}])
+        FLEXIBLE FORMATS:
+        1. List format: batch_update_custom_fields([{"issue_id": "DEMO-123", "fields": {"Priority": "High"}}])
+        2. Bulk format: batch_update_custom_fields(issues=["DEMO-123", "DEMO-124"], custom_fields={"Priority": "High"})
 
         Args:
-            updates: List of update dictionaries with format:
-                    [{"issue_id": "DEMO-123", "fields": {"Priority": "High", "Sprint": "2024.1"}}]
+            issues: List of issue IDs (for bulk format)
+            custom_fields: Dictionary of fields to apply to all issues (for bulk format)  
+            updates: List of update dictionaries (for list format)
 
         Returns:
             JSON string with batch update results
         """
         try:
-            if not updates:
+            # Handle different input formats
+            if updates:
+                # Format 1: List of update dictionaries
+                final_updates = updates
+            elif issues and custom_fields:
+                # Format 2: Bulk update same fields for multiple issues
+                final_updates = [
+                    {"issue_id": issue_id, "fields": custom_fields}
+                    for issue_id in issues
+                ]
+            else:
                 return format_json_response({
                     "status": "error",
-                    "error": "Updates list is required"
+                    "error": "Either 'updates' list or both 'issues' and 'custom_fields' parameters are required"
+                })
+
+            if not final_updates:
+                return format_json_response({
+                    "status": "error",
+                    "error": "No updates to process"
                 })
 
             # Process batch updates
-            results = self.issues_api.batch_update_custom_fields(updates)
+            results = self.issues_api.batch_update_custom_fields(final_updates)
 
             # Summarize results
             success_count = len([r for r in results if r.get("status") == "success"])
@@ -129,7 +150,7 @@ class CustomFields:
             response = {
                 "status": "completed",
                 "summary": {
-                    "total": len(updates),
+                    "total": len(final_updates),
                     "successful": success_count,
                     "errors": error_count,
                     "skipped": skipped_count
@@ -144,7 +165,7 @@ class CustomFields:
             return format_json_response({
                 "status": "error",
                 "error": str(e),
-                "attempted_updates": len(updates) if updates else 0
+                "attempted_updates": len(final_updates) if 'final_updates' in locals() else 0
             })
 
     @sync_wrapper
