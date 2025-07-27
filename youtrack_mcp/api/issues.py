@@ -5,6 +5,7 @@ YouTrack Issues API client.
 from typing import Any, Dict, List, Optional
 import json
 import logging
+import re
 
 from pydantic import BaseModel, Field
 
@@ -739,12 +740,69 @@ class IssuesClient:
             }
 
     def _create_period_field_object(self, field_name: str, field_value: str) -> Dict[str, Any]:
-        """Create proper period field object."""
-        return {
-            "$type": "PeriodIssueCustomField",
-            "name": field_name,
-            "value": field_value
-        }
+        """Create proper period field object with PeriodValue format."""
+        try:
+            # Convert simple time strings to proper PeriodValue format
+            # Examples: "4h" -> 240 minutes, "30m" -> 30 minutes, "2h 30m" -> 150 minutes
+            
+            minutes = self._parse_time_to_minutes(field_value)
+            
+            if minutes is not None:
+                return {
+                    "$type": "PeriodIssueCustomField",
+                    "name": field_name,
+                    "value": {
+                        "$type": "PeriodValue",
+                        "minutes": minutes
+                    }
+                }
+            else:
+                # Fallback to simple value if parsing fails
+                logger.warning(f"Could not parse period value '{field_value}' for field '{field_name}', using simple value")
+                return {
+                    "$type": "PeriodIssueCustomField",
+                    "name": field_name,
+                    "value": field_value
+                }
+        except Exception as e:
+            logger.warning(f"Error creating period field object for '{field_name}': {e}, using simple value")
+            return {
+                "$type": "PeriodIssueCustomField",
+                "name": field_name,
+                "value": field_value
+            }
+    
+    def _parse_time_to_minutes(self, time_str: str) -> Optional[int]:
+        """Parse time string to minutes for PeriodValue."""
+        try:
+            time_str = time_str.strip().lower()
+            total_minutes = 0
+            
+            # Handle formats like "4h", "30m", "2h 30m", "1h30m"
+            
+            # Extract hours
+            hours_match = re.search(r'(\d+)\s*h', time_str)
+            if hours_match:
+                total_minutes += int(hours_match.group(1)) * 60
+            
+            # Extract minutes
+            minutes_match = re.search(r'(\d+)\s*m', time_str)
+            if minutes_match:
+                total_minutes += int(minutes_match.group(1))
+            
+            # If no h or m found, assume it's just minutes
+            if not hours_match and not minutes_match:
+                # Try to parse as plain number (minutes)
+                if time_str.isdigit():
+                    total_minutes = int(time_str)
+                else:
+                    return None
+            
+            return total_minutes if total_minutes > 0 else None
+            
+        except Exception as e:
+            logger.debug(f"Failed to parse time string '{time_str}': {e}")
+            return None
 
     def _apply_commands_update(self, issue_id: str, custom_fields: Dict[str, Any]) -> None:
         """
