@@ -549,15 +549,15 @@ class ProjectsClient:
                     values = bundle_data.get("values", [])
                     logger.info(f"Found {len(values)} state values for field '{field_name}' from bundle '{bundle_data.get('name', 'unknown')}'")
                     return [
-                            {
-                                "name": value.get("name", ""),
-                                "description": value.get("description", ""),
-                                "id": value.get("id"),
-                                "resolved": value.get("isResolved", False),
-                                "color": value.get("color", {})
-                            }
-                            for value in values
-                        ]
+                        {
+                            "name": value.get("name", ""),
+                            "description": value.get("description", ""),
+                            "id": value.get("id"),
+                            "resolved": value.get("isResolved", False),
+                            "color": value.get("color", {})
+                        }
+                        for value in values
+                    ]
                 except Exception as e:
                     logger.error(f"Error getting state bundle {bundle_id}: {str(e)}")
                     return []
