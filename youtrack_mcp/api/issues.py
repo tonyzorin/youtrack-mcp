@@ -513,82 +513,33 @@ class IssuesClient:
         """
         # Method 1: Direct field update approach (primary method)
         try:
-            # Get project ID to fetch field schemas
-            issue_data = self.get_issue(issue_id)
+            # YouTrack explicitly requires $type fields for custom field updates
+            # Use minimal $type with simple values based on field names
             
-            # Extract project ID from Issue object (project is a dict)
-            project_id = None
-            if hasattr(issue_data, 'project') and issue_data.project:
-                project_id = issue_data.project.get('id')
-            
-            if not project_id:
-                raise YouTrackAPIError("Could not determine project ID for custom field schema lookup")
-            
-            # Get field schemas to determine correct $type for each field
-            from youtrack_mcp.api.projects import ProjectsClient
-            projects_client = ProjectsClient(self.client)
-            field_schemas = projects_client.get_all_custom_fields_schemas(project_id)
-            
-            # Build update data with proper $type fields
             update_data = {"customFields": []}
             
             for field_name, field_value in custom_fields.items():
-                # Find the field schema (field_schemas is a dict with field names as keys)
-                field_schema = None
-                
-                # Try direct lookup first (case sensitive)
-                if field_name in field_schemas:
-                    field_schema = field_schemas[field_name]
+                # Determine minimal $type based on common field names
+                if field_name.lower() in ['state']:
+                    field_type = "StateIssueCustomField"
+                elif field_name.lower() in ['priority', 'type']:
+                    field_type = "SingleEnumIssueCustomField"
+                elif field_name.lower() in ['assignee', 'reporter']:
+                    field_type = "SingleUserIssueCustomField"
+                elif field_name.lower() in ['estimation', 'spent time']:
+                    field_type = "PeriodIssueCustomField"
                 else:
-                    # Fall back to case-insensitive search
-                    for schema_name, schema in field_schemas.items():
-                        if schema_name.lower() == field_name.lower():
-                            field_schema = schema
-                            break
+                    # Default to enum for unknown fields
+                    field_type = "SingleEnumIssueCustomField"
                 
-                if not field_schema:
-                    logger.warning(f"Could not find schema for field '{field_name}', using default $type")
-                    field_type = "SingleEnumIssueCustomField"  # Default fallback
-                    field_data = {
-                        "$type": field_type,
-                        "name": field_name,
-                        "value": field_value  # Use simple value as fallback
-                    }
-                else:
-                    # Determine the correct $type based on schema
-                    value_type = field_schema.get("type", "")  # Changed from "valueType" to "type"
-                    bundle_type = field_schema.get("bundle_type", "")  # Changed from "bundleType" to "bundle_type"
-                    field_type = self._determine_field_type(field_name, value_type, bundle_type)
-                    
-                    # Create the appropriate value object based on field type
-                    if value_type == "enum":
-                        # For enum fields, use simple string value (like states)
-                        value_object = field_value
-                            
-                    elif value_type == "state":
-                        # For state fields, use simple string value  
-                        value_object = field_value
-                            
-                    elif value_type == "user":
-                        # For user fields, use simple string (login)
-                        value_object = field_value
-                        
-                    elif value_type == "period":
-                        # For period fields, use simple string
-                        value_object = field_value
-                        
-                    else:
-                        # For other field types, use simple value
-                        value_object = field_value
-                    
-                    field_data = {
-                        "$type": field_type,
-                        "name": field_name,
-                        "value": value_object
-                    }
+                field_data = {
+                    "$type": field_type,
+                    "name": field_name,
+                    "value": field_value  # Keep values simple
+                }
                 update_data["customFields"].append(field_data)
             
-            logger.info(f"Updating custom fields for issue {issue_id} using direct API with proper $type fields")
+            logger.info(f"Updating custom fields for issue {issue_id} using minimal $type fields")
             self.client.post(f"issues/{issue_id}", data=update_data)
             logger.info(f"Direct field update succeeded for issue {issue_id}")
             
@@ -599,7 +550,6 @@ class IssuesClient:
             if use_commands:
                 logger.info(f"Trying command-based approach as fallback for issue {issue_id}")
                 try:
-                    # Use the command approach that was working before
                     self._apply_commands_update(issue_id, custom_fields)
                     logger.info(f"Command-based update succeeded for issue {issue_id}")
                     return
