@@ -560,4 +560,4 @@ jobs:
         echo "# Or install globally and run" >> $GITHUB_STEP_SUMMARY
         echo "npm install -g youtrack-mcp-tonyzorin" >> $GITHUB_STEP_SUMMARY
         echo "youtrack-mcp-tonyzorin" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY 
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

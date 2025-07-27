@@ -385,6 +385,27 @@ class IssueTools:
                     "new_priority": "Target priority like 'Critical', 'Major', 'Normal', 'Minor'"
                 }
             },
+            "update_issue_assignee": {
+                "description": "Update an issue's assignee using the proven working REST API approach. Example: update_issue_assignee(issue_id='DEMO-123', assignee='admin')",
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'",
+                    "assignee": "The user login name (e.g., 'admin', 'john.doe', 'jane.smith')"
+                }
+            },
+            "update_issue_type": {
+                "description": "Update an issue's type using the proven working REST API approach. Example: update_issue_type(issue_id='DEMO-123', issue_type='Bug')",
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'",
+                    "issue_type": "The issue type (e.g., 'Bug', 'Feature', 'Task', 'Story')"
+                }
+            },
+            "update_issue_estimation": {
+                "description": "Update an issue's time estimation using the proven working REST API approach. Example: update_issue_estimation(issue_id='DEMO-123', estimation='4h')",
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'",
+                    "estimation": "Time estimate (e.g., '4h', '2d', '30m', '1w', '3d 5h')"
+                }
+            },
             "get_help": {
                 "description": "Get interactive help with live YouTrack data and working examples. Unlike static tool descriptions, this provides dynamic help based on your actual YouTrack configuration, showing real project IDs, available values, and copy-paste ready examples.",
                 "parameter_descriptions": {
@@ -1174,17 +1195,96 @@ class IssueTools:
                     })
                     
                 except Exception as cmd_error:
+                    # Enhanced error handling with specific workflow analysis
+                    error_msg = str(cmd_error)
+                    
+                    # Parse specific workflow failure reasons
+                    specific_guidance = []
+                    workflow_reason = "Unknown workflow restriction"
+                    
+                    if "workflow restrictions" in error_msg.lower() or "status 405" in error_msg or "Failed to transition" in error_msg:
+                        # Try to get current state for better context
+                        try:
+                            current_issue = self.issues_api.get_issue(issue_id)
+                            current_state = "Unknown"
+                            
+                            for field in current_issue.get("customFields", []):
+                                if field.get("name") == "State":
+                                    current_state = field.get("value", {}).get("name", "Unknown")
+                                    break
+                            
+                            workflow_reason = f"Transition from '{current_state}' to '{new_state}' is blocked by workflow rules"
+                            
+                            # Provide specific guidance based on common workflow patterns
+                            if current_state == "Submitted" and new_state == "Open":
+                                specific_guidance = [
+                                    "🚫 WORKFLOW RESTRICTION: Moving from 'Submitted' back to 'Open' is typically not allowed",
+                                    "💡 WHY: Once submitted/reviewed, issues shouldn't go backwards in the workflow", 
+                                    "✅ TRY INSTEAD: Move to 'In Progress' to continue work",
+                                    "✅ OR: Move to 'Fixed' if the work is complete",
+                                    "🔧 IF NEEDED: Contact your YouTrack admin to modify workflow rules"
+                                ]
+                            elif new_state == "In Progress" and ("assignee" in error_msg.lower() or current_state in ["Open", "Submitted"]):
+                                specific_guidance = [
+                                    "🚫 WORKFLOW RESTRICTION: 'In Progress' state may require an assignee",
+                                    "✅ SOLUTION: Set assignee first with update_issue_assignee()",
+                                    f"📝 EXAMPLE: update_issue_assignee('{issue_id}', 'admin')",
+                                    f"📝 THEN: update_issue_state('{issue_id}', 'In Progress')"
+                                ]
+                            elif current_state in ["Fixed", "Closed"] and new_state in ["Open", "In Progress"]:
+                                specific_guidance = [
+                                    f"🚫 WORKFLOW RESTRICTION: Reopening from '{current_state}' may require special permissions",
+                                    "💡 WHY: Completed work typically shouldn't be reopened without approval",
+                                    "✅ TRY: Check if you need admin permissions for this transition",
+                                    "✅ OR: Create a new issue for additional work instead"
+                                ]
+                            elif "status 405" in error_msg:
+                                specific_guidance = [
+                                    "🚫 API RESTRICTION: HTTP 405 indicates this operation is not allowed",
+                                    f"💡 COMMON CAUSE: '{current_state}' → '{new_state}' transition violates workflow rules",
+                                    "✅ TRY: Forward transitions like 'In Progress' or 'Fixed'", 
+                                    "✅ CHECK: Available transitions with diagnose_workflow_restrictions()",
+                                    "🔧 NOTE: This may require different permissions or workflow configuration"
+                                ]
+                            else:
+                                specific_guidance = [
+                                    f"🚫 WORKFLOW RESTRICTION: '{current_state}' → '{new_state}' transition is not allowed",
+                                    "💡 This is enforced by your project's workflow configuration",
+                                    "✅ USE: diagnose_workflow_restrictions() to see allowed transitions",
+                                    "✅ CHECK: Available target states for your current position"
+                                ]
+                                
+                        except Exception:
+                            # Fallback if we can't get current state
+                            if "status 405" in error_msg:
+                                specific_guidance = [
+                                    "🚫 API RESTRICTION: HTTP 405 indicates this operation is not allowed",
+                                    f"💡 LIKELY CAUSE: Transition to '{new_state}' violates workflow rules",
+                                    "✅ TRY: Forward transitions like 'In Progress' or 'Fixed'",
+                                    "✅ USE: diagnose_workflow_restrictions() to analyze the restriction",
+                                    "🔧 NOTE: Some transitions require admin permissions"
+                                ]
+                            else:
+                                specific_guidance = [
+                                    f"🚫 WORKFLOW RESTRICTION: Transition to '{new_state}' is blocked",
+                                    "💡 This is enforced by your project's workflow rules",
+                                    "✅ USE: diagnose_workflow_restrictions() to analyze the restriction",
+                                    "✅ TRY: Different target states that may be allowed"
+                                ]
+                    
                     return format_json_response({
-                        "error": f"State transition failed with both methods: {str(cmd_error)}",
+                        "error": f"State transition failed: {workflow_reason}",
                         "issue_id": issue_id,
                         "target_state": new_state,
-                        "troubleshooting": [
+                        "workflow_restriction": True,
+                        "specific_guidance": specific_guidance,
+                        "general_troubleshooting": [
                             "Check if the target state exists in your YouTrack project",
                             "Verify you have permissions to change issue states",
-                            "Some transitions may be blocked by workflow rules",
-                            "Try using diagnose_workflow_restrictions() to analyze restrictions"
+                            "Some transitions require intermediate steps or conditions"
                         ],
-                        "workflow_help": f"Use diagnose_workflow_restrictions('{issue_id}') for detailed analysis"
+                        "diagnostic_help": f"Use diagnose_workflow_restrictions('{issue_id}') for detailed workflow analysis",
+                        "alternative_suggestion": "Try forward transitions like 'In Progress' or 'Fixed' instead of backward ones"
                     })
                 
         except Exception as e:
@@ -1276,6 +1376,258 @@ class IssueTools:
                 "issue_id": issue_id,
                 "target_priority": new_priority,
                 "suggestion": "Check issue ID format and verify it exists in YouTrack"
+            })
+
+    @sync_wrapper
+    def update_issue_assignee(self, issue_id: str, assignee: str) -> str:
+        """
+        Update an issue's assignee using the proven working REST API approach.
+        
+        🎯 PROVEN WORKING FORMAT (based on successful testing):
+        - Uses simple string values: "admin", "john.doe", "jane.smith"
+        - NO complex objects or ID references needed
+        
+        ✅ EXAMPLES THAT WORK:
+        - update_issue_assignee("DEMO-123", "admin")
+        - update_issue_assignee("PROJECT-456", "john.doe") 
+        - update_issue_assignee("TASK-789", "jane.smith")
+        
+        🔧 WHAT HAPPENS UNDER THE HOOD:
+        - Direct Field Update API with format {"customFields": [{"name": "Assignee", "value": "admin"}]}
+        - Simple string values proven to work reliably
+        - Smart error handling with assignee-specific guidance
+        
+        FORMAT: update_issue_assignee(issue_id="DEMO-123", assignee="admin")
+        
+        Args:
+            issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
+            assignee: The user login name (e.g., "admin", "john.doe", "jane.smith")
+            
+        Returns:
+            JSON string with the updated issue information and success details
+            
+        Common Usage: Assignment during triage, team member allocation
+        """
+        try:
+            if not issue_id or not assignee:
+                return format_json_response({
+                    "error": "Both issue ID and assignee are required"
+                })
+            
+            logger.info(f"Updating issue {issue_id} assignee to '{assignee}' using proven simple string format")
+            
+            # Use the proven simple string format for custom field updates
+            result = self.update_custom_fields(
+                issue_id=issue_id,
+                custom_fields={"Assignee": assignee}
+            )
+            
+            # Parse the result to provide assignee-specific feedback
+            result_data = json.loads(result) if isinstance(result, str) else result
+            
+            if result_data.get("status") == "success":
+                return format_json_response({
+                    "status": "success",
+                    "message": f"Successfully assigned issue {issue_id} to '{assignee}'",
+                    "issue_id": issue_id,
+                    "assignee": assignee,
+                    "api_method": "Direct Field Update API",
+                    "updated_fields": result_data.get("updated_fields", ["Assignee"]),
+                    "issue_data": result_data.get("issue_data", {})
+                })
+            else:
+                # Handle error case with assignee-specific guidance
+                error_msg = result_data.get("error", "Unknown error")
+                return format_json_response({
+                    "error": f"Assignee update failed: {error_msg}",
+                    "issue_id": issue_id,
+                    "target_assignee": assignee,
+                    "troubleshooting": [
+                        "Check if the user exists in your YouTrack instance",
+                        "Verify the user has access to this project",
+                        "Use login names like 'admin', 'john.doe' (not display names)",
+                        "Use get_current_user() to see your login format"
+                    ],
+                    "user_help": "Use get_current_user() or search_users() to find valid login names"
+                })
+                
+        except Exception as e:
+            logger.exception(f"Error updating assignee for issue {issue_id}")
+            return format_json_response({
+                "error": str(e),
+                "issue_id": issue_id,
+                "target_assignee": assignee,
+                "suggestion": "Check issue ID format and verify user exists in YouTrack"
+            })
+
+    @sync_wrapper
+    def update_issue_type(self, issue_id: str, issue_type: str) -> str:
+        """
+        Update an issue's type using the proven working REST API approach.
+        
+        🎯 PROVEN WORKING FORMAT (based on successful testing):
+        - Uses simple string values: "Bug", "Feature", "Task", "Story"
+        - NO complex objects or ID references needed
+        
+        ✅ EXAMPLES THAT WORK:
+        - update_issue_type("DEMO-123", "Bug")
+        - update_issue_type("PROJECT-456", "Feature") 
+        - update_issue_type("TASK-789", "Task")
+        
+        🔧 WHAT HAPPENS UNDER THE HOOD:
+        - Direct Field Update API with format {"customFields": [{"name": "Type", "value": "Bug"}]}
+        - Simple string values proven to work reliably
+        - Smart error handling with type-specific guidance
+        
+        FORMAT: update_issue_type(issue_id="DEMO-123", issue_type="Bug")
+        
+        Args:
+            issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
+            issue_type: The issue type (e.g., "Bug", "Feature", "Task", "Story")
+            
+        Returns:
+            JSON string with the updated issue information and success details
+            
+        Common Types: "Bug", "Feature", "Task", "Story", "Epic", "Improvement"
+        """
+        try:
+            if not issue_id or not issue_type:
+                return format_json_response({
+                    "error": "Both issue ID and issue type are required"
+                })
+            
+            logger.info(f"Updating issue {issue_id} type to '{issue_type}' using proven simple string format")
+            
+            # Use the proven simple string format for custom field updates
+            result = self.update_custom_fields(
+                issue_id=issue_id,
+                custom_fields={"Type": issue_type}
+            )
+            
+            # Parse the result to provide type-specific feedback
+            result_data = json.loads(result) if isinstance(result, str) else result
+            
+            if result_data.get("status") == "success":
+                return format_json_response({
+                    "status": "success",
+                    "message": f"Successfully updated issue {issue_id} type to '{issue_type}'",
+                    "issue_id": issue_id,
+                    "issue_type": issue_type,
+                    "api_method": "Direct Field Update API",
+                    "updated_fields": result_data.get("updated_fields", ["Type"]),
+                    "issue_data": result_data.get("issue_data", {})
+                })
+            else:
+                # Handle error case with type-specific guidance
+                error_msg = result_data.get("error", "Unknown error")
+                return format_json_response({
+                    "error": f"Type update failed: {error_msg}",
+                    "issue_id": issue_id,
+                    "target_type": issue_type,
+                    "troubleshooting": [
+                        "Check if the issue type exists in your YouTrack project",
+                        "Verify you have permissions to change issue types",
+                        "Common types: Bug, Feature, Task, Story, Epic",
+                        "Use get_available_custom_field_values() to see available types"
+                    ],
+                    "type_help": f"Use get_available_custom_field_values('Type') to see valid options"
+                })
+                
+        except Exception as e:
+            logger.exception(f"Error updating type for issue {issue_id}")
+            return format_json_response({
+                "error": str(e),
+                "issue_id": issue_id,
+                "target_type": issue_type,
+                "suggestion": "Check issue ID format and verify type exists in YouTrack"
+            })
+
+    @sync_wrapper
+    def update_issue_estimation(self, issue_id: str, estimation: str) -> str:
+        """
+        Update an issue's time estimation using the proven working REST API approach.
+        
+        🎯 PROVEN WORKING FORMAT (based on successful testing):
+        - Uses simple string values: "4h", "2d", "30m", "1w"
+        - NO complex objects or duration formats needed
+        
+        ✅ EXAMPLES THAT WORK:
+        - update_issue_estimation("DEMO-123", "4h")     # 4 hours
+        - update_issue_estimation("PROJECT-456", "2d")  # 2 days
+        - update_issue_estimation("TASK-789", "30m")    # 30 minutes
+        
+        🔧 WHAT HAPPENS UNDER THE HOOD:
+        - Direct Field Update API with format {"customFields": [{"name": "Estimation", "value": "4h"}]}
+        - Simple time string values proven to work reliably
+        - Smart error handling with estimation-specific guidance
+        
+        FORMAT: update_issue_estimation(issue_id="DEMO-123", estimation="4h")
+        
+        Args:
+            issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
+            estimation: Time estimate (e.g., "4h", "2d", "30m", "1w", "3d 5h")
+            
+        Returns:
+            JSON string with the updated issue information and success details
+            
+        Time Formats: "30m" (minutes), "4h" (hours), "2d" (days), "1w" (weeks), "3d 5h" (combined)
+        """
+        try:
+            if not issue_id or not estimation:
+                return format_json_response({
+                    "error": "Both issue ID and estimation are required"
+                })
+            
+            logger.info(f"Updating issue {issue_id} estimation to '{estimation}' using proven simple string format")
+            
+            # Use the proven simple string format for custom field updates
+            result = self.update_custom_fields(
+                issue_id=issue_id,
+                custom_fields={"Estimation": estimation}
+            )
+            
+            # Parse the result to provide estimation-specific feedback
+            result_data = json.loads(result) if isinstance(result, str) else result
+            
+            if result_data.get("status") == "success":
+                return format_json_response({
+                    "status": "success",
+                    "message": f"Successfully updated issue {issue_id} estimation to '{estimation}'",
+                    "issue_id": issue_id,
+                    "estimation": estimation,
+                    "api_method": "Direct Field Update API",
+                    "updated_fields": result_data.get("updated_fields", ["Estimation"]),
+                    "issue_data": result_data.get("issue_data", {})
+                })
+            else:
+                # Handle error case with estimation-specific guidance
+                error_msg = result_data.get("error", "Unknown error")
+                return format_json_response({
+                    "error": f"Estimation update failed: {error_msg}",
+                    "issue_id": issue_id,
+                    "target_estimation": estimation,
+                    "troubleshooting": [
+                        "Use simple time formats: '4h', '2d', '30m', '1w'",
+                        "Combine units: '3d 5h' for 3 days 5 hours",
+                        "Check if Estimation field exists in your project",
+                        "Verify you have permissions to update time estimates"
+                    ],
+                    "format_examples": [
+                        "30m (30 minutes)",
+                        "4h (4 hours)", 
+                        "2d (2 days)",
+                        "1w (1 week)",
+                        "3d 5h (3 days 5 hours)"
+                    ]
+                })
+                
+        except Exception as e:
+            logger.exception(f"Error updating estimation for issue {issue_id}")
+            return format_json_response({
+                "error": str(e),
+                "issue_id": issue_id,
+                "target_estimation": estimation,
+                "suggestion": "Check issue ID format and use simple time format like '4h' or '2d'"
             })
 
     @sync_wrapper

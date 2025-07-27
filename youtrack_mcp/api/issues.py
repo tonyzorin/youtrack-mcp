@@ -304,7 +304,7 @@ class IssuesClient:
             custom_fields: Dictionary of field names and values to update
             validate: Whether to validate field values before updating
             use_commands: Whether to try command-based approach as fallback (default: False)
-            
+
         Returns:
             Updated issue data
         """
@@ -341,7 +341,7 @@ class IssuesClient:
             
             # Return updated issue data
             return self.get_issue(issue_id)
-            
+
         except Exception as e:
             logger.exception(f"Error updating custom fields for issue {issue_id}")
             raise YouTrackAPIError(f"Failed to update custom fields: {str(e)}")
@@ -464,7 +464,7 @@ class IssuesClient:
             else:
                 logger.warning(f"No suitable event found for state transition to '{target_state}'")
                 return False
-                
+                    
         except Exception as e:
             logger.error(f"State machine transition failed: {e}")
             return False
@@ -544,7 +544,7 @@ class IssuesClient:
                         self.client.post("commands", data=command_data)
                         
                     logger.info(f"Command-based updates succeeded for issue {issue_id}")
-                    
+            
                 except Exception as cmd_error:
                     logger.error(f"Both direct and command approaches failed for issue {issue_id}: {cmd_error}")
                     raise YouTrackAPIError(f"Failed to update custom fields: {cmd_error}")

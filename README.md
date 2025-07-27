@@ -28,16 +28,68 @@ update_issue_priority("TASK-789", "Normal")
 # update_custom_fields(issue_id, {"Priority": {"id": "152-1"}})       # FAILS
 ```
 
-### **⚡ Quick Combined Operations**
+### **👤 Assignment Updates (Common)**
 ```python
-# Common workflow: Update priority AND move to In Progress
-update_issue_priority("DEMO-123", "Critical")
-update_issue_state("DEMO-123", "In Progress") 
-add_comment("DEMO-123", "Escalated to critical priority")
+# ✅ PROVEN WORKING FORMAT - Use login names
+update_issue_assignee("DEMO-123", "admin")
+update_issue_assignee("PROJECT-456", "john.doe")
+update_issue_assignee("TASK-789", "jane.smith")
 
-# Triage workflow: Set priority and assign
-update_issue_priority("DEMO-123", "Major")
-update_custom_fields("DEMO-123", {"Assignee": "admin"})
+# ❌ DON'T USE - Complex objects fail
+# update_custom_fields(issue_id, {"Assignee": {"login": "admin"}})    # FAILS
+```
+
+### **🏷️ Type Updates (Common)**
+```python
+# ✅ PROVEN WORKING FORMAT - Use simple strings
+update_issue_type("DEMO-123", "Bug")
+update_issue_type("PROJECT-456", "Feature")
+update_issue_type("TASK-789", "Task")
+
+# ❌ DON'T USE - Complex objects fail
+# update_custom_fields(issue_id, {"Type": {"name": "Bug"}})          # FAILS
+```
+
+### **⏱️ Time Estimation (Common)**
+```python
+# ✅ PROVEN WORKING FORMAT - Use simple time strings
+update_issue_estimation("DEMO-123", "4h")     # 4 hours
+update_issue_estimation("PROJECT-456", "2d")  # 2 days
+update_issue_estimation("TASK-789", "30m")    # 30 minutes
+update_issue_estimation("TASK-790", "1w")     # 1 week
+update_issue_estimation("TASK-791", "3d 5h")  # 3 days 5 hours
+
+# ❌ DON'T USE - ISO duration or complex formats fail
+# update_custom_fields(issue_id, {"Estimation": "PT4H"})             # FAILS
+```
+
+### **⚡ Complete Issue Workflows**
+```python
+# 🎯 Complete Triage Workflow
+update_issue_type("DEMO-123", "Bug")           # Classify as bug
+update_issue_priority("DEMO-123", "Critical")  # Set priority  
+update_issue_assignee("DEMO-123", "admin")     # Assign to admin
+update_issue_estimation("DEMO-123", "4h")      # Estimate 4 hours
+update_issue_state("DEMO-123", "In Progress")  # Start work
+add_comment("DEMO-123", "Critical bug triaged and assigned")
+
+# 🚀 Feature Development Workflow  
+update_issue_type("PROJ-456", "Feature")       # Classify as feature
+update_issue_priority("PROJ-456", "Normal")    # Standard priority
+update_issue_assignee("PROJ-456", "jane.doe")  # Assign to developer
+update_issue_estimation("PROJ-456", "2d")      # Estimate 2 days
+add_comment("PROJ-456", "Feature ready for development")
+
+# ✅ Task Completion Workflow
+update_issue_state("TASK-789", "Fixed")        # Mark as fixed
+add_comment("TASK-789", "Implementation completed and tested")
+
+# 📊 Quick Updates (Most Common)
+update_issue_state("DEMO-123", "In Progress")       # Start work
+update_issue_priority("DEMO-123", "Critical")       # Escalate
+update_issue_assignee("DEMO-123", "admin")          # Reassign
+update_issue_type("DEMO-123", "Bug")                # Reclassify
+update_issue_estimation("DEMO-123", "6h")           # Re-estimate
 ```
 
 ### **📝 Other Custom Fields**

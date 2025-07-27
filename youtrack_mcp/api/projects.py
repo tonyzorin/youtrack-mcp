@@ -415,11 +415,11 @@ class ProjectsClient:
     def get_custom_field_allowed_values(self, project_id: str, field_name: str) -> List[Dict[str, Any]]:
         """
         Get allowed values for a custom field in a specific project.
-        
+
         Args:
             project_id: The project identifier
             field_name: The custom field name
-            
+
         Returns:
             List of allowed values with id, name, and other properties
         """
@@ -545,9 +545,10 @@ class ProjectsClient:
                     else:
                         # Direct bundle ID format: get specific bundle
                         bundle_data = self.client.get(f"admin/customFieldSettings/bundles/state/{bundle_id}?fields=values(id,name,description,isResolved,color)")
-                        values = bundle_data.get("values", [])
-                        logger.info(f"Found {len(values)} state values for field '{field_name}' from bundle '{bundle_data.get('name', 'unknown')}'")
-                        return [
+                    
+                    values = bundle_data.get("values", [])
+                    logger.info(f"Found {len(values)} state values for field '{field_name}' from bundle '{bundle_data.get('name', 'unknown')}'")
+                    return [
                             {
                                 "name": value.get("name", ""),
                                 "description": value.get("description", ""),
@@ -697,7 +698,7 @@ class ProjectsClient:
             else:
                 logger.info(f"Field '{field_name}' type '{value_type}' doesn't support allowed values")
                 return []
-        
+            
         except Exception as e:
             logger.error(f"Error getting custom field allowed values for '{field_name}': {str(e)}")
             return []
@@ -785,12 +786,12 @@ class ProjectsClient:
     ) -> Dict[str, Any]:
         """
         Validate a custom field value against project schema.
-        
+
         Args:
             project_id: The project ID
             field_name: The custom field name
             field_value: The value to validate
-            
+
         Returns:
             Dictionary with validation result
         """
@@ -897,7 +898,7 @@ class ProjectsClient:
             elif value_type == "integer":
                 # Integer field - validate that value can be converted to int
                 try:
-                    int(field_value)
+                        int(field_value)
                 except (ValueError, TypeError):
                     return {
                         "valid": False,
@@ -908,7 +909,7 @@ class ProjectsClient:
             elif value_type == "float":
                 # Float field - validate that value can be converted to float
                 try:
-                    float(field_value)
+                        float(field_value)
                 except (ValueError, TypeError):
                     return {
                         "valid": False,
