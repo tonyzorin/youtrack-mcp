@@ -562,38 +562,12 @@ class IssuesClient:
                     
                     # Create the appropriate value object based on field type
                     if value_type == "enum":
-                        # For enum fields, find the matching value by name
-                        value_object = None
-                        allowed_values = field_schema.get("allowed_values", [])
-                        for allowed_value in allowed_values:
-                            if allowed_value.get("name", "").lower() == str(field_value).lower():
-                                value_object = {
-                                    "$type": "EnumBundleElement",
-                                    "id": allowed_value.get("id"),
-                                    "name": allowed_value.get("name")
-                                }
-                                break
-                        
-                        if not value_object:
-                            logger.warning(f"Value '{field_value}' not found for enum field '{field_name}', using simple value")
-                            value_object = field_value
+                        # For enum fields, use simple string value (like states)
+                        value_object = field_value
                             
                     elif value_type == "state":
-                        # For state fields, find the matching state by name
-                        value_object = None
-                        allowed_values = field_schema.get("allowed_values", [])
-                        for allowed_value in allowed_values:
-                            if allowed_value.get("name", "").lower() == str(field_value).lower():
-                                value_object = {
-                                    "$type": "StateBundleElement",
-                                    "id": allowed_value.get("id"),
-                                    "name": allowed_value.get("name")
-                                }
-                                break
-                        
-                        if not value_object:
-                            logger.warning(f"State '{field_value}' not found for state field '{field_name}', using simple value")
-                            value_object = field_value
+                        # For state fields, use simple string value  
+                        value_object = field_value
                             
                     elif value_type == "user":
                         # For user fields, use simple string (login)
