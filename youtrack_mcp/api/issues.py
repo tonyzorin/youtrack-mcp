@@ -100,7 +100,7 @@ class IssuesClient:
                 and "summary" not in response
             ):
                 # Get additional fields we need including attachments
-                fields = "id,idReadable,summary,description,created,updated,project,reporter,assignee,customFields,attachments(id,name,url,mimeType,size)"
+                fields = "id,idReadable,summary,description,created,updated,project(id,shortName),reporter,assignee,customFields,attachments(id,name,url,mimeType,size)"
                 try:
                     detailed_response = self.client.get(
                         f"issues/{issue_id}?fields={fields}"
