@@ -533,27 +533,85 @@ class IssuesClient:
             update_data = {"customFields": []}
             
             for field_name, field_value in custom_fields.items():
-                # Find the field schema
+                # Find the field schema (field_schemas is a dict with field names as keys)
                 field_schema = None
-                for schema in field_schemas:
-                    if schema.get("name", "").lower() == field_name.lower():
-                        field_schema = schema
-                        break
+                
+                # Try direct lookup first (case sensitive)
+                if field_name in field_schemas:
+                    field_schema = field_schemas[field_name]
+                else:
+                    # Fall back to case-insensitive search
+                    for schema_name, schema in field_schemas.items():
+                        if schema_name.lower() == field_name.lower():
+                            field_schema = schema
+                            break
                 
                 if not field_schema:
                     logger.warning(f"Could not find schema for field '{field_name}', using default $type")
                     field_type = "SingleEnumIssueCustomField"  # Default fallback
+                    field_data = {
+                        "$type": field_type,
+                        "name": field_name,
+                        "value": field_value  # Use simple value as fallback
+                    }
                 else:
                     # Determine the correct $type based on schema
-                    value_type = field_schema.get("valueType", "")
-                    bundle_type = field_schema.get("bundleType", "")
+                    value_type = field_schema.get("type", "")  # Changed from "valueType" to "type"
+                    bundle_type = field_schema.get("bundle_type", "")  # Changed from "bundleType" to "bundle_type"
                     field_type = self._determine_field_type(field_name, value_type, bundle_type)
-                
-                field_data = {
-                    "$type": field_type,
-                    "name": field_name,
-                    "value": field_value  # Use simple values - this works best!
-                }
+                    
+                    # Create the appropriate value object based on field type
+                    if value_type == "enum":
+                        # For enum fields, find the matching value by name
+                        value_object = None
+                        allowed_values = field_schema.get("allowed_values", [])
+                        for allowed_value in allowed_values:
+                            if allowed_value.get("name", "").lower() == str(field_value).lower():
+                                value_object = {
+                                    "$type": "EnumBundleElement",
+                                    "id": allowed_value.get("id"),
+                                    "name": allowed_value.get("name")
+                                }
+                                break
+                        
+                        if not value_object:
+                            logger.warning(f"Value '{field_value}' not found for enum field '{field_name}', using simple value")
+                            value_object = field_value
+                            
+                    elif value_type == "state":
+                        # For state fields, find the matching state by name
+                        value_object = None
+                        allowed_values = field_schema.get("allowed_values", [])
+                        for allowed_value in allowed_values:
+                            if allowed_value.get("name", "").lower() == str(field_value).lower():
+                                value_object = {
+                                    "$type": "StateBundleElement",
+                                    "id": allowed_value.get("id"),
+                                    "name": allowed_value.get("name")
+                                }
+                                break
+                        
+                        if not value_object:
+                            logger.warning(f"State '{field_value}' not found for state field '{field_name}', using simple value")
+                            value_object = field_value
+                            
+                    elif value_type == "user":
+                        # For user fields, use simple string (login)
+                        value_object = field_value
+                        
+                    elif value_type == "period":
+                        # For period fields, use simple string
+                        value_object = field_value
+                        
+                    else:
+                        # For other field types, use simple value
+                        value_object = field_value
+                    
+                    field_data = {
+                        "$type": field_type,
+                        "name": field_name,
+                        "value": value_object
+                    }
                 update_data["customFields"].append(field_data)
             
             logger.info(f"Updating custom fields for issue {issue_id} using direct API with proper $type fields")
@@ -1342,3 +1400,39 @@ class IssuesClient:
                 return field_value_data["id"]
         
         return field_value_data
+
+    def _determine_field_type(self, field_name: str, value_type: str, bundle_type: str) -> str:
+        """
+        Determine the correct $type field for YouTrack custom field updates.
+        
+        Args:
+            field_name: Name of the field
+            value_type: Type from schema (enum, state, user, period, etc.)
+            bundle_type: Bundle type from schema
+            
+        Returns:
+            The appropriate $type string for the API
+        """
+        # Map field types to YouTrack $type values
+        type_mapping = {
+            "enum": "SingleEnumIssueCustomField",
+            "state": "StateIssueCustomField", 
+            "user": "SingleUserIssueCustomField",
+            "period": "PeriodIssueCustomField",
+            "ownedField": "SingleOwnedIssueCustomField",  # Subsystem
+            "version": "SingleVersionIssueCustomField",   # Fix/Affected versions
+            "build": "SingleBuildIssueCustomField",       # Fixed in build
+            "string": "SingleStringIssueCustomField",
+            "text": "TextIssueCustomField",
+            "integer": "SingleIntegerIssueCustomField",
+            "float": "SingleFloatIssueCustomField",
+            "date": "SingleDateIssueCustomField",
+            "datetime": "SingleDateTimeIssueCustomField"
+        }
+        
+        # Get the appropriate type, defaulting to enum if not found
+        field_type = type_mapping.get(value_type.lower(), "SingleEnumIssueCustomField")
+        
+        logger.debug(f"Field '{field_name}' (type: {value_type}, bundle: {bundle_type}) mapped to $type: {field_type}")
+        
+        return field_type
