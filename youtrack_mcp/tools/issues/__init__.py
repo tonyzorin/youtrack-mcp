@@ -16,12 +16,14 @@ This package contains modular issue management tools broken down by functionalit
 __all__ = [
     "DedicatedUpdates",
     "Diagnostics",
+    "CustomFields",
 ]
 
 # Import the completed modules
 try:
     from .dedicated_updates import DedicatedUpdates
     from .diagnostics import Diagnostics
+    from .custom_fields import CustomFields
 except ImportError:
     # During development, modules might not be ready yet
     pass 

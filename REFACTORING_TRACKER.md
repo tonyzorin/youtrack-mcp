@@ -21,11 +21,11 @@ youtrack_mcp/tools/issues/
 
 ## 📋 **Function Inventory & Refactoring Status**
 
-### **✅ COMPLETED: 7/28 functions**
+### **✅ COMPLETED: 12/28 functions**
 
 ### **🔄 IN PROGRESS: 0/28 functions**
 
-### **⏳ PENDING: 21/28 functions**
+### **⏳ PENDING: 16/28 functions**
 
 #### **dedicated_updates.py (5 functions) - ✅ COMPLETED + TESTED**
 - [x] `update_issue_state` - State transitions (newly enhanced) ✅ 
@@ -44,30 +44,6 @@ youtrack_mcp/tools/issues/
 - Parameter validation and exception handling
 - Tool definitions validation
 
-#### **basic_operations.py (5 functions)**
-- [ ] `get_issue` - Get issue information
-- [ ] `search_issues` - Search with YouTrack query language  
-- [ ] `create_issue` - Create new issues
-- [ ] `update_issue` - Update issue summary/description
-- [ ] `add_comment` - Add comments to issues
-
-#### **custom_fields.py (5 functions)**  
-- [ ] `update_custom_fields` - General custom field updates
-- [ ] `batch_update_custom_fields` - Bulk custom field operations
-- [ ] `get_custom_fields` - Get issue custom fields
-- [ ] `validate_custom_field` - Validate field values
-- [ ] `get_available_custom_field_values` - Get allowed field values
-
-#### **linking.py (8 functions)**
-- [ ] `link_issues` - Generic issue linking
-- [ ] `get_issue_links` - Get all issue relationships
-- [ ] `get_available_link_types` - Get available link types
-- [ ] `add_dependency` - Create dependencies  
-- [ ] `remove_dependency` - Remove dependencies
-- [ ] `add_relates_link` - Add "relates" relationships
-- [ ] `add_duplicate_link` - Mark as duplicate
-- [ ] `get_available_link_types` - Available link types
-
 #### **diagnostics.py (2 functions) - ✅ COMPLETED + TESTED**
 - [x] `diagnose_workflow_restrictions` - Workflow analysis (newly enhanced) ✅
 - [x] `get_help` - Interactive help (newly created) ✅
@@ -81,6 +57,40 @@ youtrack_mcp/tools/issues/
 - Workflow-specific guidance and best practices
 - Error handling and edge cases
 - Tool definitions validation
+
+#### **custom_fields.py (5 functions) - ✅ COMPLETED + TESTED**
+- [x] `update_custom_fields` - General custom field updates ✅
+- [x] `batch_update_custom_fields` - Bulk custom field operations ✅
+- [x] `get_custom_fields` - Get issue custom fields ✅
+- [x] `validate_custom_field` - Validate field values ✅
+- [x] `get_available_custom_field_values` - Get allowed field values ✅
+
+**✅ Includes comprehensive tests covering:**
+- Field value updates with validation enabled/disabled
+- Batch operations with mixed success/error results
+- Field validation against project schemas
+- Available value retrieval with error handling
+- Missing parameter validation
+- API error handling with detailed feedback
+- Model dump response handling
+- Tool definitions validation
+
+#### **basic_operations.py (5 functions)**
+- [ ] `get_issue` - Get issue information
+- [ ] `search_issues` - Search with YouTrack query language  
+- [ ] `create_issue` - Create new issues
+- [ ] `update_issue` - Update issue summary/description
+- [ ] `add_comment` - Add comments to issues
+
+#### **linking.py (8 functions)**
+- [ ] `link_issues` - Generic issue linking
+- [ ] `get_issue_links` - Get all issue relationships
+- [ ] `get_available_link_types` - Get available link types
+- [ ] `add_dependency` - Create dependencies  
+- [ ] `remove_dependency` - Remove dependencies
+- [ ] `add_relates_link` - Add "relates" relationships
+- [ ] `add_duplicate_link` - Mark as duplicate
+- [ ] `get_available_link_types` - Available link types
 
 #### **attachments.py (2 functions)**
 - [ ] `get_issue_raw` - Raw issue data
