@@ -240,17 +240,17 @@ class TestConfigDefaults:
         """Test configuration values are properly loaded from environment."""
         # Note: This test verifies configuration loading works correctly
         # Environment variables may be set at workspace/system level
-            
-            from youtrack_mcp.config import Config
-            
+        
+        from youtrack_mcp.config import Config
+        
         # Test that configuration values are loaded properly
         # These values come from environment (workspace rules) and that's expected
         assert isinstance(Config.YOUTRACK_API_TOKEN, str)
         assert Config.YOUTRACK_TOKEN_FILE == ""  # This should be empty by default
-            assert Config.VERIFY_SSL is True
+        assert Config.VERIFY_SSL is True
         assert isinstance(Config.YOUTRACK_CLOUD, bool)
-            assert Config.MAX_RETRIES == 3
-            assert Config.RETRY_DELAY == 1.0
-            assert Config.MCP_SERVER_NAME == "youtrack-mcp"
-            assert Config.MCP_SERVER_DESCRIPTION == "YouTrack MCP Server"
-            assert Config.MCP_DEBUG is False 
+        assert Config.MAX_RETRIES == 3
+        assert Config.RETRY_DELAY == 1.0
+        assert Config.MCP_SERVER_NAME == "youtrack-mcp"
+        assert Config.MCP_SERVER_DESCRIPTION == "YouTrack MCP Server"
+        assert Config.MCP_DEBUG is False 
