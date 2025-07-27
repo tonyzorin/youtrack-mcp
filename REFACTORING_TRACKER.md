@@ -21,11 +21,11 @@ youtrack_mcp/tools/issues/
 
 ## 📋 **Function Inventory & Refactoring Status**
 
-### **✅ COMPLETED: 5/28 functions**
+### **✅ COMPLETED: 7/28 functions**
 
 ### **🔄 IN PROGRESS: 0/28 functions**
 
-### **⏳ PENDING: 23/28 functions**
+### **⏳ PENDING: 21/28 functions**
 
 #### **dedicated_updates.py (5 functions) - ✅ COMPLETED + TESTED**
 - [x] `update_issue_state` - State transitions (newly enhanced) ✅ 
@@ -68,9 +68,19 @@ youtrack_mcp/tools/issues/
 - [ ] `add_duplicate_link` - Mark as duplicate
 - [ ] `get_available_link_types` - Available link types
 
-#### **diagnostics.py (2 functions) - ⭐ HIGH PRIORITY**
-- [ ] `diagnose_workflow_restrictions` - Workflow analysis (newly enhanced)
-- [ ] `get_help` - Interactive help (newly created)
+#### **diagnostics.py (2 functions) - ✅ COMPLETED + TESTED**
+- [x] `diagnose_workflow_restrictions` - Workflow analysis (newly enhanced) ✅
+- [x] `get_help` - Interactive help (newly created) ✅
+
+**✅ Includes comprehensive tests covering:**
+- State machine vs direct field workflow detection
+- Available transition analysis with event mapping
+- Permission restriction identification
+- Technical notes and troubleshooting guidance
+- Interactive help system with topic-based content
+- Workflow-specific guidance and best practices
+- Error handling and edge cases
+- Tool definitions validation
 
 #### **attachments.py (2 functions)**
 - [ ] `get_issue_raw` - Raw issue data

@@ -15,11 +15,13 @@ This package contains modular issue management tools broken down by functionalit
 
 __all__ = [
     "DedicatedUpdates",
+    "Diagnostics",
 ]
 
 # Import the completed modules
 try:
     from .dedicated_updates import DedicatedUpdates
+    from .diagnostics import Diagnostics
 except ImportError:
     # During development, modules might not be ready yet
     pass 
