@@ -117,26 +117,37 @@ class CustomFields:
             JSON string with batch update results
         """
         try:
+            logger.info(f"Batch update called with: updates={updates}, issues={issues}, custom_fields={custom_fields}")
+            
             # Handle different input formats
             if updates:
                 # Format 1: List of update dictionaries
                 final_updates = updates
+                logger.info(f"Using list format with {len(updates)} updates")
             elif issues and custom_fields:
                 # Format 2: Bulk update same fields for multiple issues
                 final_updates = [
                     {"issue_id": issue_id, "fields": custom_fields}
                     for issue_id in issues
                 ]
+                logger.info(f"Using bulk format: {len(issues)} issues with fields {list(custom_fields.keys())}")
             else:
+                logger.warning(f"Invalid parameters: updates={updates}, issues={issues}, custom_fields={custom_fields}")
                 return format_json_response({
                     "status": "error",
-                    "error": "Either 'updates' list or both 'issues' and 'custom_fields' parameters are required"
+                    "error": "Either 'updates' list or both 'issues' and 'custom_fields' parameters are required",
+                    "received_params": {
+                        "updates": updates is not None,
+                        "issues": issues is not None, 
+                        "custom_fields": custom_fields is not None
+                    }
                 })
 
             if not final_updates:
                 return format_json_response({
                     "status": "error",
-                    "error": "No updates to process"
+                    "error": "No updates to process",
+                    "final_updates": final_updates
                 })
 
             # Process batch updates

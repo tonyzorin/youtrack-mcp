@@ -575,14 +575,10 @@ class IssuesClient:
                     }
                 else:
                     # Enhanced approach with proper YouTrack objects and actual IDs
-                    # BUT: Keep Estimation simple to avoid regressions
+                    # Handle Estimation with proper PeriodValue format
                     if field_name.lower() in ['estimation']:
-                        # Keep Estimation simple - it was working before
-                        field_data = {
-                            "$type": "PeriodIssueCustomField",
-                            "name": field_name,
-                            "value": field_value  # Simple string: "4h", "30m", etc.
-                        }
+                        # Estimation REQUIRES PeriodValue format, not simple strings
+                        field_data = self._create_period_field_object(field_name, field_value)
                     elif field_name.lower() in ['state']:
                         field_data = self._create_state_field_object(project_id, field_name, field_value)
                     elif field_name.lower() in ['priority', 'type']:
