@@ -162,7 +162,9 @@ class Config:
         """
         # If URL is explicitly provided, use it regardless of cloud setting
         if cls.YOUTRACK_URL:
-            return f"{cls.YOUTRACK_URL}/api"
+            # Remove trailing slash to prevent double slashes
+            clean_url = cls.YOUTRACK_URL.rstrip('/')
+            return f"{clean_url}/api"
 
         # For cloud instances without explicit URL, try to extract from token
         if cls.is_cloud_instance():

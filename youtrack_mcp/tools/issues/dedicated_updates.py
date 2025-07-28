@@ -25,10 +25,11 @@ logger = logging.getLogger(__name__)
 class DedicatedUpdates:
     """Specialized update functions for common YouTrack operations."""
 
-    def __init__(self, issues_api, projects_api):
+    def __init__(self, issues_api, projects_api, custom_fields=None):
         """Initialize with API clients."""
         self.issues_api = issues_api
         self.projects_api = projects_api
+        self.custom_fields = custom_fields
 
     @sync_wrapper
     def update_issue_state(self, issue_id: str, new_state: str) -> str:
@@ -503,9 +504,12 @@ class DedicatedUpdates:
             
             logger.info(f"Updating issue {issue_id} estimation to '{estimation}' using proven simple string format")
             
-            # Use the proven simple string format for custom field updates
-            from youtrack_mcp.tools.issues.custom_fields import CustomFields
-            custom_fields_handler = CustomFields(self.issues_api, self.projects_api)
+            # Use the existing custom_fields instance or create one if needed
+            if self.custom_fields:
+                custom_fields_handler = self.custom_fields
+            else:
+                from youtrack_mcp.tools.issues.custom_fields import CustomFields
+                custom_fields_handler = CustomFields(self.issues_api, self.projects_api)
             
             result = custom_fields_handler.update_custom_fields(
                 issue_id=issue_id,

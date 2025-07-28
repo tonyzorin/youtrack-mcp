@@ -46,9 +46,9 @@ class IssueTools:
         self.projects_api = ProjectsClient(self.client)
         
         # Initialize all modular components
-        self.dedicated_updates = DedicatedUpdates(self.issues_api, self.projects_api)
-        self.diagnostics = Diagnostics(self.issues_api, self.projects_api)
         self.custom_fields = CustomFields(self.issues_api, self.projects_api)
+        self.dedicated_updates = DedicatedUpdates(self.issues_api, self.projects_api, self.custom_fields)
+        self.diagnostics = Diagnostics(self.issues_api, self.projects_api)
         self.basic_operations = BasicOperations(self.issues_api, self.projects_api)
         self.linking = Linking(self.issues_api, self.projects_api)
         self.attachments = Attachments(self.issues_api, self.projects_api)
@@ -96,15 +96,15 @@ class IssueTools:
     
     def batch_update_custom_fields(
         self, 
+        updates: List[Dict[str, Any]] = None,
         issues: List[str] = None,
-        custom_fields: Dict[str, Any] = None,
-        updates: List[Dict[str, Any]] = None
+        custom_fields: Dict[str, Any] = None
     ) -> str:
         """Batch update custom fields across multiple issues with flexible formats."""
         return self.custom_fields.batch_update_custom_fields(
+            updates=updates,
             issues=issues,
-            custom_fields=custom_fields, 
-            updates=updates
+            custom_fields=custom_fields
         )
     
     def get_custom_fields(self, issue_id: str) -> str:

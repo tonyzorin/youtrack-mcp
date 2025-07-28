@@ -97,9 +97,9 @@ class CustomFields:
     @sync_wrapper  
     def batch_update_custom_fields(
         self,
+        updates: List[Dict[str, Any]] = None,
         issues: List[str] = None,
-        custom_fields: Dict[str, Any] = None,
-        updates: List[Dict[str, Any]] = None
+        custom_fields: Dict[str, Any] = None
     ) -> str:
         """
         Update custom fields for multiple issues in a single operation.

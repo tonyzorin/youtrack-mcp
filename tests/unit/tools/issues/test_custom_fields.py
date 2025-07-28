@@ -174,7 +174,7 @@ class TestCustomFields:
         
         # Assert
         assert result_data["status"] == "error"
-        assert "Updates list is required" in result_data["error"]
+        assert "Either 'updates' list or both 'issues' and 'custom_fields' parameters are required" in result_data["error"]
 
     def test_batch_update_custom_fields_api_error(self):
         """Test batch update when API call fails."""
