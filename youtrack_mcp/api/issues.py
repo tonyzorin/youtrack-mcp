@@ -1693,7 +1693,10 @@ class IssuesClient:
             
             update_data = {"customFields": []}
             
-            for field_name, field_value in custom_fields.items():
+            for field_name, raw_field_value in custom_fields.items():
+                # Normalize complex object formats to simple strings first
+                field_value = self._normalize_field_value(raw_field_value)
+                
                 # Determine field type and construct proper object with actual ID
                 if use_simple_approach:
                     # Fallback to simple $type approach when project ID is not available
