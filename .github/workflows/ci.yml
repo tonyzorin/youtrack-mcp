@@ -210,7 +210,7 @@ jobs:
     name: "🔨 Dev Build"
     needs: [test-unit, test-integration, test-docker]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
