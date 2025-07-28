@@ -10,9 +10,10 @@ on:
       release_type:
         description: 'Release type'
         required: true
-        default: 'patch'
+        default: 'current'
         type: choice
         options:
+        - current
         - patch
         - minor
         - major
@@ -299,18 +300,22 @@ jobs:
         CURRENT_VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
         echo "Current version: $CURRENT_VERSION"
         
-        if [[ "${{ github.event.inputs.release_type }}" == "custom" ]]; then
+        if [[ "${{ github.event.inputs.release_type }}" == "current" ]]; then
+          NEW_VERSION="$CURRENT_VERSION"
+          echo "🚀 Using current version for production: $NEW_VERSION"
+        elif [[ "${{ github.event.inputs.release_type }}" == "custom" ]]; then
           if [[ -z "${{ github.event.inputs.custom_version }}" ]]; then
             echo "❌ Custom version is required when release_type is 'custom'"
             exit 1
           fi
           NEW_VERSION="${{ github.event.inputs.custom_version }}"
+          echo "🚀 Using custom version: $NEW_VERSION"
         else
           NEW_VERSION=$(python scripts/version_bump.py ${{ github.event.inputs.release_type }} --dry-run)
+          echo "🚀 Will bump to new version: $NEW_VERSION"
         fi
         
         echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "🚀 Will build production version: $NEW_VERSION"
 
     - name: Configure git
       run: |
@@ -322,7 +327,9 @@ jobs:
         CURRENT_VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
         NEW_VERSION="${{ steps.version.outputs.NEW_VERSION }}"
         
-        if [[ "$CURRENT_VERSION" == "$NEW_VERSION" ]]; then
+        if [[ "${{ github.event.inputs.release_type }}" == "current" ]]; then
+          echo "✅ Using current version $NEW_VERSION for production build, no update needed"
+        elif [[ "$CURRENT_VERSION" == "$NEW_VERSION" ]]; then
           echo "✅ Version is already $NEW_VERSION, no update needed"
         else
           echo "🔄 Updating version from $CURRENT_VERSION to $NEW_VERSION"
