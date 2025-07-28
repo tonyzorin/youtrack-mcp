@@ -312,9 +312,22 @@ jobs:
         echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "🚀 Will build production version: $NEW_VERSION"
 
+    - name: Configure git
+      run: |
+        git config --global user.email "action@github.com"
+        git config --global user.name "GitHub Action"
+
     - name: Update version
       run: |
-        python scripts/version_bump.py ${{ steps.version.outputs.NEW_VERSION }}
+        CURRENT_VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
+        NEW_VERSION="${{ steps.version.outputs.NEW_VERSION }}"
+        
+        if [[ "$CURRENT_VERSION" == "$NEW_VERSION" ]]; then
+          echo "✅ Version is already $NEW_VERSION, no update needed"
+        else
+          echo "🔄 Updating version from $CURRENT_VERSION to $NEW_VERSION"
+          python scripts/version_bump.py $NEW_VERSION
+        fi
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
