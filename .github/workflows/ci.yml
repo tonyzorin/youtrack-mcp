@@ -7,9 +7,18 @@ on:
     branches: [ main ]
   workflow_dispatch:  # Manual trigger for production builds
     inputs:
-      release_type:
-        description: 'Release type'
+      build_type:
+        description: 'Build type'
         required: true
+        default: 'test_only'
+        type: choice
+        options:
+        - test_only
+        - dev_build
+        - production_release
+      release_type:
+        description: 'Release type (only for production_release)'
+        required: false
         default: 'current'
         type: choice
         options:
@@ -22,15 +31,15 @@ on:
         description: 'Custom version (only if release_type is custom)'
         required: false
         type: string
-      create_release:
-        description: 'Create GitHub release'
-        required: true
-        default: true
+      create_github_release:
+        description: 'Create GitHub release (only for production_release)'
+        required: false
+        default: false
         type: boolean
-      publish_packages:
-        description: 'Publish npm packages'
-        required: true
-        default: true
+      confirm_production:
+        description: '⚠️ CONFIRM: Deploy to production Docker Hub and NPM?'
+        required: false
+        default: false
         type: boolean
 
 env:
@@ -211,7 +220,7 @@ jobs:
     name: "🔨 Dev Build"
     needs: [test-unit, test-integration, test-docker]
     runs-on: ubuntu-latest
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && (github.event.inputs.build_type == 'dev_build' || github.event.inputs.build_type == 'production_release'))
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -281,7 +290,7 @@ jobs:
     name: "🚀 Production Build"
     needs: [build-dev]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'production_release' && github.event.inputs.confirm_production == 'true'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -300,7 +309,7 @@ jobs:
         CURRENT_VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
         echo "Current version: $CURRENT_VERSION"
         
-        if [[ "${{ github.event.inputs.release_type }}" == "current" ]]; then
+        if [[ "${{ github.event.inputs.release_type }}" == "current" ]] || [[ -z "${{ github.event.inputs.release_type }}" ]]; then
           NEW_VERSION="$CURRENT_VERSION"
           echo "🚀 Using current version for production: $NEW_VERSION"
         elif [[ "${{ github.event.inputs.release_type }}" == "custom" ]]; then
@@ -327,7 +336,7 @@ jobs:
         CURRENT_VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
         NEW_VERSION="${{ steps.version.outputs.NEW_VERSION }}"
         
-        if [[ "${{ github.event.inputs.release_type }}" == "current" ]]; then
+        if [[ "${{ github.event.inputs.release_type }}" == "current" ]] || [[ -z "${{ github.event.inputs.release_type }}" ]]; then
           echo "✅ Using current version $NEW_VERSION for production build, no update needed"
         elif [[ "$CURRENT_VERSION" == "$NEW_VERSION" ]]; then
           echo "✅ Version is already $NEW_VERSION, no update needed"
@@ -370,7 +379,7 @@ jobs:
         cache-to: type=gha,mode=max
 
     - name: Create GitHub Release
-      if: github.event.inputs.create_release == 'true'
+      if: github.event.inputs.create_github_release == 'true'
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -416,7 +425,7 @@ jobs:
     name: "📦 Publish NPM"
     needs: [build-production]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_packages == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'production_release' && github.event.inputs.confirm_production == 'true'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
