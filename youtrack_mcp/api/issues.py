@@ -1773,6 +1773,79 @@ class IssuesClient:
             
             raise YouTrackAPIError(error_msg)
 
+    def _extract_project_id(self, issue_data) -> str:
+        """Extract project ID from issue data."""
+        if hasattr(issue_data, 'project') and issue_data.project:
+            if isinstance(issue_data.project, dict):
+                return issue_data.project.get('id')
+            else:
+                return getattr(issue_data.project, 'id', None)
+        return None
+
+    def _build_custom_fields_payload(self, custom_fields: Dict[str, Any], project_id: str = None) -> Dict[str, Any]:
+        """Build the custom fields payload with normalized field processing."""
+        update_data = {"customFields": []}
+        use_simple_approach = not project_id
+        
+        if not project_id:
+            logger.warning("Could not determine project ID for enhanced object creation, using simple $type approach")
+        
+        for field_name, raw_field_value in custom_fields.items():
+            # Normalize complex object formats to simple strings first
+            field_value = self._normalize_field_value(raw_field_value)
+            
+            # Create appropriate field object
+            if use_simple_approach:
+                field_data = self._create_simple_field_object(field_name, field_value)
+            else:
+                field_data = self._create_enhanced_field_object(project_id, field_name, field_value)
+            
+            if field_data:
+                update_data["customFields"].append(field_data)
+        
+        return update_data
+
+    def _create_simple_field_object(self, field_name: str, field_value: str) -> Dict[str, Any]:
+        """Create simple field object using basic $type approach."""
+        field_name_lower = field_name.lower()
+        
+        if field_name_lower == 'state':
+            field_type = "StateIssueCustomField"
+        elif field_name_lower in ['priority', 'type']:
+            field_type = "SingleEnumIssueCustomField"
+        elif field_name_lower in ['assignee', 'reporter']:
+            field_type = "SingleUserIssueCustomField"
+        elif field_name_lower in ['estimation', 'spent time']:
+            field_type = "PeriodIssueCustomField"
+        else:
+            field_type = "SingleEnumIssueCustomField"
+        
+        return {
+            "$type": field_type,
+            "name": field_name,
+            "value": field_value
+        }
+
+    def _create_enhanced_field_object(self, project_id: str, field_name: str, field_value: str) -> Dict[str, Any]:
+        """Create enhanced field object with proper YouTrack objects and actual IDs."""
+        try:
+            field_name_lower = field_name.lower()
+            
+            if field_name_lower in ['estimation', 'spent time']:
+                return self._create_period_field_object(field_name, field_value)
+            elif field_name_lower == 'state':
+                return self._create_state_field_object(project_id, field_name, field_value)
+            elif field_name_lower in ['priority', 'type']:
+                return self._create_enum_field_object(project_id, field_name, field_value)
+            elif field_name_lower in ['assignee', 'reporter']:
+                return self._create_user_field_object(field_name, field_value)
+            else:
+                # Default to enum for unknown fields
+                return self._create_enum_field_object(project_id, field_name, field_value)
+        except Exception as e:
+            logger.warning(f"Enhanced field creation failed for '{field_name}': {e}, falling back to simple approach")
+            return self._create_simple_field_object(field_name, field_value)
+
     def _create_enum_field_object(self, project_id: str, field_name: str, field_value: str) -> Dict[str, Any]:
         """Create proper EnumBundleElement object with actual ID."""
         try:
