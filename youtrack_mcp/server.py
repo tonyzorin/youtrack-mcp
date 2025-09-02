@@ -17,6 +17,14 @@ except ImportError:
     # Fall back to mcp (old package name)
     from mcp.server.fastmcp import FastMCP as ToolServerBase
 
+# Determine if ToolServerBase.__init__ accepts a 'transport' kwarg
+try:
+    _TOOLSERVER_ACCEPTS_TRANSPORT = (
+        "transport" in inspect.signature(ToolServerBase.__init__).parameters
+    )
+except Exception:
+    _TOOLSERVER_ACCEPTS_TRANSPORT = False
+
 from youtrack_mcp.config import config
 
 logger = logging.getLogger(__name__)
@@ -48,11 +56,22 @@ class YouTrackMCPServer:
         self.transport_mode = transport
 
         # Initialize server with ToolServerBase
-        self.server = ToolServerBase(
-            name=config.MCP_SERVER_NAME,
-            instructions=config.MCP_SERVER_DESCRIPTION,
-            transport=transport,  # ToolServerBase expects 'transport' parameter
-        )
+        server_kwargs = {
+            "name": config.MCP_SERVER_NAME,
+            "instructions": config.MCP_SERVER_DESCRIPTION,
+        }
+        if _TOOLSERVER_ACCEPTS_TRANSPORT:
+            server_kwargs["transport"] = transport
+
+        try:
+            self.server = ToolServerBase(**server_kwargs)
+        except TypeError as e:
+            # Safety net if detection was wrong or runtime changes
+            if "transport" in server_kwargs and "transport" in str(e):
+                server_kwargs.pop("transport", None)
+                self.server = ToolServerBase(**server_kwargs)
+            else:
+                raise
 
         # Initialize tool registry
         self._tools: Dict[str, Callable] = {}
