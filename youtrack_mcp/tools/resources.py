@@ -28,6 +28,10 @@ URI_TEMPLATES = {
     "users": f"{YOUTRACK_URI_SCHEME}://users",
     "user": f"{YOUTRACK_URI_SCHEME}://users/{{user_id}}",
     "search": f"{YOUTRACK_URI_SCHEME}://search?query={{query}}",
+    "articles": f"{YOUTRACK_URI_SCHEME}://articles",
+    "article": f"{YOUTRACK_URI_SCHEME}://articles/{{article_id}}",
+    "spaces": f"{YOUTRACK_URI_SCHEME}://spaces",
+    "space": f"{YOUTRACK_URI_SCHEME}://spaces/{{space_id}}",
 }
 
 
@@ -72,6 +76,18 @@ class ResourcesTools:
                     "description": "List of all YouTrack users",
                     "mimeType": "application/json",
                 },
+                {
+                    "uri": URI_TEMPLATES["articles"],
+                    "name": "All Articles",
+                    "description": "List of all Knowledge Base articles",
+                    "mimeType": "application/json",
+                },
+                {
+                    "uri": URI_TEMPLATES["spaces"],
+                    "name": "All Spaces",
+                    "description": "List of all Knowledge Base spaces",
+                    "mimeType": "application/json",
+                },
             ]
 
             # Define resource templates
@@ -112,6 +128,18 @@ class ResourcesTools:
                     "description": "Results of a YouTrack search query",
                     "mimeType": "application/json",
                 },
+                {
+                    "uriTemplate": URI_TEMPLATES["article"],
+                    "name": "Article Details",
+                    "description": "Details of a specific knowledge base article",
+                    "mimeType": "application/json",
+                },
+                {
+                    "uriTemplate": URI_TEMPLATES["space"],
+                    "name": "Space Details",
+                    "description": "Details of a specific knowledge base space",
+                    "mimeType": "application/json",
+                },
             ]
 
             # Dynamically add all projects as resources
@@ -119,9 +147,7 @@ class ResourcesTools:
                 projects = self.projects_api.get_projects()
                 for project in projects:
                     project_id = (
-                        project.id
-                        if hasattr(project, "id")
-                        else project.get("id")
+                        project.id if hasattr(project, "id") else project.get("id")
                     )
                     project_name = (
                         project.name
@@ -143,9 +169,7 @@ class ResourcesTools:
             except Exception as e:
                 logger.warning(f"Could not fetch projects for resources: {e}")
 
-            return json.dumps(
-                {"resources": resources, "resourceTemplates": templates}
-            )
+            return json.dumps({"resources": resources, "resourceTemplates": templates})
         except Exception as e:
             logger.exception("Error listing resources")
             return json.dumps({"error": str(e)})
@@ -183,7 +207,9 @@ class ResourcesTools:
                 path = [parsed.netloc]
             else:
                 # For youtrack://issues/3-41, path contains the full path
-                path = parsed.path.strip("/").split("/") if parsed.path.strip("/") else []
+                path = (
+                    parsed.path.strip("/").split("/") if parsed.path.strip("/") else []
+                )
 
             # Process query parameters
             query_params = parse_qs(parsed.query)
@@ -205,6 +231,41 @@ class ResourcesTools:
                 elif path[0] == "search" and "query" in query_params:
                     query = query_params["query"][0]
                     return self.search_issues(query)
+                elif path[0] == "articles":
+                    # List articles (basic list)
+                    articles = self.client.get(
+                        "articles",
+                        params={
+                            "fields": "id,summary,updated,space(id,name)",
+                            "$top": 50,
+                        },
+                    )
+                    return json.dumps(
+                        {
+                            "contents": [
+                                {
+                                    "uri": URI_TEMPLATES["articles"],
+                                    "mimeType": "application/json",
+                                    "text": json.dumps(articles),
+                                }
+                            ]
+                        }
+                    )
+                elif path[0] == "spaces":
+                    spaces = self.client.get(
+                        "spaces", params={"fields": "id,name", "$top": 50}
+                    )
+                    return json.dumps(
+                        {
+                            "contents": [
+                                {
+                                    "uri": URI_TEMPLATES["spaces"],
+                                    "mimeType": "application/json",
+                                    "text": json.dumps(spaces),
+                                }
+                            ]
+                        }
+                    )
             elif len(path) == 2:
                 # Resource with ID
                 if path[0] == "projects":
@@ -219,6 +280,42 @@ class ResourcesTools:
                     user_id = path[1]
                     logger.debug(f"Fetching user with ID: {user_id}")
                     return self.get_user(user_id)
+                elif path[0] == "articles":
+                    article_id = path[1]
+                    logger.debug(f"Fetching article with ID: {article_id}")
+                    article = self.client.get(
+                        f"articles/{article_id}?fields=id,summary,content,updated,space(id,name)"
+                    )
+                    return json.dumps(
+                        {
+                            "contents": [
+                                {
+                                    "uri": URI_TEMPLATES["article"].format(
+                                        article_id=article_id
+                                    ),
+                                    "mimeType": "application/json",
+                                    "text": json.dumps(article),
+                                }
+                            ]
+                        }
+                    )
+                elif path[0] == "spaces":
+                    space_id = path[1]
+                    logger.debug(f"Fetching space with ID: {space_id}")
+                    space = self.client.get(f"spaces/{space_id}?fields=id,name")
+                    return json.dumps(
+                        {
+                            "contents": [
+                                {
+                                    "uri": URI_TEMPLATES["space"].format(
+                                        space_id=space_id
+                                    ),
+                                    "mimeType": "application/json",
+                                    "text": json.dumps(space),
+                                }
+                            ]
+                        }
+                    )
             elif len(path) == 3:
                 # Sub-resources
                 if path[0] == "projects" and path[2] == "issues":
@@ -236,9 +333,7 @@ class ResourcesTools:
                         )
                         # Fall back to direct API call
                         try:
-                            comments = self.client.get(
-                                f"issues/{issue_id}/comments"
-                            )
+                            comments = self.client.get(f"issues/{issue_id}/comments")
                             return json.dumps(
                                 {
                                     "contents": [
@@ -262,9 +357,7 @@ class ResourcesTools:
             return json.dumps({"error": f"Unknown resource URI: {uri}"})
         except Exception as e:
             logger.exception(f"Error reading resource: {uri}")
-            return json.dumps(
-                {"error": f"Error processing resource {uri}: {str(e)}"}
-            )
+            return json.dumps({"error": f"Error processing resource {uri}: {str(e)}"})
 
     @sync_wrapper
     def subscribe_resource(self, uri: str) -> str:
@@ -312,14 +405,14 @@ class ResourcesTools:
         try:
             # Fetch projects using the API client
             result = self.projects_api.get_projects()
-            
+
             # Convert Project objects to dictionaries for JSON serialization
             if isinstance(result, list):
                 serializable_result = []
                 for project in result:
-                    if hasattr(project, 'model_dump'):
+                    if hasattr(project, "model_dump"):
                         serializable_result.append(project.model_dump())
-                    elif hasattr(project, '__dict__'):
+                    elif hasattr(project, "__dict__"):
                         serializable_result.append(project.__dict__)
                     else:
                         serializable_result.append(str(project))
@@ -424,9 +517,7 @@ class ResourcesTools:
                 else:
                     issue_data = issue
             except Exception as api_error:
-                logger.warning(
-                    f"Error retrieving issue with issues_api: {api_error}"
-                )
+                logger.warning(f"Error retrieving issue with issues_api: {api_error}")
 
                 # Fall back to direct API call
                 try:
@@ -449,9 +540,7 @@ class ResourcesTools:
                 {
                     "contents": [
                         {
-                            "uri": URI_TEMPLATES["issue"].format(
-                                issue_id=issue_id
-                            ),
+                            "uri": URI_TEMPLATES["issue"].format(issue_id=issue_id),
                             "mimeType": "application/json",
                             "text": json.dumps(issue_data),
                         }
@@ -546,9 +635,7 @@ class ResourcesTools:
                 {
                     "contents": [
                         {
-                            "uri": URI_TEMPLATES["user"].format(
-                                user_id=user_id
-                            ),
+                            "uri": URI_TEMPLATES["user"].format(user_id=user_id),
                             "mimeType": "application/json",
                             "text": json.dumps(user),
                         }
@@ -562,9 +649,7 @@ class ResourcesTools:
     def search_issues(self, query: str) -> str:
         """Search issues as a resource."""
         try:
-            results = self.client.get(
-                "issues", params={"query": query, "$top": 100}
-            )
+            results = self.client.get("issues", params={"query": query, "$top": 100})
 
             return json.dumps(
                 {
@@ -648,9 +733,7 @@ class ResourcesTools:
             },
             "get_user": {
                 "description": "Get a specific user as a resource.",
-                "parameter_descriptions": {
-                    "user_id": "The user ID (e.g., '1-1')"
-                },
+                "parameter_descriptions": {"user_id": "The user ID (e.g., '1-1')"},
             },
             "search_issues": {
                 "description": "Search issues as a resource.",

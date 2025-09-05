@@ -377,6 +377,82 @@ class YouTrackClient:
         """
         return self._make_request("DELETE", endpoint, **kwargs)
 
+    def post_multipart(
+        self,
+        endpoint: str,
+        files: Dict[str, Any],
+        data: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Make POST request with multipart form-data (for file uploads).
+
+        Args:
+            endpoint: API endpoint
+            files: Mapping for requests 'files' parameter, e.g. {'file': (filename, bytes, mimeType)}
+            data: Optional additional form fields
+            headers: Optional headers to merge for this request
+
+        Returns:
+            Parsed JSON response
+        """
+        url = self._get_api_url(endpoint)
+        request_headers = dict(self.session.headers)
+        # Remove JSON content-type so requests can set multipart boundary
+        if "Content-Type" in request_headers:
+            request_headers.pop("Content-Type", None)
+        if headers:
+            request_headers.update(headers)
+
+        response = self.session.request(
+            "POST",
+            url,
+            files=files,
+            data=data,
+            headers=request_headers,
+            verify=self.session.verify,
+        )
+        return self._handle_response(response)
+
+    def get_bytes(
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> bytes:
+        """
+        Make GET request and return raw bytes (for binary downloads).
+
+        Args:
+            endpoint: API endpoint
+            params: Query parameters
+            headers: Optional headers (e.g., Accept: application/octet-stream)
+
+        Returns:
+            Raw response bytes
+        """
+        url = self._get_api_url(endpoint)
+        request_headers = dict(self.session.headers)
+        if headers:
+            request_headers.update(headers)
+        response = self.session.request(
+            "GET",
+            url,
+            params=params,
+            headers=request_headers,
+            verify=self.session.verify,
+            stream=True,
+        )
+        status_code = response.status_code
+        if 200 <= status_code < 300:
+            return response.content
+        # Delegate error handling to common handler (will raise)
+        self._handle_response(response)
+        # Should not reach here
+        raise YouTrackAPIError(
+            f"Unexpected error downloading from {endpoint}", status_code, response
+        )
+
     def close(self) -> None:
         """Close the API client session."""
         self.session.close()

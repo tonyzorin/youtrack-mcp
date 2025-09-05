@@ -3,6 +3,7 @@ from youtrack_mcp.tools.projects import ProjectTools
 from youtrack_mcp.tools.users import UserTools
 from youtrack_mcp.tools.search import SearchTools
 from youtrack_mcp.tools.resources import ResourcesTools
+import os
 from typing import Dict, Any
 
 
@@ -16,6 +17,26 @@ class MCPServer:
         self.user_tools = UserTools()
         self.search_tools = SearchTools()
         self.resources_tools = ResourcesTools()
+        # Optionally enable KB tools via env flag
+        self.articles_tools = None
+        self.spaces_tools = None
+        enable_kb = os.getenv("YOUTRACK_ENABLE_KB", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if enable_kb:
+            try:
+                from youtrack_mcp.tools.articles import ArticlesTools as _ArticlesTools  # type: ignore
+                from youtrack_mcp.tools.spaces import SpacesTools as _SpacesTools  # type: ignore
+
+                self.articles_tools = _ArticlesTools()
+                self.spaces_tools = _SpacesTools()
+            except Exception:
+                # Keep server running without KB tools
+                self.articles_tools = None
+                self.spaces_tools = None
 
     def get_all_tool_definitions(self) -> Dict[str, Dict[str, Any]]:
         """Get all tool definitions from the improved tools."""
@@ -102,5 +123,36 @@ class MCPServer:
                         "parameter_descriptions", {}
                     ),
                 }
+
+        # Add KB tools only if enabled and initialized
+        if self.articles_tools is not None:
+            articles_tool_definitions = self.articles_tools.get_tool_definitions()
+            for tool_name, tool_config in articles_tool_definitions.items():
+                function = tool_config.get("function") or getattr(
+                    self.articles_tools, tool_name, None
+                )
+                if function:
+                    all_tools[tool_name] = {
+                        "description": tool_config["description"],
+                        "function": function,
+                        "parameter_descriptions": tool_config.get(
+                            "parameter_descriptions", {}
+                        ),
+                    }
+
+        if self.spaces_tools is not None:
+            spaces_tool_definitions = self.spaces_tools.get_tool_definitions()
+            for tool_name, tool_config in spaces_tool_definitions.items():
+                function = tool_config.get("function") or getattr(
+                    self.spaces_tools, tool_name, None
+                )
+                if function:
+                    all_tools[tool_name] = {
+                        "description": tool_config["description"],
+                        "function": function,
+                        "parameter_descriptions": tool_config.get(
+                            "parameter_descriptions", {}
+                        ),
+                    }
 
         return all_tools
