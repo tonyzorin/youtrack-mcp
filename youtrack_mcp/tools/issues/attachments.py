@@ -15,6 +15,7 @@ import base64
 import logging
 from typing import Any, Dict
 
+from youtrack_mcp.api.issues import AttachmentNotFoundError
 from youtrack_mcp.mcp_wrappers import sync_wrapper
 from youtrack_mcp.utils import format_json_response
 
@@ -125,7 +126,7 @@ class Attachments:
                 "status": "success",
                 "message": f"Attachment {attachment_id} successfully deleted from issue {issue_id}"
             })
-        except ValueError as e:
+        except AttachmentNotFoundError as e:
             logger.warning(f"Attachment not found: {e}")
             return format_json_response({"error": str(e), "status": "not_found"})
         except Exception as e:

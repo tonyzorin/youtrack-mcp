@@ -14,6 +14,12 @@ from youtrack_mcp.api.client import YouTrackClient, YouTrackAPIError
 logger = logging.getLogger(__name__)
 
 
+class AttachmentNotFoundError(ValueError):
+    """Raised when an attachment is not found in an issue."""
+
+    pass
+
+
 class Issue(BaseModel):
     """Model for a YouTrack issue."""
 
@@ -1146,7 +1152,7 @@ class IssuesClient:
             attachment_id: The attachment ID to delete
 
         Raises:
-            ValueError: If attachment not found
+            AttachmentNotFoundError: If attachment not found
             YouTrackAPIError: If API request fails (e.g., insufficient permissions)
         """
         # First verify the attachment exists
@@ -1163,7 +1169,7 @@ class IssuesClient:
                     break
 
         if not attachment_found:
-            raise ValueError(
+            raise AttachmentNotFoundError(
                 f"Attachment {attachment_id} not found in issue {issue_id}"
             )
 
