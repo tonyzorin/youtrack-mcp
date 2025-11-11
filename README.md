@@ -154,6 +154,18 @@ add_comment("DEMO-123", "Fixed the login bug")
 get_issue_comments("DEMO-123")
 ```
 
+### **📎 Attachments**
+```python
+# Get raw issue data with attachments
+get_issue_raw("DEMO-123")
+
+# Download attachment content as base64
+get_attachment_content("DEMO-123", "1-456")
+
+# Delete an attachment (requires permissions)
+delete_attachment("DEMO-123", "1-456")
+```
+
 ---
 
 ## Installation
@@ -240,7 +252,7 @@ npx @tonyzorin/youtrack-mcp
 - **Project Management**: Access project information and custom fields
 - **Search Capabilities**: Advanced search with filters and custom fields
 - **User Management**: Retrieve user information and permissions
-- **Attachment Support**: Download and process issue attachments (up to 10MB)
+- **Attachment Support**: Download, process, and delete issue attachments (up to 10MB)
 - **Multi-Platform Support**: ARM64/Apple Silicon and AMD64 architecture support
 - **Comprehensive API**: Full YouTrack REST API integration
 
