@@ -2470,38 +2470,6 @@ class IssuesClient:
         # Return the binary content
         return response.content
 
-    def delete_attachment(self, issue_id: str, attachment_id: str) -> None:
-        """
-        Delete an attachment from an issue.
-
-        Args:
-            issue_id: The issue ID or readable ID
-            attachment_id: The attachment ID to delete
-
-        Raises:
-            ValueError: If attachment not found
-            YouTrackAPIError: If API request fails (e.g., insufficient permissions)
-        """
-        # First verify the attachment exists
-        issue_response = self.client.get(
-            f"issues/{issue_id}?fields=attachments(id,name)"
-        )
-
-        # Check if attachment exists
-        attachment_found = False
-        if "attachments" in issue_response:
-            for attachment in issue_response["attachments"]:
-                if attachment.get("id") == attachment_id:
-                    attachment_found = True
-                    break
-
-        if not attachment_found:
-            raise ValueError(
-                f"Attachment {attachment_id} not found in issue {issue_id}"
-            )
-
-        # Delete the attachment
-        self.client.delete(f"issues/{issue_id}/attachments/{attachment_id}")
 
     def _get_internal_id(self, issue_id: str) -> str:
         """Convert issue ID to internal format if needed."""
