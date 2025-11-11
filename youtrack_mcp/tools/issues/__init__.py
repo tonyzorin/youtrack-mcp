@@ -172,14 +172,18 @@ class IssueTools:
         return self.linking.add_duplicate_link(duplicate_issue_id, original_issue_id)
 
     # === Attachment Functions ===
-    
+
     def get_issue_raw(self, issue_id: str) -> str:
         """Get raw issue data with all fields."""
         return self.attachments.get_issue_raw(issue_id)
-    
+
     def get_attachment_content(self, issue_id: str, attachment_id: str) -> str:
         """Get attachment content as base64."""
         return self.attachments.get_attachment_content(issue_id, attachment_id)
+
+    def delete_attachment(self, issue_id: str, attachment_id: str) -> str:
+        """Delete an attachment from an issue."""
+        return self.attachments.delete_attachment(issue_id, attachment_id)
 
     # === Utility Functions ===
     

@@ -281,4 +281,11 @@ class Utilities:
                     "attachment_id": "Attachment ID like '1-123'",
                 },
             },
+            "delete_attachment": {
+                "description": 'Delete an attachment from an issue. Requires appropriate permissions. Example: delete_attachment(issue_id="DEMO-123", attachment_id="1-123")',
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier like 'DEMO-123'",
+                    "attachment_id": "Attachment ID to delete like '1-123'",
+                },
+            },
         } 
