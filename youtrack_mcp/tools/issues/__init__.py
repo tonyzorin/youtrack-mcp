@@ -133,9 +133,9 @@ class IssueTools:
         """Create a new issue in the specified project."""
         return self.basic_operations.create_issue(project, summary, description)
     
-    def update_issue(self, issue_id: str, summary: Optional[str] = None, description: Optional[str] = None, additional_fields: Optional[Dict[str, Any]] = None) -> str:
+    def update_issue(self, issue_id: str, summary: Optional[str] = None, description: Optional[str] = None, uses_markdown: Optional[bool] = None, additional_fields: Optional[Dict[str, Any]] = None) -> str:
         """Update basic issue fields."""
-        return self.basic_operations.update_issue(issue_id, summary, description, additional_fields)
+        return self.basic_operations.update_issue(issue_id, summary, description, uses_markdown, additional_fields)
     
     def add_comment(self, issue_id: str, text: str) -> str:
         """Add a comment to an issue."""

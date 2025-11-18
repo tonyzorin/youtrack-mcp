@@ -259,6 +259,7 @@ class IssuesClient:
         issue_id: str,
         summary: Optional[str] = None,
         description: Optional[str] = None,
+        uses_markdown: Optional[bool] = None,
         additional_fields: Optional[Dict[str, Any]] = None,
     ) -> Issue:
         """
@@ -268,6 +269,7 @@ class IssuesClient:
             issue_id: The issue ID or readable ID
             summary: The new issue summary
             description: The new issue description
+            uses_markdown: Whether the description uses Markdown formatting (True/False)
             additional_fields: Additional fields to update
 
         Returns:
@@ -280,6 +282,9 @@ class IssuesClient:
 
         if description is not None:
             data["description"] = description
+
+        if uses_markdown is not None:
+            data["usesMarkdown"] = uses_markdown
 
         if additional_fields:
             data.update(additional_fields)
