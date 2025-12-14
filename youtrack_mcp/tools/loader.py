@@ -10,6 +10,7 @@ from typing import Dict, Callable, Any
 from collections import defaultdict
 
 from youtrack_mcp.mcp_wrappers import create_bound_tool
+from youtrack_mcp.config import Config
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -40,6 +41,92 @@ TOOL_PRIORITY = {
 }
 
 
+def filter_tools(tools: Dict[str, Callable]) -> Dict[str, Callable]:
+    """
+    Filter tools based on ENABLED_TOOLS or DISABLED_TOOLS configuration.
+
+    If ENABLED_TOOLS is set (allowlist mode), only those tools are included.
+    If DISABLED_TOOLS is set (denylist mode), those tools are excluded.
+    ENABLED_TOOLS takes precedence if both are set.
+
+    Args:
+        tools: Dictionary mapping tool names to their functions
+
+    Returns:
+        Filtered dictionary of tools
+    """
+    # Get all available tool names (normalized for comparison)
+    available_tools = {Config._normalize_tool_name(name): name for name in tools}
+
+    # Check which mode we're in
+    if Config.is_allowlist_mode():
+        # Allowlist mode: only include specified tools
+        enabled_set = Config.get_enabled_tools()
+
+        # Warn about invalid tool names
+        for enabled_name in enabled_set:
+            if enabled_name not in available_tools:
+                logger.warning(
+                    f"ENABLED_TOOLS contains unknown tool '{enabled_name}'. "
+                    f"Available tools: {', '.join(sorted(tools.keys()))}"
+                )
+
+        # Filter to only enabled tools
+        filtered = {
+            original_name: tools[original_name]
+            for normalized, original_name in available_tools.items()
+            if normalized in enabled_set
+        }
+
+        disabled_count = len(tools) - len(filtered)
+        if disabled_count > 0:
+            enabled_word = "tool" if len(filtered) == 1 else "tools"
+            disabled_word = "tool" if disabled_count == 1 else "tools"
+            logger.info(
+                f"Allowlist mode: {len(filtered)} {enabled_word} enabled, "
+                f"{disabled_count} {disabled_word} disabled"
+            )
+
+        return filtered
+
+    else:
+        # Denylist mode: exclude specified tools
+        disabled_set = Config.get_disabled_tools()
+
+        if not disabled_set:
+            return tools  # No filtering needed
+
+        # Warn about invalid tool names
+        for disabled_name in disabled_set:
+            if disabled_name not in available_tools:
+                logger.warning(
+                    f"DISABLED_TOOLS contains unknown tool '{disabled_name}'. "
+                    f"Available tools: {', '.join(sorted(tools.keys()))}"
+                )
+
+        # Filter out disabled tools
+        filtered = {
+            original_name: func
+            for original_name, func in tools.items()
+            if Config._normalize_tool_name(original_name) not in disabled_set
+        }
+
+        actually_disabled = len(tools) - len(filtered)
+        if actually_disabled > 0:
+            disabled_names = [
+                name
+                for name in tools.keys()
+                if Config._normalize_tool_name(name) in disabled_set
+            ]
+            disabled_word = "tool" if actually_disabled == 1 else "tools"
+            logger.info(
+                f"Denylist mode: {actually_disabled} {disabled_word} disabled: "
+                f"{', '.join(sorted(disabled_names))}"
+            )
+
+        return filtered
+
+
 def load_all_tools() -> Dict[str, Callable]:
     """
     Load all tools from the youtrack_mcp.tools package.
@@ -47,6 +134,11 @@ def load_all_tools() -> Dict[str, Callable]:
     This function loads tools from all tool classes and registers them with their
     short names (without namespaces). If the same tool name exists in multiple classes,
     the tool from the class with higher priority will be used.
+
+    Tools can be filtered using environment variables:
+    - DISABLED_TOOLS: Comma-separated list of tool names to disable (denylist)
+    - ENABLED_TOOLS: Comma-separated list of tool names to enable (allowlist)
+    If ENABLED_TOOLS is set, it takes precedence over DISABLED_TOOLS.
 
     Available tools:
     - get_projects, get_project, get_project_by_name, get_project_issues, get_custom_fields,
@@ -211,8 +303,11 @@ def load_all_tools() -> Dict[str, Callable]:
             # Log in debug level only to reduce verbosity
             logger.debug(f"Registered tool '{name}' from {class_name}")
 
-    # Log total number of tools loaded
+    # Log total number of tools loaded (before filtering)
     logger.info(f"Loader registered {len(tools)} tools from all tool classes")
+
+    # Apply tool filtering based on configuration
+    tools = filter_tools(tools)
 
     return tools
 
