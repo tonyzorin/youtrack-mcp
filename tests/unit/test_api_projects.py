@@ -94,11 +94,12 @@ class TestProjectsClientInitialization:
 
 
 class TestProjectsClientGetProjects:
-    """Test getting projects list."""
+    """Test getting projects list with pagination."""
 
     def test_get_projects_basic(self):
-        """Test getting basic projects list."""
+        """Test getting basic projects list with pagination."""
         mock_client = Mock(spec=YouTrackClient)
+        # Simulate single page of results (less than page_size)
         mock_client.get.return_value = [
             {
                 "id": "0-0",
@@ -107,26 +108,110 @@ class TestProjectsClientGetProjects:
                 "archived": False
             },
             {
-                "id": "1-1", 
+                "id": "1-1",
                 "name": "Test Project",
                 "shortName": "TEST",
                 "archived": False
             }
         ]
-        
+
         projects_client = ProjectsClient(mock_client)
         projects = projects_client.get_projects()
-        
+
         assert len(projects) == 2
         assert isinstance(projects[0], Project)
         assert projects[0].id == "0-0"
         assert projects[0].name == "Demo Project"
         assert projects[0].shortName == "DEMO"
-        
-        # Verify API call
+
+        # Verify API call includes pagination parameters
         mock_client.get.assert_called_once_with(
-            "admin/projects", 
-            params={"fields": "id,name,shortName,description,archived,created,updated,lead(id,name,login)", "$filter": "archived eq false"}
+            "admin/projects",
+            params={
+                "fields": "id,name,shortName,description,archived,created,updated,lead(id,name,login)",
+                "$top": 100,
+                "$skip": 0,
+                "$filter": "archived eq false"
+            }
+        )
+
+    def test_get_projects_pagination_multiple_pages(self):
+        """Test fetching projects across multiple pages."""
+        mock_client = Mock(spec=YouTrackClient)
+
+        # Create 150 projects (more than default page_size of 100)
+        page1_projects = [
+            {"id": f"{i}-{i}", "name": f"Project {i}", "shortName": f"P{i}", "archived": False}
+            for i in range(100)
+        ]
+        page2_projects = [
+            {"id": f"{i}-{i}", "name": f"Project {i}", "shortName": f"P{i}", "archived": False}
+            for i in range(100, 150)
+        ]
+
+        # Simulate paginated responses
+        mock_client.get.side_effect = [page1_projects, page2_projects]
+
+        projects_client = ProjectsClient(mock_client)
+        projects = projects_client.get_projects()
+
+        # Should have all 150 projects
+        assert len(projects) == 150
+
+        # Verify pagination calls
+        assert mock_client.get.call_count == 2
+
+        # Verify first call (skip=0)
+        first_call = mock_client.get.call_args_list[0]
+        assert first_call[1]["params"]["$skip"] == 0
+        assert first_call[1]["params"]["$top"] == 100
+
+        # Verify second call (skip=100)
+        second_call = mock_client.get.call_args_list[1]
+        assert second_call[1]["params"]["$skip"] == 100
+        assert second_call[1]["params"]["$top"] == 100
+
+    def test_get_projects_pagination_exact_page_boundary(self):
+        """Test pagination when results are exactly at page boundary."""
+        mock_client = Mock(spec=YouTrackClient)
+
+        # Create exactly 100 projects (equal to page_size)
+        page1_projects = [
+            {"id": f"{i}-{i}", "name": f"Project {i}", "shortName": f"P{i}", "archived": False}
+            for i in range(100)
+        ]
+
+        # Simulate paginated responses - second page is empty
+        mock_client.get.side_effect = [page1_projects, []]
+
+        projects_client = ProjectsClient(mock_client)
+        projects = projects_client.get_projects()
+
+        # Should have all 100 projects
+        assert len(projects) == 100
+
+        # Should make two calls (first page full, second empty)
+        assert mock_client.get.call_count == 2
+
+    def test_get_projects_custom_page_size(self):
+        """Test fetching projects with custom page size."""
+        mock_client = Mock(spec=YouTrackClient)
+        mock_client.get.return_value = [
+            {"id": "0-0", "name": "Project 1", "shortName": "P1", "archived": False}
+        ]
+
+        projects_client = ProjectsClient(mock_client)
+        projects = projects_client.get_projects(page_size=50)
+
+        # Verify custom page size was used
+        mock_client.get.assert_called_once_with(
+            "admin/projects",
+            params={
+                "fields": "id,name,shortName,description,archived,created,updated,lead(id,name,login)",
+                "$top": 50,
+                "$skip": 0,
+                "$filter": "archived eq false"
+            }
         )
 
     def test_get_projects_include_archived(self):
@@ -141,20 +226,21 @@ class TestProjectsClientGetProjects:
             },
             {
                 "id": "1-1",
-                "name": "Archived Project", 
+                "name": "Archived Project",
                 "shortName": "ARCH",
                 "archived": True
             }
         ]
-        
+
         projects_client = ProjectsClient(mock_client)
         projects = projects_client.get_projects(include_archived=True)
-        
+
         assert len(projects) == 2
         assert projects[1].archived is True
-        
+
         # Should not filter archived projects when include_archived=True
-        mock_client.get.assert_called_once()
+        call_params = mock_client.get.call_args[1]["params"]
+        assert "$filter" not in call_params
 
     def test_get_projects_exclude_archived_default(self):
         """Test that archived projects are excluded by default."""
@@ -163,7 +249,7 @@ class TestProjectsClientGetProjects:
             {
                 "id": "0-0",
                 "name": "Active Project",
-                "shortName": "ACTIVE", 
+                "shortName": "ACTIVE",
                 "archived": False
             },
             {
@@ -173,10 +259,10 @@ class TestProjectsClientGetProjects:
                 "archived": True
             }
         ]
-        
+
         projects_client = ProjectsClient(mock_client)
         projects = projects_client.get_projects()  # Default: include_archived=False
-        
+
         # Should filter out archived projects
         active_projects = [p for p in projects if not p.archived]
         assert len(active_projects) == 1
@@ -186,22 +272,22 @@ class TestProjectsClientGetProjects:
         """Test handling empty projects response."""
         mock_client = Mock(spec=YouTrackClient)
         mock_client.get.return_value = []
-        
+
         projects_client = ProjectsClient(mock_client)
         projects = projects_client.get_projects()
-        
+
         assert projects == []
 
     def test_get_projects_api_error(self):
         """Test handling API errors in get_projects."""
         mock_client = Mock(spec=YouTrackClient)
         mock_client.get.side_effect = Exception("API Error")
-        
+
         projects_client = ProjectsClient(mock_client)
-        
+
         with pytest.raises(Exception) as exc_info:
             projects_client.get_projects()
-        
+
         assert "API Error" in str(exc_info.value)
 
 
@@ -254,13 +340,164 @@ class TestProjectsClientGetProject:
         """Test handling project not found."""
         mock_client = Mock(spec=YouTrackClient)
         mock_client.get.side_effect = Exception("Project not found")
-        
+
         projects_client = ProjectsClient(mock_client)
-        
+
         with pytest.raises(Exception) as exc_info:
             projects_client.get_project("NONEXISTENT")
-        
+
         assert "Project not found" in str(exc_info.value)
+
+
+class TestProjectsClientGetProjectByName:
+    """Test get_project_by_name with direct lookup and fallback."""
+
+    def test_get_project_by_name_direct_lookup_success(self):
+        """Test successful direct lookup by shortName."""
+        mock_client = Mock(spec=YouTrackClient)
+        mock_client.get.return_value = {
+            "id": "0-0",
+            "name": "Demo Project",
+            "shortName": "DEMO",
+            "description": "Test project"
+        }
+
+        projects_client = ProjectsClient(mock_client)
+        project = projects_client.get_project_by_name("DEMO")
+
+        assert project is not None
+        assert project.id == "0-0"
+        assert project.shortName == "DEMO"
+
+        # Should only make one direct lookup call
+        mock_client.get.assert_called_once_with(
+            "admin/projects/DEMO",
+            params={"fields": "id,name,shortName,description,archived,created,updated,lead(id,name,login)"}
+        )
+
+    def test_get_project_by_name_fallback_to_pagination(self):
+        """Test fallback to paginated search when direct lookup fails."""
+        mock_client = Mock(spec=YouTrackClient)
+
+        # First call (direct lookup) fails, then pagination succeeds
+        mock_client.get.side_effect = [
+            Exception("Project not found"),  # Direct lookup fails
+            [  # Pagination returns projects
+                {"id": "0-0", "name": "Demo Project", "shortName": "DEMO", "archived": False},
+                {"id": "1-1", "name": "Test Project", "shortName": "TEST", "archived": False}
+            ]
+        ]
+
+        projects_client = ProjectsClient(mock_client)
+        project = projects_client.get_project_by_name("DEMO")
+
+        assert project is not None
+        assert project.shortName == "DEMO"
+
+        # Should make two calls: direct lookup + pagination
+        assert mock_client.get.call_count == 2
+
+    def test_get_project_by_name_match_by_full_name(self):
+        """Test matching project by full name (case-insensitive)."""
+        mock_client = Mock(spec=YouTrackClient)
+
+        mock_client.get.side_effect = [
+            Exception("Project not found"),  # Direct lookup fails (name has spaces)
+            [  # Pagination returns projects
+                {"id": "0-0", "name": "Demo Project", "shortName": "DEMO", "archived": False},
+                {"id": "1-1", "name": "Test Project", "shortName": "TEST", "archived": False}
+            ]
+        ]
+
+        projects_client = ProjectsClient(mock_client)
+        project = projects_client.get_project_by_name("demo project")  # lowercase
+
+        assert project is not None
+        assert project.name == "Demo Project"
+        assert project.shortName == "DEMO"
+
+    def test_get_project_by_name_match_by_partial_name(self):
+        """Test matching project by partial name."""
+        mock_client = Mock(spec=YouTrackClient)
+
+        mock_client.get.side_effect = [
+            Exception("Project not found"),  # Direct lookup fails
+            [  # Pagination returns projects
+                {"id": "0-0", "name": "My Demo Project", "shortName": "DEMO", "archived": False},
+                {"id": "1-1", "name": "Test Project", "shortName": "TEST", "archived": False}
+            ]
+        ]
+
+        projects_client = ProjectsClient(mock_client)
+        project = projects_client.get_project_by_name("Demo")  # Partial match
+
+        assert project is not None
+        assert project.name == "My Demo Project"
+
+    def test_get_project_by_name_not_found(self):
+        """Test when project is not found anywhere."""
+        mock_client = Mock(spec=YouTrackClient)
+
+        mock_client.get.side_effect = [
+            Exception("Project not found"),  # Direct lookup fails
+            []  # No projects in paginated result
+        ]
+
+        projects_client = ProjectsClient(mock_client)
+        project = projects_client.get_project_by_name("NONEXISTENT")
+
+        assert project is None
+
+    def test_get_project_by_name_prefers_shortname_match(self):
+        """Test that shortName match takes priority over full name match."""
+        mock_client = Mock(spec=YouTrackClient)
+
+        mock_client.get.side_effect = [
+            Exception("Project not found"),  # Direct lookup fails
+            [
+                {"id": "0-0", "name": "Some Project Named TEST", "shortName": "OTHER", "archived": False},
+                {"id": "1-1", "name": "Different Project", "shortName": "TEST", "archived": False}
+            ]
+        ]
+
+        projects_client = ProjectsClient(mock_client)
+        project = projects_client.get_project_by_name("TEST")
+
+        # Should match by shortName, not by name containing "TEST"
+        assert project is not None
+        assert project.shortName == "TEST"
+        assert project.id == "1-1"
+
+    def test_get_project_by_name_pagination_multiple_pages(self):
+        """Test project search across multiple pagination pages."""
+        mock_client = Mock(spec=YouTrackClient)
+
+        # Create 150 projects, target project is on page 2
+        page1_projects = [
+            {"id": f"{i}-{i}", "name": f"Project {i}", "shortName": f"P{i}", "archived": False}
+            for i in range(100)
+        ]
+        page2_projects = [
+            {"id": f"{i}-{i}", "name": f"Project {i}", "shortName": f"P{i}", "archived": False}
+            for i in range(100, 120)
+        ]
+        # Add target project at the end of page 2
+        page2_projects.append(
+            {"id": "target-id", "name": "Target Project", "shortName": "TARGET", "archived": False}
+        )
+
+        mock_client.get.side_effect = [
+            Exception("Project not found"),  # Direct lookup fails
+            page1_projects,  # First page
+            page2_projects   # Second page with target
+        ]
+
+        projects_client = ProjectsClient(mock_client)
+        project = projects_client.get_project_by_name("TARGET")
+
+        assert project is not None
+        assert project.shortName == "TARGET"
+        assert project.id == "target-id"
 
 
 class TestProjectsClientCustomFields:

@@ -39,24 +39,56 @@ class ProjectsClient:
         """
         self.client = client
 
-    def get_projects(self, include_archived: bool = False) -> List[Project]:
+    def get_projects(
+        self, include_archived: bool = False, page_size: int = 100
+    ) -> List[Project]:
         """
-        Get all projects.
+        Get all projects with pagination support.
+
+        This method fetches all projects by iterating through pages of results.
+        YouTrack API limits results per request, so pagination is required
+        for instances with many projects (>50).
 
         Args:
             include_archived: Whether to include archived projects
+            page_size: Number of projects to fetch per page (default: 100)
 
         Returns:
-            List of projects
+            List of all projects
         """
-        params = {
-            "fields": "id,name,shortName,description,archived,created,updated,lead(id,name,login)"
-        }
-        if not include_archived:
-            params["$filter"] = "archived eq false"
+        all_projects: List[Project] = []
+        skip = 0
+        fields = "id,name,shortName,description,archived,created,updated,lead(id,name,login)"
 
-        response = self.client.get("admin/projects", params=params)
-        return [Project.model_validate(project) for project in response]
+        while True:
+            params = {
+                "fields": fields,
+                "$top": page_size,
+                "$skip": skip,
+            }
+            if not include_archived:
+                params["$filter"] = "archived eq false"
+
+            logger.debug(f"Fetching projects page: skip={skip}, top={page_size}")
+            response = self.client.get("admin/projects", params=params)
+
+            if not response:
+                # No more projects
+                break
+
+            projects = [Project.model_validate(project) for project in response]
+            all_projects.extend(projects)
+
+            logger.debug(f"Fetched {len(projects)} projects (total: {len(all_projects)})")
+
+            if len(projects) < page_size:
+                # Last page - fewer results than requested
+                break
+
+            skip += page_size
+
+        logger.info(f"Retrieved {len(all_projects)} total projects")
+        return all_projects
 
     def get_project(self, project_id: str) -> Project:
         """
@@ -80,29 +112,57 @@ class ProjectsClient:
         """
         Get a project by its name or short name.
 
+        This method uses an efficient lookup strategy:
+        1. First, try direct API lookup by shortName (most efficient)
+        2. If that fails, fetch all projects with pagination and match client-side
+
         Args:
             project_name: The project name or short name
 
         Returns:
             The project data or None if not found
         """
+        # Strategy 1: Try direct API lookup by shortName (most efficient)
+        # YouTrack allows fetching a project directly by its shortName
+        try:
+            logger.debug(f"Attempting direct project lookup: {project_name}")
+            response = self.client.get(
+                f"admin/projects/{project_name}",
+                params={
+                    "fields": "id,name,shortName,description,archived,created,updated,lead(id,name,login)"
+                },
+            )
+            if response:
+                project = Project.model_validate(response)
+                logger.info(f"Found project by direct lookup: {project.name} ({project.shortName})")
+                return project
+        except Exception as e:
+            # Direct lookup failed, this is expected for full names
+            logger.debug(f"Direct project lookup failed for '{project_name}': {e}")
+
+        # Strategy 2: Fetch all projects with pagination and match client-side
+        logger.debug(f"Falling back to full project search for: {project_name}")
         projects = self.get_projects(include_archived=True)
 
-        # First try to match by short name (exact match)
+        # First try to match by short name (exact match, case-insensitive)
         for project in projects:
             if project.shortName.lower() == project_name.lower():
+                logger.info(f"Found project by shortName match: {project.name}")
                 return project
 
-        # Then try to match by full name (case insensitive)
+        # Then try to match by full name (case-insensitive)
         for project in projects:
             if project.name.lower() == project_name.lower():
+                logger.info(f"Found project by name match: {project.name}")
                 return project
 
         # Finally try to match if project_name is contained in the name
         for project in projects:
             if project_name.lower() in project.name.lower():
+                logger.info(f"Found project by partial name match: {project.name}")
                 return project
 
+        logger.warning(f"Project not found: {project_name}")
         return None
 
     def get_project_issues(
