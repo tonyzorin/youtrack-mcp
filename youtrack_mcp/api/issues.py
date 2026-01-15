@@ -2374,39 +2374,6 @@ class IssuesClient:
         # Return the binary content
         return response.content
 
-
-    def _get_internal_id(self, issue_id: str) -> str:
-        """Convert issue ID to internal format if needed."""
-        try:
-            internal_id = self.client.get(f"issues/{issue_id}?fields=id")["id"]
-            return internal_id
-        except Exception:
-            # If that fails, assume the issue_id is already internal
-            return issue_id
-
-    def _get_readable_id(self, issue_id: str) -> str:
-        """
-        Convert an internal issue ID (like 3-37) to readable ID (like DEMO-37).
-        If it's already a readable ID, return as-is.
-
-        Args:
-            issue_id: Issue ID (internal like '3-41' or readable like 'DEMO-123')
-
-        Returns:
-            Readable project ID (like 'DEMO-41')
-        """
-        try:
-            # If it doesn't look like an internal ID, return as-is
-            if not ("-" in issue_id and issue_id.replace("-", "").isdigit()):
-                return issue_id
-
-            # Fetch the issue to get its readable ID
-            issue = self.client.get(f"issues/{issue_id}?fields=idReadable")
-            return issue.get("idReadable", issue_id)
-        except Exception:
-            # If we can't get the readable ID, return the original
-            return issue_id
-
     def link_issues(
         self, source_issue_id: str, target_issue_id: str, link_type: str
     ) -> dict:
