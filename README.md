@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/tonyzorin-youtrack-mcp-badge.png)](https://mseep.ai/app/tonyzorin-youtrack-mcp)
+
 # YouTrack MCP
 
 A Model Context Protocol (MCP) server that provides access to YouTrack functionality.
