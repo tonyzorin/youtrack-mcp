@@ -261,6 +261,29 @@ For development instructions, see the [Automation Scripts Guide](automations/REA
 - `YOUTRACK_URL`: Your YouTrack instance URL
 - `YOUTRACK_API_TOKEN`: Your YouTrack API token
 - `YOUTRACK_VERIFY_SSL`: SSL verification (default: true)
+- `DISABLED_TOOLS`: Comma-separated list of tools to disable (denylist mode)
+- `ENABLED_TOOLS`: Comma-separated list of tools to enable (allowlist mode)
+
+### Tool Filtering
+
+You can reduce context pollution and token usage by filtering which tools are available:
+
+**Denylist Mode** - Disable specific tools:
+```bash
+export DISABLED_TOOLS="create_issue,update_issue,delete_page"
+```
+
+**Allowlist Mode** - Enable only specific tools (disables all others):
+```bash
+export ENABLED_TOOLS="get_issue,search_issues,get_projects"
+```
+
+**Notes:**
+- Tool names are case-insensitive (`Get_Issue` = `get_issue`)
+- Hyphens and underscores are equivalent (`get-issue` = `get_issue`)
+- If `ENABLED_TOOLS` is set, it takes precedence over `DISABLED_TOOLS`
+- Invalid tool names generate warnings but don't cause errors
+- Filtering happens at startup for maximum efficiency
 
 ### Example Configuration
 

@@ -52,6 +52,69 @@ class Config:
         "yes",
     )
 
+    # Tool filtering configuration
+    DISABLED_TOOLS: str = os.getenv("DISABLED_TOOLS", "")
+    ENABLED_TOOLS: str = os.getenv("ENABLED_TOOLS", "")
+
+    @classmethod
+    def _normalize_tool_name(cls, name: str) -> str:
+        """
+        Normalize a tool name for comparison.
+
+        Strips whitespace, converts to lowercase, and replaces hyphens with underscores.
+
+        Args:
+            name: The tool name to normalize
+
+        Returns:
+            Normalized tool name
+        """
+        return name.strip().lower().replace("-", "_")
+
+    @classmethod
+    def get_disabled_tools(cls) -> set:
+        """
+        Get the set of disabled tool names (normalized).
+
+        Returns:
+            Set of normalized tool names to disable
+        """
+        if not cls.DISABLED_TOOLS:
+            return set()
+
+        return {
+            cls._normalize_tool_name(name)
+            for name in cls.DISABLED_TOOLS.split(",")
+            if name.strip()
+        }
+
+    @classmethod
+    def get_enabled_tools(cls) -> set:
+        """
+        Get the set of enabled tool names (normalized).
+
+        Returns:
+            Set of normalized tool names to enable (allowlist mode)
+        """
+        if not cls.ENABLED_TOOLS:
+            return set()
+
+        return {
+            cls._normalize_tool_name(name)
+            for name in cls.ENABLED_TOOLS.split(",")
+            if name.strip()
+        }
+
+    @classmethod
+    def is_allowlist_mode(cls) -> bool:
+        """
+        Check if allowlist mode is active (ENABLED_TOOLS is set).
+
+        Returns:
+            True if allowlist mode is active
+        """
+        return bool(cls.ENABLED_TOOLS.strip())
+
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> None:
         """
