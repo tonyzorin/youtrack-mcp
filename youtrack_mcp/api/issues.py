@@ -14,6 +14,12 @@ from youtrack_mcp.api.client import YouTrackClient, YouTrackAPIError
 logger = logging.getLogger(__name__)
 
 
+class AttachmentNotFoundError(ValueError):
+    """Raised when an attachment is not found in an issue."""
+
+    pass
+
+
 class Issue(BaseModel):
     """Model for a YouTrack issue."""
 
@@ -253,6 +259,7 @@ class IssuesClient:
         issue_id: str,
         summary: Optional[str] = None,
         description: Optional[str] = None,
+        uses_markdown: Optional[bool] = None,
         additional_fields: Optional[Dict[str, Any]] = None,
     ) -> Issue:
         """
@@ -262,6 +269,7 @@ class IssuesClient:
             issue_id: The issue ID or readable ID
             summary: The new issue summary
             description: The new issue description
+            uses_markdown: Whether the description uses Markdown formatting (True/False)
             additional_fields: Additional fields to update
 
         Returns:
@@ -274,6 +282,9 @@ class IssuesClient:
 
         if description is not None:
             data["description"] = description
+
+        if uses_markdown is not None:
+            data["usesMarkdown"] = uses_markdown
 
         if additional_fields:
             data.update(additional_fields)
@@ -1136,6 +1147,39 @@ class IssuesClient:
 
         # Return the binary content
         return response.content
+
+    def delete_attachment(self, issue_id: str, attachment_id: str) -> None:
+        """
+        Delete an attachment from an issue.
+
+        Args:
+            issue_id: The issue ID or readable ID
+            attachment_id: The attachment ID to delete
+
+        Raises:
+            AttachmentNotFoundError: If attachment not found
+            YouTrackAPIError: If API request fails (e.g., insufficient permissions)
+        """
+        # First verify the attachment exists
+        issue_response = self.client.get(
+            f"issues/{issue_id}?fields=attachments(id,name)"
+        )
+
+        # Check if attachment exists
+        attachment_found = False
+        if "attachments" in issue_response:
+            for attachment in issue_response["attachments"]:
+                if attachment.get("id") == attachment_id:
+                    attachment_found = True
+                    break
+
+        if not attachment_found:
+            raise AttachmentNotFoundError(
+                f"Attachment {attachment_id} not found in issue {issue_id}"
+            )
+
+        # Delete the attachment
+        self.client.delete(f"issues/{issue_id}/attachments/{attachment_id}")
 
     def _get_internal_id(self, issue_id: str) -> str:
         """Convert issue ID to internal format if needed."""
@@ -2329,6 +2373,7 @@ class IssuesClient:
 
         # Return the binary content
         return response.content
+
 
     def _get_internal_id(self, issue_id: str) -> str:
         """Convert issue ID to internal format if needed."""

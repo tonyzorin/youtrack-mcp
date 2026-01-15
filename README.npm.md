@@ -143,7 +143,7 @@ Choose your preferred method:
 - **Project Management**: Access project information and custom fields
 - **Search Capabilities**: Advanced search with filters and custom fields
 - **User Management**: Retrieve user information and permissions
-- **Attachment Support**: Download and process issue attachments (up to 10MB)
+- **Attachment Support**: Download, process, and delete issue attachments (up to 10MB)
 - **Multi-Platform Support**: ARM64/Apple Silicon and AMD64 architecture support
 
 ## Requirements
@@ -166,7 +166,7 @@ Once configured, you can use these commands in Claude:
 - Create, update, and manage YouTrack issues
 - Search issues with advanced filters
 - Access project information and custom fields
-- Download and analyze issue attachments
+- Download, analyze, and delete issue attachments
 - Manage user permissions and assignments
 
 ## CLI Options

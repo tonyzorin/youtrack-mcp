@@ -15,6 +15,7 @@ import base64
 import logging
 from typing import Any, Dict
 
+from youtrack_mcp.api.issues import AttachmentNotFoundError
 from youtrack_mcp.mcp_wrappers import sync_wrapper
 from youtrack_mcp.utils import format_json_response
 
@@ -107,6 +108,33 @@ class Attachments:
             )
             return format_json_response({"error": str(e), "status": "error"})
 
+    @sync_wrapper
+    def delete_attachment(self, issue_id: str, attachment_id: str) -> str:
+        """
+        Delete an attachment from an issue.
+
+        Args:
+            issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
+            attachment_id: The attachment ID to delete (e.g., "1-123")
+
+        Returns:
+            JSON string with the deletion status
+        """
+        try:
+            self.issues_api.delete_attachment(issue_id, attachment_id)
+            return format_json_response({
+                "status": "success",
+                "message": f"Attachment {attachment_id} successfully deleted from issue {issue_id}"
+            })
+        except AttachmentNotFoundError as e:
+            logger.warning(f"Attachment not found: {e}")
+            return format_json_response({"error": str(e), "status": "not_found"})
+        except Exception as e:
+            logger.exception(
+                f"Error deleting attachment {attachment_id} from issue {issue_id}"
+            )
+            return format_json_response({"error": str(e), "status": "error"})
+
     def get_tool_definitions(self) -> Dict[str, Dict[str, Any]]:
         """Get tool definitions for attachment functions."""
         return {
@@ -121,6 +149,13 @@ class Attachments:
                 "parameter_descriptions": {
                     "issue_id": "Issue identifier containing the attachment like 'DEMO-123'",
                     "attachment_id": "Attachment identifier from issue attachments list like '1-456' or '2-789'"
+                }
+            },
+            "delete_attachment": {
+                "description": "Delete an attachment from an issue. Requires appropriate permissions (either being the attachment author or having 'Delete Attachment' permission in the project). The deletion is permanent. Example: delete_attachment(issue_id='DEMO-123', attachment_id='1-456')",
+                "parameter_descriptions": {
+                    "issue_id": "Issue identifier containing the attachment like 'DEMO-123'",
+                    "attachment_id": "Attachment identifier to delete from issue attachments list like '1-456' or '2-789'"
                 }
             }
         } 

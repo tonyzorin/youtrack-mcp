@@ -133,9 +133,9 @@ class IssueTools:
         """Create a new issue in the specified project."""
         return self.basic_operations.create_issue(project, summary, description)
     
-    def update_issue(self, issue_id: str, summary: Optional[str] = None, description: Optional[str] = None, additional_fields: Optional[Dict[str, Any]] = None) -> str:
+    def update_issue(self, issue_id: str, summary: Optional[str] = None, description: Optional[str] = None, uses_markdown: Optional[bool] = None, additional_fields: Optional[Dict[str, Any]] = None) -> str:
         """Update basic issue fields."""
-        return self.basic_operations.update_issue(issue_id, summary, description, additional_fields)
+        return self.basic_operations.update_issue(issue_id, summary, description, uses_markdown, additional_fields)
     
     def add_comment(self, issue_id: str, text: str) -> str:
         """Add a comment to an issue."""
@@ -172,14 +172,18 @@ class IssueTools:
         return self.linking.add_duplicate_link(duplicate_issue_id, original_issue_id)
 
     # === Attachment Functions ===
-    
+
     def get_issue_raw(self, issue_id: str) -> str:
         """Get raw issue data with all fields."""
         return self.attachments.get_issue_raw(issue_id)
-    
+
     def get_attachment_content(self, issue_id: str, attachment_id: str) -> str:
         """Get attachment content as base64."""
         return self.attachments.get_attachment_content(issue_id, attachment_id)
+
+    def delete_attachment(self, issue_id: str, attachment_id: str) -> str:
+        """Delete an attachment from an issue."""
+        return self.attachments.delete_attachment(issue_id, attachment_id)
 
     # === Utility Functions ===
     
