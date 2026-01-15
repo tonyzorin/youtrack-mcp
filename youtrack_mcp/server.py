@@ -51,7 +51,7 @@ class YouTrackMCPServer:
         self.server = ToolServerBase(
             name=config.MCP_SERVER_NAME,
             instructions=config.MCP_SERVER_DESCRIPTION,
-            transport=transport,  # ToolServerBase expects 'transport' parameter
+            # transport is passed to run(), not __init__()
         )
 
         # Initialize tool registry
@@ -872,7 +872,9 @@ class YouTrackMCPServer:
         logger.info(
             f"Starting YouTrack MCP server ({config.MCP_SERVER_NAME}) with {self.transport_mode} transport"
         )
-        self.server.run()
+        # Pass transport to run() - FastMCP expects 'stdio', 'sse', or 'streamable-http'
+        transport = self.transport_mode if self.transport_mode in ('stdio', 'sse', 'streamable-http') else 'stdio'
+        self.server.run(transport=transport)
 
     def register_loaded_tools(self, loaded_tools: Dict[str, Callable]) -> None:
         """
