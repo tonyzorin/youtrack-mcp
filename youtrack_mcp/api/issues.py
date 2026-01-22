@@ -926,7 +926,7 @@ class IssuesClient:
                     "value": version_objects[0] if version_objects else None
                 }
 
-        except Exception as e:
+        except (YouTrackAPIError, KeyError, TypeError, AttributeError) as e:
             logger.warning(f"Error creating version field object for '{field_name}': {e}, using simple value")
             # Fallback to simple version object (no ID lookup)
             if isinstance(field_value, str):
@@ -2226,7 +2226,7 @@ class IssuesClient:
                     "value": version_objects[0] if version_objects else None
                 }
 
-        except Exception as e:
+        except (YouTrackAPIError, KeyError, TypeError, AttributeError) as e:
             logger.warning(f"Error creating version field object for '{field_name}': {e}, using simple value")
             # Fallback to simple version object (no ID lookup)
             if isinstance(field_value, str):

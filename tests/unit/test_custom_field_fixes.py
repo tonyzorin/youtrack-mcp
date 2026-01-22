@@ -445,7 +445,7 @@ class TestVersionFieldSupport:
         """Create an IssuesClient with mocked dependencies."""
         return IssuesClient(mock_client)
 
-    def test_create_version_field_object_multi_with_string_input(self, issues_client, mock_client):
+    def test_create_version_field_object_multi_with_string_input(self, issues_client):
         """Test creating MultiVersionIssueCustomField with a single string value."""
         with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
             mock_projects_instance = Mock()
@@ -469,7 +469,7 @@ class TestVersionFieldSupport:
         assert result["value"][0]["id"] == "117-2447"
         assert result["value"][0]["name"] == "2026.02.Sasuke"
 
-    def test_create_version_field_object_multi_with_list_input(self, issues_client, mock_client):
+    def test_create_version_field_object_multi_with_list_input(self, issues_client):
         """Test creating MultiVersionIssueCustomField with multiple values."""
         with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
             mock_projects_instance = Mock()
@@ -492,7 +492,7 @@ class TestVersionFieldSupport:
         assert result["value"][0]["name"] == "2026.02.Sasuke"
         assert result["value"][1]["name"] == "2026.03.Naruto"
 
-    def test_create_version_field_object_single(self, issues_client, mock_client):
+    def test_create_version_field_object_single(self, issues_client):
         """Test creating SingleVersionIssueCustomField."""
         with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
             mock_projects_instance = Mock()
@@ -516,7 +516,7 @@ class TestVersionFieldSupport:
         assert result["value"]["id"] == "117-2447"
         assert result["value"]["name"] == "v1.0.0"
 
-    def test_create_version_field_object_case_insensitive_match(self, issues_client, mock_client):
+    def test_create_version_field_object_case_insensitive_match(self, issues_client):
         """Test that version name matching is case-insensitive."""
         with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
             mock_projects_instance = Mock()
@@ -536,7 +536,7 @@ class TestVersionFieldSupport:
         assert result["value"][0]["id"] == "117-2447"
         assert result["value"][0]["name"] == "2026.02.SASUKE"
 
-    def test_create_version_field_object_version_not_found(self, issues_client, mock_client):
+    def test_create_version_field_object_version_not_found(self, issues_client):
         """Test fallback when version ID is not found."""
         with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
             mock_projects_instance = Mock()
@@ -558,11 +558,13 @@ class TestVersionFieldSupport:
         assert result["value"][0]["name"] == "NonExistentSprint"
         assert "id" not in result["value"][0]
 
-    def test_create_version_field_object_api_error_fallback(self, issues_client, mock_client):
+    def test_create_version_field_object_api_error_fallback(self, issues_client):
         """Test fallback when API call fails."""
+        from youtrack_mcp.api.client import YouTrackAPIError
+
         with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
             mock_projects_instance = Mock()
-            mock_projects_instance.get_custom_field_allowed_values.side_effect = Exception("API Error")
+            mock_projects_instance.get_custom_field_allowed_values.side_effect = YouTrackAPIError("API Error")
             MockProjectsClient.return_value = mock_projects_instance
 
             result = issues_client._create_version_field_object(
