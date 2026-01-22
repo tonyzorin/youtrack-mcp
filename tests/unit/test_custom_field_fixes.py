@@ -427,6 +427,209 @@ class TestCustomFieldUpdateFixes:
     def test_get_custom_field_allowed_values_api_error(self, projects_client, mock_client):
         """Test API error handling."""
         mock_client.get.side_effect = Exception("API Error")
-        
+
         values = projects_client.get_custom_field_allowed_values("DEMO", "Priority")
-        assert values == [] 
+        assert values == []
+
+
+class TestVersionFieldSupport:
+    """Test MultiVersionIssueCustomField and SingleVersionIssueCustomField support."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock YouTrack client."""
+        return Mock(spec=YouTrackClient)
+
+    @pytest.fixture
+    def issues_client(self, mock_client):
+        """Create an IssuesClient with mocked dependencies."""
+        return IssuesClient(mock_client)
+
+    def test_create_version_field_object_multi_with_string_input(self, issues_client, mock_client):
+        """Test creating MultiVersionIssueCustomField with a single string value."""
+        with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
+            mock_projects_instance = Mock()
+            mock_projects_instance.get_custom_field_allowed_values.return_value = [
+                {"id": "117-2447", "name": "2026.02.Sasuke"},
+                {"id": "117-2448", "name": "2026.03.Naruto"}
+            ]
+            MockProjectsClient.return_value = mock_projects_instance
+
+            result = issues_client._create_version_field_object(
+                project_id="DEMO",
+                field_name="Sprints",
+                field_value="2026.02.Sasuke",
+                multi=True
+            )
+
+        assert result["$type"] == "MultiVersionIssueCustomField"
+        assert result["name"] == "Sprints"
+        assert len(result["value"]) == 1
+        assert result["value"][0]["$type"] == "VersionBundleElement"
+        assert result["value"][0]["id"] == "117-2447"
+        assert result["value"][0]["name"] == "2026.02.Sasuke"
+
+    def test_create_version_field_object_multi_with_list_input(self, issues_client, mock_client):
+        """Test creating MultiVersionIssueCustomField with multiple values."""
+        with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
+            mock_projects_instance = Mock()
+            mock_projects_instance.get_custom_field_allowed_values.return_value = [
+                {"id": "117-2447", "name": "2026.02.Sasuke"},
+                {"id": "117-2448", "name": "2026.03.Naruto"}
+            ]
+            MockProjectsClient.return_value = mock_projects_instance
+
+            result = issues_client._create_version_field_object(
+                project_id="DEMO",
+                field_name="Fix versions",
+                field_value=["2026.02.Sasuke", "2026.03.Naruto"],
+                multi=True
+            )
+
+        assert result["$type"] == "MultiVersionIssueCustomField"
+        assert result["name"] == "Fix versions"
+        assert len(result["value"]) == 2
+        assert result["value"][0]["name"] == "2026.02.Sasuke"
+        assert result["value"][1]["name"] == "2026.03.Naruto"
+
+    def test_create_version_field_object_single(self, issues_client, mock_client):
+        """Test creating SingleVersionIssueCustomField."""
+        with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
+            mock_projects_instance = Mock()
+            mock_projects_instance.get_custom_field_allowed_values.return_value = [
+                {"id": "117-2447", "name": "v1.0.0"},
+                {"id": "117-2448", "name": "v2.0.0"}
+            ]
+            MockProjectsClient.return_value = mock_projects_instance
+
+            result = issues_client._create_version_field_object(
+                project_id="DEMO",
+                field_name="Target version",
+                field_value="v1.0.0",
+                multi=False
+            )
+
+        assert result["$type"] == "SingleVersionIssueCustomField"
+        assert result["name"] == "Target version"
+        # Single version has a single object, not an array
+        assert result["value"]["$type"] == "VersionBundleElement"
+        assert result["value"]["id"] == "117-2447"
+        assert result["value"]["name"] == "v1.0.0"
+
+    def test_create_version_field_object_case_insensitive_match(self, issues_client, mock_client):
+        """Test that version name matching is case-insensitive."""
+        with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
+            mock_projects_instance = Mock()
+            mock_projects_instance.get_custom_field_allowed_values.return_value = [
+                {"id": "117-2447", "name": "2026.02.SASUKE"}
+            ]
+            MockProjectsClient.return_value = mock_projects_instance
+
+            result = issues_client._create_version_field_object(
+                project_id="DEMO",
+                field_name="Sprints",
+                field_value="2026.02.sasuke",  # lowercase
+                multi=True
+            )
+
+        # Should find the match despite case difference
+        assert result["value"][0]["id"] == "117-2447"
+        assert result["value"][0]["name"] == "2026.02.SASUKE"
+
+    def test_create_version_field_object_version_not_found(self, issues_client, mock_client):
+        """Test fallback when version ID is not found."""
+        with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
+            mock_projects_instance = Mock()
+            mock_projects_instance.get_custom_field_allowed_values.return_value = [
+                {"id": "117-2447", "name": "OtherVersion"}
+            ]
+            MockProjectsClient.return_value = mock_projects_instance
+
+            result = issues_client._create_version_field_object(
+                project_id="DEMO",
+                field_name="Sprints",
+                field_value="NonExistentSprint",
+                multi=True
+            )
+
+        # Should still create the object but without ID
+        assert result["$type"] == "MultiVersionIssueCustomField"
+        assert result["value"][0]["$type"] == "VersionBundleElement"
+        assert result["value"][0]["name"] == "NonExistentSprint"
+        assert "id" not in result["value"][0]
+
+    def test_create_version_field_object_api_error_fallback(self, issues_client, mock_client):
+        """Test fallback when API call fails."""
+        with patch('youtrack_mcp.api.projects.ProjectsClient') as MockProjectsClient:
+            mock_projects_instance = Mock()
+            mock_projects_instance.get_custom_field_allowed_values.side_effect = Exception("API Error")
+            MockProjectsClient.return_value = mock_projects_instance
+
+            result = issues_client._create_version_field_object(
+                project_id="DEMO",
+                field_name="Sprints",
+                field_value="SomeSprint",
+                multi=True
+            )
+
+        # Should use fallback with name only
+        assert result["$type"] == "MultiVersionIssueCustomField"
+        assert result["name"] == "Sprints"
+        assert result["value"][0]["$type"] == "VersionBundleElement"
+        assert result["value"][0]["name"] == "SomeSprint"
+
+    def test_version_field_detection_in_update_other_custom_fields(self, issues_client, mock_client):
+        """Test that version fields are correctly detected in _update_other_custom_fields."""
+        # Mock get_issue to return issue data with project info
+        mock_issue = Mock()
+        mock_issue.project = {"id": "DEMO", "shortName": "DEMO"}
+
+        with patch.object(issues_client, 'get_issue', return_value=mock_issue):
+            mock_client.post.return_value = {"success": True}
+
+            with patch.object(issues_client, '_create_version_field_object') as mock_version:
+                mock_version.return_value = {
+                    "$type": "MultiVersionIssueCustomField",
+                    "name": "Sprints",
+                    "value": [{"$type": "VersionBundleElement", "name": "Sprint1"}]
+                }
+
+                # This should detect "Sprints" as a version field
+                issues_client._update_other_custom_fields(
+                    issue_id="DEMO-123",
+                    custom_fields={"Sprints": "Sprint1"},
+                    validate=False,
+                    use_commands=False
+                )
+
+                # Verify version field handler was called
+                mock_version.assert_called_once_with("DEMO", "Sprints", "Sprint1", multi=True)
+
+    def test_version_field_names_detected(self, issues_client, mock_client):
+        """Test that common version field names are detected."""
+        version_field_names = ["sprints", "fix versions", "affected versions", "Sprints", "Fix Versions"]
+
+        for field_name in version_field_names:
+            # Mock get_issue to return issue data with project info
+            mock_issue = Mock()
+            mock_issue.project = {"id": "DEMO", "shortName": "DEMO"}
+
+            with patch.object(issues_client, 'get_issue', return_value=mock_issue):
+                mock_client.post.return_value = {"success": True}
+
+                with patch.object(issues_client, '_create_version_field_object') as mock_version:
+                    mock_version.return_value = {
+                        "$type": "MultiVersionIssueCustomField",
+                        "name": field_name,
+                        "value": []
+                    }
+
+                    issues_client._update_other_custom_fields(
+                        issue_id="DEMO-123",
+                        custom_fields={field_name: "TestValue"},
+                        validate=False,
+                        use_commands=False
+                    )
+
+                    # Verify version field handler was called for each version field name
+                    assert mock_version.called, f"Version handler not called for '{field_name}'" 
