@@ -40,7 +40,7 @@ class ArticlesTools:
             )
         except Exception as e:
             logger.exception(f"Error getting article {article_id}")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def list_articles(
@@ -66,7 +66,7 @@ class ArticlesTools:
             return format_json_response(result)
         except Exception as e:
             logger.exception("Error listing articles")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def search_articles(
@@ -89,7 +89,7 @@ class ArticlesTools:
             return format_json_response(result)
         except Exception as e:
             logger.exception("Error searching articles")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def search_articles_filtered(
@@ -125,7 +125,7 @@ class ArticlesTools:
             return format_json_response(result)
         except Exception as e:
             logger.exception("Error searching filtered articles")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def create_article(
@@ -160,7 +160,7 @@ class ArticlesTools:
             )
         except Exception as e:
             logger.exception("Error creating article")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def update_article(
@@ -193,7 +193,7 @@ class ArticlesTools:
             )
         except Exception as e:
             logger.exception("Error updating article")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def set_article_status(self, article_id: str, status: str) -> str:
@@ -209,7 +209,7 @@ class ArticlesTools:
             )
         except Exception as e:
             logger.exception("Error setting article status")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     # === Comments ===
     @sync_wrapper
@@ -230,7 +230,7 @@ class ArticlesTools:
             return format_json_response(result)
         except Exception as e:
             logger.exception("Error listing article comments")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def add_article_comment(
@@ -249,7 +249,7 @@ class ArticlesTools:
             )
         except Exception as e:
             logger.exception("Error adding article comment")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def update_article_comment(
@@ -274,7 +274,7 @@ class ArticlesTools:
             )
         except Exception as e:
             logger.exception("Error updating article comment")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     # === Attachments ===
     @sync_wrapper
@@ -295,7 +295,7 @@ class ArticlesTools:
             return format_json_response(result)
         except Exception as e:
             logger.exception("Error listing article attachments")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def upload_article_attachment(
@@ -331,7 +331,7 @@ class ArticlesTools:
             )
         except Exception as e:
             logger.exception("Error uploading article attachment")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def download_article_attachment(
@@ -355,7 +355,7 @@ class ArticlesTools:
             return format_json_response({"content": data.decode("utf-8", errors="replace")})
         except Exception as e:
             logger.exception("Error downloading article attachment")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
     def get_tool_definitions(self) -> Dict[str, Dict[str, Any]]:
         return {
             "get_article": {

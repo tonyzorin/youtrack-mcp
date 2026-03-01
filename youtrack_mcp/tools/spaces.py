@@ -36,7 +36,7 @@ class SpacesTools:
             )
         except Exception as e:
             logger.exception(f"Error getting space {space_id}")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     @sync_wrapper
     def list_spaces(self, fields: str = "id,name", top: int = 50, skip: int = 0) -> str:
@@ -47,7 +47,7 @@ class SpacesTools:
             return format_json_response(result)
         except Exception as e:
             logger.exception("Error listing spaces")
-            return format_json_response({"error": str(e)})
+            return format_json_response({"error": "An unexpected error occurred. Check server logs for details."})
 
     def get_tool_definitions(self) -> Dict[str, Dict[str, Any]]:
         return {

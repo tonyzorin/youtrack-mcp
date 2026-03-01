@@ -181,11 +181,14 @@ def load_all_tools() -> Dict[str, Callable]:
         try:
             from youtrack_mcp.tools.articles import ArticlesTools  # type: ignore
             from youtrack_mcp.tools.spaces import SpacesTools  # type: ignore
-
-            tool_classes.append(ArticlesTools())
-            tool_classes.append(SpacesTools())
-        except Exception as e:
-            logger.warning(f"KB tools not loaded: {e}")
+        except ImportError as e:
+            logger.warning(f"KB tools not loaded (import error): {e}")
+        else:
+            try:
+                tool_classes.append(ArticlesTools())
+                tool_classes.append(SpacesTools())
+            except Exception:
+                logger.exception("KB tools not loaded (init error)")
 
     # Collect tool definitions from all classes
     all_tool_definitions = {}

@@ -357,7 +357,7 @@ class ResourcesTools:
             return json.dumps({"error": f"Unknown resource URI: {uri}"})
         except Exception as e:
             logger.exception(f"Error reading resource: {uri}")
-            return json.dumps({"error": f"Error processing resource {uri}: {str(e)}"})
+            return json.dumps({"error": f"Error processing resource {uri}: {e!s}"})
 
     @sync_wrapper
     def subscribe_resource(self, uri: str) -> str:
