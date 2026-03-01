@@ -22,20 +22,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_server(host: str = "0.0.0.0", port: int = 8000, transport: str = "stdio") -> FastMCP:
+def create_server(host: str = "0.0.0.0", port: int = 8000) -> FastMCP:
     """Create and configure the FastMCP server with all tools registered."""
-    if transport == "sse":
-        mcp = FastMCP(
-            config.MCP_SERVER_NAME,
-            instructions=config.MCP_SERVER_DESCRIPTION,
-            host=host,
-            port=port,
-        )
-    else:
-        mcp = FastMCP(
-            config.MCP_SERVER_NAME,
-            instructions=config.MCP_SERVER_DESCRIPTION,
-        )
+    mcp = FastMCP(
+        config.MCP_SERVER_NAME,
+        instructions=config.MCP_SERVER_DESCRIPTION,
+        host=host,
+        port=port,
+    )
 
     # Load and register all tools
     tools = load_all_tools()
@@ -72,7 +66,7 @@ def main():
 
     logger.info(f"Starting YouTrack MCP Server v{APP_VERSION} [{transport}]")
 
-    mcp = create_server(host=args.host, port=port, transport=transport)
+    mcp = create_server(host=args.host, port=port)
     mcp.run(transport=transport)
 
 

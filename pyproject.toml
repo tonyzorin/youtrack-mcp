@@ -8,16 +8,13 @@ dynamic = ["version"]
 description = "Model Context Protocol Server for JetBrains YouTrack"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.9"
+requires-python = ">=3.14"
 dependencies = [
     "httpx>=0.24.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "mcp>=1.11.0",
-    "nest_asyncio>=1.5.6",
-    "fastapi>=0.115.12",
     "requests>=2.32.3",
-    "uvicorn>=0.20.0",
 ]
 
 [project.scripts]
