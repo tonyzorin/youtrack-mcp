@@ -1,25 +1,25 @@
-FROM python:3.13-alpine
+FROM python:3.11-slim
 
 WORKDIR /app
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
-RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt && \
-    python -c "import mcp; print(dir(mcp))"
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Copy application code
 COPY . .
 
-# Default environment variables (will be overridden at runtime)
+# Default environment variables (override at runtime)
 ENV MCP_SERVER_NAME="youtrack-mcp"
 ENV MCP_SERVER_DESCRIPTION="YouTrack MCP Server"
 ENV MCP_DEBUG="false"
 ENV YOUTRACK_VERIFY_SSL="true"
+ENV YOUTRACK_URL=""
+ENV YOUTRACK_API_TOKEN=""
 
-# Transport mode: stdio (default, for Claude/Cursor integration), sse (for SSE server), http (for REST API)
+# Transport mode: stdio (default, for Claude/Cursor) or sse (for SSE server)
 ENV TRANSPORT="stdio"
-# Port for SSE and HTTP transport modes
+# Port for SSE transport mode
 ENV PORT="8000"
 
-# Run the MCP server with configurable transport
-CMD ["sh", "-c", "python main.py --transport  --port "]
+ENTRYPOINT ["python", "main.py"]
