@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class YouTrackMCPServer:
     """MCP server for YouTrack integration."""
 
-    def __init__(self, transport: Optional[str] = None):
+    def __init__(self, transport: Optional[str] = None, port: int = 8000, host: str = "0.0.0.0"):
         """
         Initialize the YouTrack MCP server.
 
@@ -46,13 +46,23 @@ class YouTrackMCPServer:
 
         # Store the transport mode for later reference
         self.transport_mode = transport
+        self.port = port
+        self.host = host
 
         # Initialize server with ToolServerBase
-        self.server = ToolServerBase(
-            name=config.MCP_SERVER_NAME,
-            instructions=config.MCP_SERVER_DESCRIPTION,
-            # transport is passed to run(), not __init__()
-        )
+        # Pass host/port for SSE transport so FastMCP binds correctly
+        if transport == 'sse':
+            self.server = ToolServerBase(
+                name=config.MCP_SERVER_NAME,
+                instructions=config.MCP_SERVER_DESCRIPTION,
+                host=host,
+                port=port,
+            )
+        else:
+            self.server = ToolServerBase(
+                name=config.MCP_SERVER_NAME,
+                instructions=config.MCP_SERVER_DESCRIPTION,
+            )
 
         # Initialize tool registry
         self._tools: Dict[str, Callable] = {}

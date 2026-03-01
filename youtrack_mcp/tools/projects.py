@@ -315,6 +315,43 @@ class ProjectTools:
             return format_json_response({"error": str(e)})
 
     @sync_wrapper
+    def get_field_values(self, project_id: str, field_name: str) -> str:
+        """
+        Get valid values for a custom field in a project (State, Priority, Type, etc.).
+
+        This tool fetches live field values from your YouTrack instance, replacing
+        hardcoded examples with actual available options.
+
+        FORMAT: get_field_values(project_id="DEMO", field_name="State")
+
+        Args:
+            project_id: The project identifier (e.g., "DEMO", "0-0")
+            field_name: The custom field name (e.g., "State", "Priority", "Type")
+
+        Returns:
+            JSON string with valid field values for the specified field
+        """
+        try:
+            if not project_id:
+                return format_json_response({"error": "Project ID is required"})
+            if not field_name:
+                return format_json_response({"error": "Field name is required"})
+
+            values = self.projects_api.get_custom_field_allowed_values(project_id, field_name)
+            return format_json_response({
+                "status": "success",
+                "project_id": project_id,
+                "field_name": field_name,
+                "values": values,
+                "count": len(values) if isinstance(values, list) else 0,
+            })
+        except Exception as e:
+            logger.exception(
+                f"Error getting field values for {field_name} in project {project_id}"
+            )
+            return format_json_response({"error": str(e)})
+
+    @sync_wrapper
     def get_all_custom_fields_schemas(self, project_id: str) -> str:
         """
         Get schemas for all custom fields in a project.

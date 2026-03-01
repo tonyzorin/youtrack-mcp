@@ -240,9 +240,15 @@ def parse_args():
     )
     parser.add_argument(
         "--transport",
-        choices=["http", "stdio"],
+        choices=["http", "stdio", "sse"],
         default="stdio",
-        help="Transport mode: 'stdio' for Claude integration (default), 'http' for API server"
+        help="Transport mode: 'stdio' for Claude integration (default), 'http' for API server, 'sse' for SSE server"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to bind to for HTTP and SSE transport modes (default: 8000)"
     )
     parser.add_argument(
         "--version",
@@ -318,12 +324,20 @@ def main():
     
     # Check if running in HTTP mode
     if args.transport == "http":
-        logger.info(f"Starting HTTP server on {args.host}")
+        logger.info(f"Starting HTTP server on {args.host}:{args.port}")
         import uvicorn
-        uvicorn.run(app, host=args.host, port=8000, log_level=args.log_level.lower())
+        uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level.lower())
+    elif args.transport == "sse":
+        # Initialize MCP server with SSE transport
+        global server
+        logger.info(f"Starting SSE server on {args.host}:{args.port}")
+        server = YouTrackMCPServer(transport="sse", port=args.port, host=args.host)
+        all_tools = load_all_tools()
+        server.register_loaded_tools(all_tools)
+        logger.info(f"Starting in SSE mode at http://{args.host}:{args.port}/sse")
+        server.run()
     else:
         # Initialize MCP server with stdio transport
-        global server
         server = YouTrackMCPServer(transport="stdio")
         
         # Load all tools just once

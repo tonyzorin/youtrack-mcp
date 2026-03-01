@@ -16,5 +16,10 @@ ENV MCP_SERVER_DESCRIPTION="YouTrack MCP Server"
 ENV MCP_DEBUG="false"
 ENV YOUTRACK_VERIFY_SSL="true"
 
-# Run the MCP server in stdio mode for Claude integration by default
-CMD ["python", "main.py", "--transport", "stdio"]
+# Transport mode: stdio (default, for Claude/Cursor integration), sse (for SSE server), http (for REST API)
+ENV TRANSPORT="stdio"
+# Port for SSE and HTTP transport modes
+ENV PORT="8000"
+
+# Run the MCP server with configurable transport
+CMD ["sh", "-c", "python main.py --transport  --port "]
