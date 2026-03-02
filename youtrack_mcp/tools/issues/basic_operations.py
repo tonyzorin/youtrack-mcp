@@ -95,24 +95,26 @@ class BasicOperations:
 
     @sync_wrapper
     def create_issue(
-        self, project: str, summary: str, description: Optional[str] = None
+        self, project: str, summary: str, description: Optional[str] = None,
+        custom_fields: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Create a new issue in YouTrack.
 
-        FORMAT: create_issue(project="DEMO", summary="Bug in login", description="Users cannot log in")
+        FORMAT: create_issue(project="DEMO", summary="Bug in login", description="Users cannot log in", custom_fields={"Assignee": "admin", "Priority": "Critical"})
 
         Args:
             project: The project identifier (e.g., "DEMO", "PROJECT")
             summary: The issue title/summary
             description: Optional detailed description of the issue
+            custom_fields: Optional dictionary of custom field names and values to set on creation (e.g., {"Assignee": "john.doe", "Priority": "Critical"})
 
         Returns:
             JSON string with the created issue information
         """
         try:
             logger.debug(
-                f"Creating issue with: project={project}, summary={summary}, description={description}"
+                f"Creating issue with: project={project}, summary={summary}, description={description}, custom_fields={custom_fields}"
             )
 
             # Validate required parameters
@@ -167,6 +169,14 @@ class BasicOperations:
                     # Handle error returned as a dict
                     return format_json_response(issue)
 
+                # Apply custom fields if provided
+                if custom_fields and hasattr(issue, "id") and issue.id:
+                    try:
+                        logger.info(f"Setting custom fields on new issue {issue.id}: {custom_fields}")
+                        self.issues_api.update_issue_custom_fields(issue.id, custom_fields, validate=False)
+                    except Exception as cf_err:
+                        logger.warning(f"Issue created but failed to set custom fields: {cf_err}")
+
                 # Try to get full issue details right after creation
                 if hasattr(issue, "id"):
                     try:
@@ -214,35 +224,27 @@ class BasicOperations:
         issue_id: str,
         summary: Optional[str] = None,
         description: Optional[str] = None,
-        uses_markdown: Optional[bool] = None,
         additional_fields: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Update an existing issue with new information.
 
-        FORMAT: update_issue(issue_id="DEMO-123", summary="New title", description="Updated description", uses_markdown=True)
+        FORMAT: update_issue(issue_id="DEMO-123", summary="New title", description="Updated description")
 
         Args:
             issue_id: The issue identifier (e.g., "DEMO-123", "PROJECT-456")
             summary: The new issue summary/title (optional)
             description: The new issue description (optional)
-            uses_markdown: Whether the description uses Markdown formatting - set to True for Markdown, False for plain text (optional)
             additional_fields: Additional fields to update as dict (optional)
 
         Returns:
             JSON string with the updated issue details
-
-        Examples:
-            - Plain text: update_issue(issue_id="DEMO-123", description="Simple text")
-            - Markdown: update_issue(issue_id="DEMO-123", description="**Bold** text", uses_markdown=True)
-            - With HTML: update_issue(issue_id="DEMO-123", description="Text\\n{html}<b>HTML</b>{html}", uses_markdown=True)
         """
         try:
             result = self.issues_api.update_issue(
                 issue_id=issue_id,
                 summary=summary,
                 description=description,
-                uses_markdown=uses_markdown,
                 additional_fields=additional_fields,
             )
             # Convert Issue object to dict if needed
@@ -293,20 +295,20 @@ class BasicOperations:
                 }
             },
             "create_issue": {
-                "description": "Create a new issue in YouTrack with automatic project validation. Accepts both project short names (DEMO) and project IDs (0-1). Example: create_issue(project='DEMO', summary='Bug in login', description='Users cannot log in')",
+                "description": "Create a new issue in YouTrack with automatic project validation. Accepts both project short names (DEMO) and project IDs (0-1). Supports setting custom fields at creation time. Example: create_issue(project='DEMO', summary='Bug in login', description='Users cannot log in', custom_fields={'Assignee': 'john.doe', 'Priority': 'Critical'})",
                 "parameter_descriptions": {
                     "project": "Project identifier (short name like 'DEMO' or ID like '0-1')",
                     "summary": "Issue title/summary (required)",
-                    "description": "Detailed description of the issue (optional)"
+                    "description": "Detailed description of the issue (optional)",
+                    "custom_fields": "Optional dictionary of custom field names to values to set on creation (e.g., {'Assignee': 'john.doe', 'Priority': 'Critical', 'Fix versions': ['1.0', '1.1']})"
                 }
             },
             "update_issue": {
-                "description": "Update an existing issue's summary, description, or additional fields. Supports Markdown formatting via uses_markdown parameter. Use for basic issue metadata updates - for custom fields use update_custom_fields. Example: update_issue(issue_id='DEMO-123', summary='Updated title', description='**Bold** text', uses_markdown=True)",
+                "description": "Update an existing issue's summary, description, or additional fields. Use for basic issue metadata updates - for custom fields use update_custom_fields. Example: update_issue(issue_id='DEMO-123', summary='Updated title', description='New description')",
                 "parameter_descriptions": {
                     "issue_id": "Issue identifier like 'DEMO-123' or 'PROJECT-456'",
                     "summary": "New issue summary/title (optional)",
-                    "description": "New issue description - can include Markdown or HTML (optional)",
-                    "uses_markdown": "Set to True to enable Markdown formatting, False for plain text (optional)",
+                    "description": "New issue description (optional)",
                     "additional_fields": "Additional fields to update as dictionary (optional)"
                 }
             },

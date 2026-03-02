@@ -259,7 +259,6 @@ class IssuesClient:
         issue_id: str,
         summary: Optional[str] = None,
         description: Optional[str] = None,
-        uses_markdown: Optional[bool] = None,
         additional_fields: Optional[Dict[str, Any]] = None,
     ) -> Issue:
         """
@@ -269,7 +268,6 @@ class IssuesClient:
             issue_id: The issue ID or readable ID
             summary: The new issue summary
             description: The new issue description
-            uses_markdown: Whether the description uses Markdown formatting (True/False)
             additional_fields: Additional fields to update
 
         Returns:
@@ -282,9 +280,6 @@ class IssuesClient:
 
         if description is not None:
             data["description"] = description
-
-        if uses_markdown is not None:
-            data["usesMarkdown"] = uses_markdown
 
         if additional_fields:
             data.update(additional_fields)
@@ -610,8 +605,13 @@ class IssuesClient:
                     elif field_name.lower() in ['spent time']:
                         field_data = self._create_period_field_object(field_name, field_value)
                     else:
-                        # Default to enum for unknown fields
-                        field_data = self._create_enum_field_object(project_id, field_name, field_value)
+                        # Query the schema to detect version/sprint fields
+                        value_type = self._get_field_value_type(project_id, field_name)
+                        if value_type == "version":
+                            field_data = self._create_version_field_object(project_id, field_name, field_value)
+                        else:
+                            # Default to enum for unknown fields
+                            field_data = self._create_enum_field_object(project_id, field_name, field_value)
                 
                 if field_data:
                     update_data["customFields"].append(field_data)
@@ -1551,6 +1551,8 @@ class IssuesClient:
             return "SingleUserIssueCustomField"
         elif value_type == "period":
             return "PeriodIssueCustomField"
+        elif value_type == "version":
+            return "MultiVersionIssueCustomField"
         elif value_type in ["integer", "float", "string", "date"]:
             return "SimpleIssueCustomField"
         elif value_type == "text":
@@ -1561,6 +1563,8 @@ class IssuesClient:
             return "SingleEnumIssueCustomField"
         elif "UserBundle" in bundle_type:
             return "SingleUserIssueCustomField"
+        elif "VersionBundle" in bundle_type:
+            return "MultiVersionIssueCustomField"
         elif "PeriodBundle" in bundle_type:
             return "PeriodIssueCustomField"
         else:
@@ -1605,6 +1609,13 @@ class IssuesClient:
                 "$type": "StateBundleElement"
             }
         
+        # For version/sprint fields
+        elif value_type == "version" or "VersionBundle" in bundle_type:
+            if isinstance(field_value, list):
+                return [{"name": self._normalize_field_value(v), "$type": "VersionBundleElement"} for v in field_value]
+            else:
+                return [{"name": str(field_value), "$type": "VersionBundleElement"}]
+
         # For enum fields
         elif value_type == "enum" or "EnumBundle" in bundle_type:
             return {
@@ -1774,12 +1785,14 @@ class IssuesClient:
                         field_data = self._create_user_field_object(field_name, field_value)
                     elif field_name.lower() in ['spent time']:
                         field_data = self._create_period_field_object(field_name, field_value)
-                    elif field_name.lower() in ['sprints', 'fix versions', 'affected versions']:
-                        # Multi-value version fields
-                        field_data = self._create_version_field_object(project_id, field_name, field_value, multi=True)
                     else:
-                        # Default to enum for unknown fields
-                        field_data = self._create_enum_field_object(project_id, field_name, field_value)
+                        # Query the schema to detect version/sprint fields
+                        value_type = self._get_field_value_type(project_id, field_name)
+                        if value_type == "version":
+                            field_data = self._create_version_field_object(project_id, field_name, field_value)
+                        else:
+                            # Default to enum for unknown fields
+                            field_data = self._create_enum_field_object(project_id, field_name, field_value)
                 
                 if field_data:
                     update_data["customFields"].append(field_data)
@@ -1856,6 +1869,10 @@ class IssuesClient:
         """Create simple field object using basic $type approach."""
         field_name_lower = field_name.lower()
 
+        # Known version/sprint multi-value field names
+        version_field_names = ['fix versions', 'fix version', 'affected versions', 'affected version',
+                               'sprints', 'sprint', 'milestone', 'release']
+
         if field_name_lower == 'state':
             field_type = "StateIssueCustomField"
         elif field_name_lower in ['priority', 'type']:
@@ -1864,18 +1881,16 @@ class IssuesClient:
             field_type = "SingleUserIssueCustomField"
         elif field_name_lower in ['estimation', 'spent time']:
             field_type = "PeriodIssueCustomField"
-        elif field_name_lower in ['sprints', 'fix versions', 'affected versions']:
-            # Multi-value version fields
-            if isinstance(field_value, str):
-                values = [{"$type": "VersionBundleElement", "name": field_value}]
-            elif isinstance(field_value, list):
-                values = [{"$type": "VersionBundleElement", "name": v} for v in field_value]
+        elif field_name_lower in version_field_names:
+            # Version/sprint fields require array value
+            if isinstance(field_value, list):
+                value_elements = [{"$type": "VersionBundleElement", "name": self._normalize_field_value(v)} for v in field_value]
             else:
-                values = [{"$type": "VersionBundleElement", "name": str(field_value)}]
+                value_elements = [{"$type": "VersionBundleElement", "name": self._normalize_field_value(field_value)}]
             return {
                 "$type": "MultiVersionIssueCustomField",
                 "name": field_name,
-                "value": values
+                "value": value_elements
             }
         else:
             field_type = "SingleEnumIssueCustomField"
@@ -1899,12 +1914,14 @@ class IssuesClient:
                 return self._create_enum_field_object(project_id, field_name, field_value)
             elif field_name_lower in ['assignee', 'reporter']:
                 return self._create_user_field_object(field_name, field_value)
-            elif field_name_lower in ['sprints', 'fix versions', 'affected versions']:
-                # Multi-value version fields
-                return self._create_version_field_object(project_id, field_name, field_value, multi=True)
             else:
-                # Default to enum for unknown fields
-                return self._create_enum_field_object(project_id, field_name, field_value)
+                # Query the schema to determine the actual field type
+                value_type = self._get_field_value_type(project_id, field_name)
+                if value_type == "version":
+                    return self._create_version_field_object(project_id, field_name, field_value)
+                else:
+                    # Default to enum for unknown fields
+                    return self._create_enum_field_object(project_id, field_name, field_value)
         except Exception as e:
             logger.warning(f"Enhanced field creation failed for '{field_name}': {e}, falling back to simple approach")
             return self._create_simple_field_object(field_name, field_value)
@@ -2114,93 +2131,62 @@ class IssuesClient:
             logger.warning(f"Command-based update failed: {e}")
             raise
 
-    def _create_version_field_object(self, project_id: str, field_name: str, field_value: Any, multi: bool = True) -> Dict[str, Any]:
-        """
-        Create proper version field object for SingleVersionIssueCustomField or MultiVersionIssueCustomField.
-
-        Args:
-            project_id: The project ID for looking up version bundle values
-            field_name: The field name (e.g., "Sprints", "Fix versions")
-            field_value: Version name(s) - can be string or list of strings
-            multi: Whether this is a multi-value field (default: True)
-
-        Returns:
-            Properly formatted version field object for YouTrack API
-
-        See: https://www.jetbrains.com/help/youtrack/devportal/api-entity-MultiVersionIssueCustomField.html
-        """
+    def _get_field_value_type(self, project_id: str, field_name: str) -> str:
+        """Get the valueType for a custom field from the project schema."""
         try:
-            # Normalize field_value to a list
-            if isinstance(field_value, str):
-                values_to_find = [field_value]
-            elif isinstance(field_value, list):
-                values_to_find = field_value
-            else:
-                values_to_find = [str(field_value)]
+            fields_query = "field(id,name,fieldType($type,valueType,id))"
+            fields = self.client.get(f"admin/projects/{project_id}/customFields?fields={fields_query}")
+            for field in fields:
+                if field.get("field", {}).get("name", "").lower() == field_name.lower():
+                    field_type = field.get("field", {}).get("fieldType", {})
+                    return field_type.get("valueType", "")
+            return ""
+        except Exception as e:
+            logger.warning(f"Error getting field value type for '{field_name}': {e}")
+            return ""
 
-            # Get allowed values to find the actual IDs
+    def _create_version_field_object(self, project_id: str, field_name: str, field_value: Any) -> Dict[str, Any]:
+        """Create proper VersionBundleElement object for version/sprint multi-value fields."""
+        try:
+            # Accept either a string (single value) or list of values
+            if isinstance(field_value, list):
+                value_names = [self._normalize_field_value(v) for v in field_value]
+            else:
+                value_names = [self._normalize_field_value(field_value)]
+
+            # Try to get version IDs from the project
             from youtrack_mcp.api.projects import ProjectsClient
             projects_client = ProjectsClient(self.client)
             allowed_values = projects_client.get_custom_field_allowed_values(project_id, field_name)
 
-            # Find matching versions by name (case-insensitive)
-            version_objects = []
-            for value_name in values_to_find:
-                found = False
-                for allowed_value in allowed_values:
-                    if allowed_value.get('name', '').lower() == value_name.lower():
-                        version_objects.append({
-                            "$type": "VersionBundleElement",
-                            "id": allowed_value.get('id'),
-                            "name": allowed_value.get('name')
-                        })
-                        found = True
+            value_elements = []
+            for name in value_names:
+                version_id = None
+                for v in allowed_values:
+                    if v.get('name', '').lower() == name.lower():
+                        version_id = v.get('id')
                         break
+                element = {"$type": "VersionBundleElement", "name": name}
+                if version_id:
+                    element["id"] = version_id
+                value_elements.append(element)
 
-                if not found:
-                    # If ID lookup fails, try with just the name
-                    logger.warning(f"Could not find ID for version '{value_name}' in field '{field_name}', using name only")
-                    version_objects.append({
-                        "$type": "VersionBundleElement",
-                        "name": value_name
-                    })
-
-            if multi:
-                return {
-                    "$type": "MultiVersionIssueCustomField",
-                    "name": field_name,
-                    "value": version_objects
-                }
+            return {
+                "$type": "MultiVersionIssueCustomField",
+                "name": field_name,
+                "value": value_elements
+            }
+        except Exception as e:
+            logger.warning(f"Error creating version field object for '{field_name}': {e}, using minimal format")
+            if isinstance(field_value, list):
+                value_elements = [{"$type": "VersionBundleElement", "name": self._normalize_field_value(v)} for v in field_value]
             else:
-                # SingleVersionIssueCustomField expects a single object, not an array
-                return {
-                    "$type": "SingleVersionIssueCustomField",
-                    "name": field_name,
-                    "value": version_objects[0] if version_objects else None
-                }
-
-        except (YouTrackAPIError, KeyError, TypeError, AttributeError) as e:
-            logger.warning(f"Error creating version field object for '{field_name}': {e}, using simple value")
-            # Fallback to simple version object (no ID lookup)
-            if isinstance(field_value, str):
-                values_to_use = [{"$type": "VersionBundleElement", "name": field_value}]
-            elif isinstance(field_value, list):
-                values_to_use = [{"$type": "VersionBundleElement", "name": v} for v in field_value]
-            else:
-                values_to_use = [{"$type": "VersionBundleElement", "name": str(field_value)}]
-
-            if multi:
-                return {
-                    "$type": "MultiVersionIssueCustomField",
-                    "name": field_name,
-                    "value": values_to_use
-                }
-            else:
-                return {
-                    "$type": "SingleVersionIssueCustomField",
-                    "name": field_name,
-                    "value": values_to_use[0] if values_to_use else None
-                }
+                value_elements = [{"$type": "VersionBundleElement", "name": self._normalize_field_value(field_value)}]
+            return {
+                "$type": "MultiVersionIssueCustomField",
+                "name": field_name,
+                "value": value_elements
+            }
 
     def get_issue_custom_fields(self, issue_id: str) -> Dict[str, Any]:
         """
@@ -2852,6 +2838,8 @@ class IssuesClient:
             return "SingleUserIssueCustomField"
         elif value_type == "period":
             return "PeriodIssueCustomField"
+        elif value_type == "version":
+            return "MultiVersionIssueCustomField"
         elif value_type in ["integer", "float", "string", "date"]:
             return "SimpleIssueCustomField"
         elif value_type == "text":
@@ -2862,6 +2850,8 @@ class IssuesClient:
             return "SingleEnumIssueCustomField"
         elif "UserBundle" in bundle_type:
             return "SingleUserIssueCustomField"
+        elif "VersionBundle" in bundle_type:
+            return "MultiVersionIssueCustomField"
         elif "PeriodBundle" in bundle_type:
             return "PeriodIssueCustomField"
         else:
@@ -2906,6 +2896,13 @@ class IssuesClient:
                 "$type": "StateBundleElement"
             }
         
+        # For version/sprint fields
+        elif value_type == "version" or "VersionBundle" in bundle_type:
+            if isinstance(field_value, list):
+                return [{"name": self._normalize_field_value(v), "$type": "VersionBundleElement"} for v in field_value]
+            else:
+                return [{"name": str(field_value), "$type": "VersionBundleElement"}]
+
         # For enum fields
         elif value_type == "enum" or "EnumBundle" in bundle_type:
             return {
