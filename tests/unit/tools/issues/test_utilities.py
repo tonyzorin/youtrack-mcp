@@ -68,7 +68,7 @@ class TestUtilities:
         diagnostics = ["diagnose_workflow_restrictions", "get_help"]
         custom_fields = ["update_custom_fields", "batch_update_custom_fields", "get_custom_fields", "validate_custom_field", "get_available_custom_field_values"]
         linking = ["link_issues", "get_issue_links", "get_available_link_types", "add_dependency", "remove_dependency", "add_relates_link", "add_duplicate_link"]
-        attachments = ["get_issue_raw", "get_attachment_content"]
+        attachments = ["get_issue_raw", "get_attachment_content", "delete_attachment"]
 
         all_expected = basic_ops + dedicated_updates + diagnostics + custom_fields + linking + attachments
 
