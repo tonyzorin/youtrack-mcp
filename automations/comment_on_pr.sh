@@ -20,7 +20,7 @@ curl -X POST \
   -H "Accept: application/vnd.github.v3+json" \
   -H "Authorization: token $TOKEN" \
   -H "User-Agent: YouTrack-MCP-Bot" \
-  https://api.github.com/repos/tonyzorin/youtrack-mcp/issues/13/comments \
+  https://api.github.com/repos/searchanise/youtrack-mcp/issues/13/comments \
   -d "{\"body\":\"$COMMENT_BODY\"}"
 
 echo ""

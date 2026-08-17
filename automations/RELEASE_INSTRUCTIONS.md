@@ -3,7 +3,7 @@
 ## To complete the v1.0.0 release and get the 'latest' Docker tag:
 
 ### 1. Navigate to GitHub Releases
-Go to: https://github.com/tonyzorin/youtrack-mcp/releases
+Go to: https://github.com/searchanise/youtrack-mcp/releases
 
 ### 2. Create New Release
 - Click **"Create a new release"**
@@ -34,7 +34,7 @@ Major milestone release with comprehensive attachment support and enhanced code 
 
 ### 🐳 Docker Improvements
 - **Stable Docker images** with proper tagging strategy
-- Available on Docker Hub: `tonyzorin/youtrack-mcp:1.0.0`
+- Available on Docker Hub: `searchanise/youtrack-mcp:1.0.0`
 - Automated CI/CD pipeline with GitHub Actions
 - Multi-architecture support
 
@@ -58,7 +58,7 @@ Major milestone release with comprehensive attachment support and enhanced code 
 docker run --rm \
   -e YOUTRACK_URL="https://your-instance.youtrack.cloud" \
   -e YOUTRACK_API_TOKEN="your-token" \
-  tonyzorin/youtrack-mcp:latest
+  searchanise/youtrack-mcp:latest
 ```
 
 ### Claude Desktop Configuration
@@ -71,7 +71,7 @@ Add to your `claude_desktop_config.json`:
       "args": ["run", "--rm", "-i", 
                "-e", "YOUTRACK_URL=https://your-instance.youtrack.cloud",
                "-e", "YOUTRACK_API_TOKEN=your-token",
-               "tonyzorin/youtrack-mcp:latest"],
+               "searchanise/youtrack-mcp:latest"],
       "env": {}
     }
   }
@@ -104,10 +104,10 @@ This release represents a major milestone in YouTrack MCP development!
 
 ### 5. Expected Results
 After publishing, GitHub Actions will automatically:
-- Build Docker image: `tonyzorin/youtrack-mcp:1.0.0`
-- Build Docker image: `tonyzorin/youtrack-mcp:latest` 
-- Build Docker image: `tonyzorin/youtrack-mcp:<commit-sha>`
+- Build Docker image: `searchanise/youtrack-mcp:1.0.0`
+- Build Docker image: `searchanise/youtrack-mcp:latest` 
+- Build Docker image: `searchanise/youtrack-mcp:<commit-sha>`
 
 ### 6. Verify Docker Images
-Check Docker Hub: https://hub.docker.com/r/tonyzorin/youtrack-mcp/tags
+Check Docker Hub: https://hub.docker.com/r/searchanise/youtrack-mcp/tags
 You should see the new tags appear within 5-10 minutes. 

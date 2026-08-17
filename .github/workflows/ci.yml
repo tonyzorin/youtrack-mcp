@@ -43,7 +43,7 @@ on:
         type: boolean
 
 env:
-  DOCKER_HUB_REPOSITORY: tonyzorin/youtrack-mcp
+  DOCKER_HUB_REPOSITORY: searchanise/youtrack-mcp
   GITHUB_REGISTRY: ghcr.io
 
 permissions:
@@ -217,10 +217,10 @@ jobs:
         
         # Get version for testing the built dev image
         VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
-        echo "🎯 Testing dev image: tonyzorin/youtrack-mcp:${VERSION}-wip"
+        echo "🎯 Testing dev image: searchanise/youtrack-mcp:${VERSION}-wip"
         
         # Test using the actual built Docker image
-        export YOUTRACK_MCP_IMAGE="tonyzorin/youtrack-mcp:${VERSION}-wip"
+        export YOUTRACK_MCP_IMAGE="searchanise/youtrack-mcp:${VERSION}-wip"
         python -m pytest tests/e2e/ -v --tb=short -m "e2e"
 
   # ==============================
@@ -543,7 +543,7 @@ jobs:
     - name: Publish to npmjs.org
       run: |
         echo "🚀 Publishing to npmjs.org..."
-        echo "Package: youtrack-mcp-tonyzorin@${{ steps.get_version.outputs.VERSION }}"
+        echo "Package: youtrack-mcp-searchanise@${{ steps.get_version.outputs.VERSION }}"
         npm publish --access public
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -561,7 +561,7 @@ jobs:
         
         # Create a scoped package for GitHub Packages
         cp package.json package.json.backup
-        sed -i.bak "s/\"name\": \"youtrack-mcp-tonyzorin\"/\"name\": \"@${{ github.repository_owner }}\/youtrack-mcp\"/" package.json
+        sed -i.bak "s/\"name\": \"youtrack-mcp-searchanise\"/\"name\": \"@${{ github.repository_owner }}\/youtrack-mcp\"/" package.json
         
         echo "Updated package name for GitHub Packages:"
         grep '"name"' package.json
@@ -579,13 +579,13 @@ jobs:
         echo "✅ NPM packages published successfully!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Published Packages:**" >> $GITHUB_STEP_SUMMARY
-        echo "- 📦 [npmjs.org](https://www.npmjs.com/package/youtrack-mcp-tonyzorin): \`youtrack-mcp-tonyzorin@${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 [npmjs.org](https://www.npmjs.com/package/youtrack-mcp-searchanise): \`youtrack-mcp-searchanise@${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- 📦 [GitHub Packages](https://github.com/${{ github.repository_owner }}/youtrack-mcp/pkgs/npm/youtrack-mcp): \`@${{ github.repository_owner }}/youtrack-mcp@${{ steps.get_version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Installation:**" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
         echo "# npmjs.org (public)" >> $GITHUB_STEP_SUMMARY
-        echo "npm install -g youtrack-mcp-tonyzorin@${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "npm install -g youtrack-mcp-searchanise@${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "# GitHub Packages (scoped)" >> $GITHUB_STEP_SUMMARY
         echo "npm install -g @${{ github.repository_owner }}/youtrack-mcp@${{ steps.get_version.outputs.VERSION }} --registry=https://npm.pkg.github.com" >> $GITHUB_STEP_SUMMARY
@@ -594,9 +594,9 @@ jobs:
         echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
         echo "# Run directly" >> $GITHUB_STEP_SUMMARY
-        echo "npx youtrack-mcp-tonyzorin" >> $GITHUB_STEP_SUMMARY
+        echo "npx youtrack-mcp-searchanise" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "# Or install globally and run" >> $GITHUB_STEP_SUMMARY
-        echo "npm install -g youtrack-mcp-tonyzorin" >> $GITHUB_STEP_SUMMARY
-        echo "youtrack-mcp-tonyzorin" >> $GITHUB_STEP_SUMMARY
+        echo "npm install -g youtrack-mcp-searchanise" >> $GITHUB_STEP_SUMMARY
+        echo "youtrack-mcp-searchanise" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

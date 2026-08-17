@@ -7,12 +7,12 @@ This document explains the enhanced CI/CD pipeline that publishes YouTrack MCP t
 Our enhanced workflow now publishes to **four registries** simultaneously:
 
 ### Docker Images
-1. **Docker Hub** (Primary): `tonyzorin/youtrack-mcp`
-2. **GitHub Container Registry** (New): `ghcr.io/tonyzorin/youtrack-mcp`
+1. **Docker Hub** (Primary): `searchanise/youtrack-mcp`
+2. **GitHub Container Registry** (New): `ghcr.io/searchanise/youtrack-mcp`
 
 ### npm Packages  
-1. **npmjs.org** (Primary): `youtrack-mcp-tonyzorin`
-2. **GitHub Packages** (New): `@tonyzorin/youtrack-mcp`
+1. **npmjs.org** (Primary): `youtrack-mcp-searchanise`
+2. **GitHub Packages** (New): `@searchanise/youtrack-mcp`
 
 ## 🔄 Automated Publishing Triggers
 
@@ -20,22 +20,22 @@ Our enhanced workflow now publishes to **four registries** simultaneously:
 ```bash
 # Triggers on: git push origin main
 # Publishes to:
-tonyzorin/youtrack-mcp:1.11.1_wip
-ghcr.io/tonyzorin/youtrack-mcp:1.11.1_wip
+searchanise/youtrack-mcp:1.11.1_wip
+ghcr.io/searchanise/youtrack-mcp:1.11.1_wip
 ```
 
 ### GitHub Release → Production Release
 ```bash
 # Triggers on: GitHub release creation
 # Publishes Docker images:
-tonyzorin/youtrack-mcp:latest
-tonyzorin/youtrack-mcp:1.11.1
-ghcr.io/tonyzorin/youtrack-mcp:latest
-ghcr.io/tonyzorin/youtrack-mcp:1.11.1
+searchanise/youtrack-mcp:latest
+searchanise/youtrack-mcp:1.11.1
+ghcr.io/searchanise/youtrack-mcp:latest
+ghcr.io/searchanise/youtrack-mcp:1.11.1
 
 # Publishes npm packages:
-youtrack-mcp-tonyzorin@1.11.1         # npmjs.org
-@tonyzorin/youtrack-mcp@1.11.1        # GitHub Packages
+youtrack-mcp-searchanise@1.11.1         # npmjs.org
+@searchanise/youtrack-mcp@1.11.1        # GitHub Packages
 ```
 
 ## 🔧 Required GitHub Secrets
@@ -45,7 +45,7 @@ The workflow requires **3 secrets** to be configured in your GitHub repository:
 ### 1. DOCKER_USERNAME
 ```
 Name: DOCKER_USERNAME
-Value: tonyzorin
+Value: searchanise
 Purpose: Docker Hub authentication
 ```
 
@@ -81,20 +81,20 @@ After publishing, users can install from multiple sources:
 ### Docker Options
 ```bash
 # Docker Hub (Primary)
-docker pull tonyzorin/youtrack-mcp:latest
+docker pull searchanise/youtrack-mcp:latest
 
 # GitHub Container Registry  
-docker pull ghcr.io/tonyzorin/youtrack-mcp:latest
+docker pull ghcr.io/searchanise/youtrack-mcp:latest
 ```
 
 ### npm Options
 ```bash
 # npmjs.org (Primary)
-npm install -g youtrack-mcp-tonyzorin
+npm install -g youtrack-mcp-searchanise
 
 # GitHub Packages (requires registry config)
-npm config set @tonyzorin:registry https://npm.pkg.github.com
-npm install -g @tonyzorin/youtrack-mcp
+npm config set @searchanise:registry https://npm.pkg.github.com
+npm install -g @searchanise/youtrack-mcp
 ```
 
 ## 🚀 Workflow Features
@@ -111,7 +111,7 @@ npm install -g @tonyzorin/youtrack-mcp
 
 ### Enhanced Security
 - **GitHub Container Registry**: Uses GITHUB_TOKEN (no additional secrets)
-- **Scoped Packages**: GitHub Packages uses `@tonyzorin/youtrack-mcp` scope
+- **Scoped Packages**: GitHub Packages uses `@searchanise/youtrack-mcp` scope
 - **Token Isolation**: Each registry uses appropriate authentication method
 
 ## 📋 Claude Desktop Integration Examples
@@ -124,7 +124,7 @@ Users can choose their preferred registry in Claude Desktop configuration:
   "mcpServers": {
     "youtrack": {
       "command": "docker",
-      "args": ["run", "--rm", "-e", "YOUTRACK_URL=...", "-e", "YOUTRACK_API_TOKEN=...", "tonyzorin/youtrack-mcp:latest"]
+      "args": ["run", "--rm", "-e", "YOUTRACK_URL=...", "-e", "YOUTRACK_API_TOKEN=...", "searchanise/youtrack-mcp:latest"]
     }
   }
 }
@@ -136,7 +136,7 @@ Users can choose their preferred registry in Claude Desktop configuration:
   "mcpServers": {
     "youtrack": {
       "command": "docker", 
-      "args": ["run", "--rm", "-e", "YOUTRACK_URL=...", "-e", "YOUTRACK_API_TOKEN=...", "ghcr.io/tonyzorin/youtrack-mcp:latest"]
+      "args": ["run", "--rm", "-e", "YOUTRACK_URL=...", "-e", "YOUTRACK_API_TOKEN=...", "ghcr.io/searchanise/youtrack-mcp:latest"]
     }
   }
 }
@@ -148,7 +148,7 @@ Users can choose their preferred registry in Claude Desktop configuration:
   "mcpServers": {
     "youtrack": {
       "command": "npx",
-      "args": ["youtrack-mcp-tonyzorin"],
+      "args": ["youtrack-mcp-searchanise"],
       "env": {"YOUTRACK_URL": "...", "YOUTRACK_API_TOKEN": "..."}
     }
   }
@@ -161,7 +161,7 @@ Users can choose their preferred registry in Claude Desktop configuration:
   "mcpServers": {
     "youtrack": {
       "command": "npx", 
-      "args": ["@tonyzorin/youtrack-mcp"],
+      "args": ["@searchanise/youtrack-mcp"],
       "env": {"YOUTRACK_URL": "...", "YOUTRACK_API_TOKEN": "..."}
     }
   }
@@ -171,12 +171,12 @@ Users can choose their preferred registry in Claude Desktop configuration:
 ## 🔍 Registry URLs & Package Pages
 
 ### Docker Registries
-- **Docker Hub**: [hub.docker.com/r/tonyzorin/youtrack-mcp](https://hub.docker.com/r/tonyzorin/youtrack-mcp)
-- **GitHub Container Registry**: [github.com/tonyzorin/youtrack-mcp/pkgs/container/youtrack-mcp](https://github.com/tonyzorin/youtrack-mcp/pkgs/container/youtrack-mcp)
+- **Docker Hub**: [hub.docker.com/r/searchanise/youtrack-mcp](https://hub.docker.com/r/searchanise/youtrack-mcp)
+- **GitHub Container Registry**: [github.com/searchanise/youtrack-mcp/pkgs/container/youtrack-mcp](https://github.com/searchanise/youtrack-mcp/pkgs/container/youtrack-mcp)
 
 ### npm Registries  
-- **npmjs.org**: [npmjs.com/package/youtrack-mcp-tonyzorin](https://www.npmjs.com/package/youtrack-mcp-tonyzorin)
-- **GitHub Packages**: [github.com/tonyzorin/youtrack-mcp/pkgs/npm/@tonyzorin/youtrack-mcp](https://github.com/tonyzorin/youtrack-mcp/pkgs/npm/%40tonyzorin%2Fyoutrack-mcp)
+- **npmjs.org**: [npmjs.com/package/youtrack-mcp-searchanise](https://www.npmjs.com/package/youtrack-mcp-searchanise)
+- **GitHub Packages**: [github.com/searchanise/youtrack-mcp/pkgs/npm/@searchanise/youtrack-mcp](https://github.com/searchanise/youtrack-mcp/pkgs/npm/%40searchanise%2Fyoutrack-mcp)
 
 ## 💡 Benefits of Dual Publishing
 

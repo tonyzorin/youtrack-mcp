@@ -3,7 +3,7 @@
 echo "🔍 Docker Hub Repository Checker"
 echo "================================"
 
-REPO_NAME="tonyzorin/youtrack-mcp"
+REPO_NAME="searchanise/youtrack-mcp"
 
 echo "Checking Docker Hub repository: $REPO_NAME"
 echo ""
@@ -30,7 +30,7 @@ else
     echo "2. Sign in with your Docker Hub account"
     echo "3. Click 'Create Repository'"
     echo "4. Repository name: youtrack-mcp"
-    echo "5. Namespace: tonyzorin"
+    echo "5. Namespace: searchanise"
     echo "6. Make sure it's set to Public (or Private if you have a paid plan)"
 fi
 
@@ -76,7 +76,7 @@ echo ""
 echo "Repository Settings → Secrets and variables → Actions:"
 echo ""
 echo "DOCKER_USERNAME (required):"
-echo "  └── Should be: tonyzorin"
+echo "  └── Should be: searchanise"
 echo ""
 echo "DOCKER_PASSWORD (required):"
 echo "  └── Should be: Your Docker Hub access token"

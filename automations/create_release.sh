@@ -39,16 +39,16 @@ gh release create v1.5.0 \
 - ✅ Production tested
 
 ### Docker Images
-- \`tonyzorin/youtrack-mcp:1.5.0\`
-- \`tonyzorin/youtrack-mcp:latest\`
+- \`searchanise/youtrack-mcp:1.5.0\`
+- \`searchanise/youtrack-mcp:latest\`
 
 This release significantly improves CI/CD performance and reduces deployment overhead while maintaining full functionality.
 
-**Full Changelog**: https://github.com/tonyzorin/youtrack-mcp/compare/v1.4.3...v1.5.0" \
+**Full Changelog**: https://github.com/searchanise/youtrack-mcp/compare/v1.4.3...v1.5.0" \
   --latest
 
 echo "✅ Release v1.5.0 created successfully!"
 echo "🐳 CI/CD will now build optimized Docker images:"
-echo "   - tonyzorin/youtrack-mcp:1.5.0"
-echo "   - tonyzorin/youtrack-mcp:latest"
+echo "   - searchanise/youtrack-mcp:1.5.0"
+echo "   - searchanise/youtrack-mcp:latest"
 echo "🎯 Docker builds will now be 25x faster!" 

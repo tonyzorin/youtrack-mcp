@@ -18,19 +18,19 @@ Our Docker images use a simple, clear tagging strategy based on the trigger even
 **For Testing (WIP builds):**
 ```bash
 # Use latest development build
-docker pull tonyzorin/youtrack-mcp:1.11.1_wip
+docker pull searchanise/youtrack-mcp:1.11.1_wip
 
 # Use specific commit 
-docker pull tonyzorin/youtrack-mcp:a1b2c3d4
+docker pull searchanise/youtrack-mcp:a1b2c3d4
 ```
 
 **For Production (Releases):**
 ```bash
 # Use latest stable release
-docker pull tonyzorin/youtrack-mcp:latest
+docker pull searchanise/youtrack-mcp:latest
 
 # Use specific version
-docker pull tonyzorin/youtrack-mcp:1.11.1
+docker pull searchanise/youtrack-mcp:1.11.1
 ```
 
 ## **🔄 Automated Process**
@@ -86,5 +86,5 @@ python scripts/version_bump.py major  # 1.11.1 → 2.0.0
 ## **🔍 Verification**
 
 Check available tags on Docker Hub:
-- 🐳 [DockerHub Repository](https://hub.docker.com/r/tonyzorin/youtrack-mcp/tags)
-- 📦 [GitHub Packages](https://github.com/tonyzorin/youtrack-mcp/pkgs/container/youtrack-mcp) 
+- 🐳 [DockerHub Repository](https://hub.docker.com/r/searchanise/youtrack-mcp/tags)
+- 📦 [GitHub Packages](https://github.com/searchanise/youtrack-mcp/pkgs/container/youtrack-mcp) 

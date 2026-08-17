@@ -122,7 +122,7 @@ console.log('      └── youtrack_mcp/ (Python package)');
 console.log('\n🎯 Next steps:');
 console.log('  1. Test locally: npm start');
 console.log('  2. Publish to npm: npm publish');
-console.log('  3. Install globally: npm install -g youtrack-mcp-tonyzorin');
+console.log('  3. Install globally: npm install -g youtrack-mcp-searchanise');
 }
 
 build().catch(error => {

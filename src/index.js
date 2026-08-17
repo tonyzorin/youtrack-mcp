@@ -121,7 +121,7 @@ class YouTrackMCPServer {
       description: 'A Model Context Protocol server for JetBrains YouTrack',
       pythonPath: this.pythonPath,
       serverPath: this.serverPath,
-      homepage: 'https://github.com/tonyzorin/youtrack-mcp'
+      homepage: 'https://github.com/searchanise/youtrack-mcp'
     };
   }
 }

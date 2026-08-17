@@ -23,14 +23,14 @@ curl -s -H "Authorization: token $TOKEN" \
 echo "2. Testing repository access:"
 curl -s -H "Authorization: token $TOKEN" \
      -H "Accept: application/vnd.github.v3+json" \
-     https://api.github.com/repos/tonyzorin/youtrack-mcp | jq '.name // .message'
+     https://api.github.com/repos/searchanise/youtrack-mcp | jq '.name // .message'
 
 # Test comment permissions (dry run)
 echo "3. Testing comment permissions:"
 curl -s -X POST \
      -H "Authorization: token $TOKEN" \
      -H "Accept: application/vnd.github.v3+json" \
-     https://api.github.com/repos/tonyzorin/youtrack-mcp/issues/13/comments \
+     https://api.github.com/repos/searchanise/youtrack-mcp/issues/13/comments \
      -d '{"body":"[TEST] Checking permissions - please ignore"}' | jq '.id // .message'
 
 echo "======================================"

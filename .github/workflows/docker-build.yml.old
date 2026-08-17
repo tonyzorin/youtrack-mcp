@@ -269,7 +269,7 @@ jobs:
     - name: Update package.json for GitHub Packages
       run: |
         # Create a scoped package for GitHub Packages
-        sed -i.bak "s/\"name\": \"youtrack-mcp-tonyzorin\"/\"name\": \"@${{ github.repository_owner }}\/youtrack-mcp\"/" package.json
+        sed -i.bak "s/\"name\": \"youtrack-mcp-searchanise\"/\"name\": \"@${{ github.repository_owner }}\/youtrack-mcp\"/" package.json
         echo "✅ Updated package name for GitHub Packages"
 
     - name: Publish to GitHub Packages
@@ -281,12 +281,12 @@ jobs:
       run: |
         echo "✅ npm packages published to both registries!"
         echo ""
-        echo "📦 npmjs.org: youtrack-mcp-tonyzorin@${{ steps.get_version.outputs.VERSION }}"
+        echo "📦 npmjs.org: youtrack-mcp-searchanise@${{ steps.get_version.outputs.VERSION }}"
         echo "📦 GitHub Packages: @${{ github.repository_owner }}/youtrack-mcp@${{ steps.get_version.outputs.VERSION }}"
         echo ""
         echo "📋 Installation examples:"
         echo "# npmjs.org (existing)"
-        echo "npm install -g youtrack-mcp-tonyzorin"
+        echo "npm install -g youtrack-mcp-searchanise"
         echo ""
         echo "# GitHub Packages (new)"
         echo "npm install -g @${{ github.repository_owner }}/youtrack-mcp --registry=https://npm.pkg.github.com"

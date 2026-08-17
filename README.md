@@ -1,4 +1,4 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/tonyzorin-youtrack-mcp-badge.png)](https://mseep.ai/app/tonyzorin-youtrack-mcp)
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/searchanise-youtrack-mcp-badge.png)](https://mseep.ai/app/searchanise-youtrack-mcp)
 
 # YouTrack MCP
 
@@ -170,7 +170,7 @@ delete_attachment("DEMO-123", "1-456")
 
 ## Installation
 
-[![Docker Build and Push](https://github.com/tonyzorin/youtrack-mcp/actions/workflows/docker-build.yml/badge.svg)](https://github.com/tonyzorin/youtrack-mcp/actions/workflows/docker-build.yml)
+[![Docker Build and Push](https://github.com/searchanise/youtrack-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/searchanise/youtrack-mcp/actions/workflows/ci.yml)
 
 This project provides a Model Context Protocol (MCP) server for YouTrack, enabling seamless integration with Claude Desktop and other MCP clients.
 
@@ -186,13 +186,13 @@ Choose from multiple registries:
 docker run --rm \
   -e YOUTRACK_URL="https://your-instance.youtrack.cloud" \
   -e YOUTRACK_API_TOKEN="your-token" \
-  tonyzorin/youtrack-mcp:latest
+  searchanise/youtrack-mcp:latest
 
 # Or use the latest development build
 docker run --rm \
   -e YOUTRACK_URL="https://your-instance.youtrack.cloud" \
   -e YOUTRACK_API_TOKEN="your-token" \
-  tonyzorin/youtrack-mcp:1.1.2_wip
+  searchanise/youtrack-mcp:1.1.2_wip
 ```
 
 #### GitHub Container Registry (New)
@@ -201,13 +201,13 @@ docker run --rm \
 docker run --rm \
   -e YOUTRACK_URL="https://your-instance.youtrack.cloud" \
   -e YOUTRACK_API_TOKEN="your-token" \
-  ghcr.io/tonyzorin/youtrack-mcp:latest
+  ghcr.io/searchanise/youtrack-mcp:latest
 
 # Or use the latest development build
 docker run --rm \
   -e YOUTRACK_URL="https://your-instance.youtrack.cloud" \
   -e YOUTRACK_API_TOKEN="your-token" \
-  ghcr.io/tonyzorin/youtrack-mcp:1.1.2_wip
+  ghcr.io/searchanise/youtrack-mcp:1.1.2_wip
 ```
 
 ### Available Docker Tags
@@ -228,22 +228,22 @@ Choose from multiple registries:
 #### npmjs.org (Primary)
 ```bash
 # Install globally
-npm install -g youtrack-mcp-tonyzorin
+npm install -g youtrack-mcp-searchanise
 
 # Or use with npx (no installation required)
-npx youtrack-mcp-tonyzorin
+npx youtrack-mcp-searchanise
 ```
 
 #### GitHub Packages (New)
 ```bash
 # Configure GitHub registry
-npm config set @tonyzorin:registry https://npm.pkg.github.com
+npm config set @searchanise:registry https://npm.pkg.github.com
 
 # Install globally
-npm install -g @tonyzorin/youtrack-mcp
+npm install -g @searchanise/youtrack-mcp
 
 # Or use with npx
-npx @tonyzorin/youtrack-mcp
+npx @searchanise/youtrack-mcp
 ```
 
 ## Features
@@ -315,10 +315,9 @@ export YOUTRACK_VERIFY_SSL="true"
 ## Support
 
 For issues and questions:
-1. Check the [Issues](https://github.com/tonyzorin/youtrack-mcp/issues) page
+1. Check the [Issues](https://github.com/searchanise/youtrack-mcp/issues) page
 2. Review the documentation
 3. Submit a new issue with detailed information
-4. Contact directly: [t.me/tonyzorin](https://t.me/tonyzorin)
 
 ---
 

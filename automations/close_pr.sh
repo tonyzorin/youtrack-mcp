@@ -17,7 +17,7 @@ curl -X PATCH \
   -H "Accept: application/vnd.github.v3+json" \
   -H "Authorization: token $TOKEN" \
   -H "User-Agent: YouTrack-MCP-Bot" \
-  https://api.github.com/repos/tonyzorin/youtrack-mcp/pulls/13 \
+  https://api.github.com/repos/searchanise/youtrack-mcp/pulls/13 \
   -d '{"state":"closed"}'
 
 echo ""

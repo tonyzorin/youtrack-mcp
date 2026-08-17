@@ -1,5 +1,5 @@
 {
-  "name": "youtrack-mcp-tonyzorin",
+  "name": "youtrack-mcp-searchanise",
   "version": "1.17.2",
   "description": "A Model Context Protocol (MCP) server for JetBrains YouTrack integration",
   "keywords": [
@@ -11,13 +11,13 @@
     "claude",
     "ai"
   ],
-  "homepage": "https://github.com/tonyzorin/youtrack-mcp",
+  "homepage": "https://github.com/searchanise/youtrack-mcp",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tonyzorin/youtrack-mcp.git"
+    "url": "https://github.com/searchanise/youtrack-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/tonyzorin/youtrack-mcp/issues"
+    "url": "https://github.com/searchanise/youtrack-mcp/issues"
   },
   "author": {
     "name": "Anton Zorin",
@@ -27,7 +27,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "youtrack-mcp-tonyzorin": "dist/bin/youtrack-mcp.js"
+    "youtrack-mcp-searchanise": "dist/bin/youtrack-mcp.js"
   },
   "files": [
     "dist",

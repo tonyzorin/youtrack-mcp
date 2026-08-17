@@ -2,7 +2,7 @@
 # YouTrack MCP Docker Pull and Run Script
 # This ensures we always have the latest image before running
 
-IMAGE="tonyzorin/youtrack-mcp:1.16.2_wip"
+IMAGE="searchanise/youtrack-mcp:1.16.2_wip"
 
 echo "Pulling latest YouTrack MCP image..." >&2
 docker pull "$IMAGE" >&2
