@@ -12,7 +12,7 @@ on:
     types: [ published ]
 
 env:
-  DOCKER_HUB_REPOSITORY: tonyzorin/youtrack-mcp
+  DOCKER_HUB_REPOSITORY: searchanise/youtrack-mcp
   GITHUB_REGISTRY: ghcr.io
   GITHUB_REPOSITORY: ${{ github.repository }}
 
