@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 YouTrack MCP Server - A Model Context Protocol server for JetBrains YouTrack.
-Uses FastMCP directly for stdio, SSE, and streamable HTTP transports.
+Uses MCPServer for stdio, SSE, and streamable HTTP transports.
 """
 import logging
 import os
 import stat
 import sys
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from youtrack_mcp.version import __version__ as APP_VERSION
 from youtrack_mcp.config import config
@@ -22,18 +22,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# FastMCP 1.x names the remote HTTP transport "streamable-http".
+# MCP SDK names the remote HTTP transport "streamable-http".
 # Accept "http" as an alias so the npm --http flag keeps working.
 _HTTP_TRANSPORTS = {"http", "streamable-http"}
+_HTTP_RUN_TRANSPORTS = {"sse", "streamable-http"}
 
 
-def create_server(host: str = "0.0.0.0", port: int = 8000) -> FastMCP:
-    """Create and configure the FastMCP server with all tools registered."""
-    mcp = FastMCP(
+def create_server() -> MCPServer:
+    """Create and configure the MCPServer with all tools registered."""
+    mcp = MCPServer(
         config.MCP_SERVER_NAME,
         instructions=config.MCP_SERVER_DESCRIPTION,
-        host=host,
-        port=port,
+        version=APP_VERSION,
     )
 
     # Load and register all tools
@@ -41,7 +41,7 @@ def create_server(host: str = "0.0.0.0", port: int = 8000) -> FastMCP:
     for name, func in tools.items():
         mcp.add_tool(func, name=name)
 
-    logger.info(f"Registered {len(tools)} tools with FastMCP")
+    logger.info(f"Registered {len(tools)} tools with MCPServer")
     return mcp
 
 
@@ -118,8 +118,11 @@ def main():
 
     logger.info(f"Starting YouTrack MCP Server v{APP_VERSION} [{transport}]")
 
-    mcp = create_server(host=args.host, port=port)
-    mcp.run(transport=transport)
+    mcp = create_server()
+    if transport in _HTTP_RUN_TRANSPORTS:
+        mcp.run(transport=transport, host=args.host, port=port)
+    else:
+        mcp.run(transport=transport)
 
 
 if __name__ == "__main__":

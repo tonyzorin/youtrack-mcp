@@ -117,7 +117,7 @@ class YouTrackMCPServer {
   getInfo() {
     return {
       name: 'YouTrack MCP Server',
-      version: '1.18.0',
+      version: '2.0.0',
       description: 'A Model Context Protocol server for JetBrains YouTrack',
       pythonPath: this.pythonPath,
       serverPath: this.serverPath,

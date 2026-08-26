@@ -1,6 +1,6 @@
 {
   "name": "youtrack-mcp-tonyzorin",
-  "version": "1.18.0",
+  "version": "2.0.0",
   "description": "A Model Context Protocol (MCP) server for JetBrains YouTrack integration",
   "keywords": [
     "mcp",

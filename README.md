@@ -77,7 +77,7 @@ docker run --rm -i \
   tonyzorin/youtrack-mcp:latest
 ```
 
-Tag `latest` is the current stable release (**1.18.0**). Pin `tonyzorin/youtrack-mcp:1.18.0` if you want a frozen image. WIP and PR tags exist for testing; do not use them in production.
+Tag `latest` is the current stable release (**2.0.0**). Pin `tonyzorin/youtrack-mcp:2.0.0` if you want a frozen image. Stay on MCP SDK 1 with `tonyzorin/youtrack-mcp:1.18.0`. WIP and PR tags exist for testing; do not use them in production.
 
 ### Docker Compose (HTTP)
 

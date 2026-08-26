@@ -1,7 +1,7 @@
 httpx>=0.24.0
 pydantic>=2.0.0
 python-dotenv>=1.0.0
-mcp>=1.11.0,<2
+mcp>=2.0.0,<3
 requests>=2.32.3
 
 # Development dependencies
