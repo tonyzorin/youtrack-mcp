@@ -46,7 +46,7 @@ class BasicOperations:
         """
         try:
             # First try to get the issue data with explicit fields
-            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value),tags(id,name)"
             raw_issue = self.client.get(f"issues/{issue_id}?fields={fields}")
 
             # If we got a minimal response, enhance it with default values
@@ -360,4 +360,4 @@ class BasicOperations:
                     "text": "Comment text content"
                 }
             }
-        } 
+        }
