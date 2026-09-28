@@ -125,6 +125,59 @@ class TestIssuesClientInitialization:
         assert issues_client.client is mock_client
 
 
+class TestBuildSubtaskLink:
+    """Test the parent link sent with create_issue(subtask_of=...)."""
+
+    LINK_TYPES = [
+        {"id": "105-0", "targetToSource": "relates to"},
+        {"id": "105-3", "targetToSource": "Subtask of"},
+    ]
+
+    def test_build_subtask_link_inward_link_to_parent(self):
+        """Test the Subtask type ID gets the inward suffix and the parent's internal ID."""
+        mock_client = Mock(spec=YouTrackClient)
+        mock_client.get.side_effect = [self.LINK_TYPES, {"id": "3-100"}]
+
+        link = IssuesClient(mock_client).build_subtask_link("DEMO-100")
+
+        assert link == {"id": "105-3t", "issues": [{"id": "3-100"}]}
+        assert mock_client.get.call_args_list[1][0][0] == "issues/DEMO-100?fields=id"
+
+    def test_build_subtask_link_no_subtask_type(self):
+        """Test an instance without the Subtask type raises ValueError."""
+        mock_client = Mock(spec=YouTrackClient)
+        mock_client.get.return_value = [self.LINK_TYPES[0]]
+
+        with pytest.raises(ValueError, match="Subtask link type not found"):
+            IssuesClient(mock_client).build_subtask_link("DEMO-100")
+
+    def test_build_subtask_link_parent_not_found(self):
+        """Test a missing parent raises ValueError."""
+        from youtrack_mcp.api.client import ResourceNotFoundError
+
+        mock_client = Mock(spec=YouTrackClient)
+        mock_client.get.side_effect = [
+            self.LINK_TYPES,
+            ResourceNotFoundError("Not found", 404),
+        ]
+
+        with pytest.raises(ValueError, match="Parent issue not found: DEMO-404"):
+            IssuesClient(mock_client).build_subtask_link("DEMO-404")
+
+    def test_build_subtask_link_other_api_error_is_not_not_found(self):
+        """Test a permission error on the parent is not reported as "not found"."""
+        from youtrack_mcp.api.client import PermissionDeniedError
+
+        mock_client = Mock(spec=YouTrackClient)
+        mock_client.get.side_effect = [
+            self.LINK_TYPES,
+            PermissionDeniedError("Permission denied", 403),
+        ]
+
+        with pytest.raises(PermissionDeniedError):
+            IssuesClient(mock_client).build_subtask_link("DEMO-100")
+
+
 class TestIssuesClientBasicMethods:
     """Test basic IssuesClient methods."""
 

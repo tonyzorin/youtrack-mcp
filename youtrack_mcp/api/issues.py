@@ -9,7 +9,11 @@ import re
 
 from pydantic import BaseModel, Field
 
-from youtrack_mcp.api.client import YouTrackClient, YouTrackAPIError
+from youtrack_mcp.api.client import (
+    ResourceNotFoundError,
+    YouTrackAPIError,
+    YouTrackClient,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2661,6 +2665,49 @@ class IssuesClient:
         fields = "name,localizedName,sourceToTarget,targetToSource"
         response = self.client.get(f"issueLinkTypes?fields={fields}")
         return response
+
+    def build_subtask_link(self, parent_issue_id: str) -> Dict[str, Any]:
+        """
+        Build the "links" entry that makes a new issue a subtask of a parent.
+
+        The link is sent inside the create-issue request, so workflows that
+        require every issue to have a parent accept the new issue.
+
+        Args:
+            parent_issue_id: The parent issue ID (readable DEMO-1 or internal 2-1)
+
+        Returns:
+            IssueLink object for the "links" array of the create request
+
+        Raises:
+            ValueError: If the parent issue or the Subtask link type is not found
+        """
+        link_types = self.client.get("issueLinkTypes?fields=id,targetToSource")
+        subtask_type = next(
+            (
+                t
+                for t in link_types or []
+                if str(t.get("targetToSource") or "").lower() == "subtask of"
+            ),
+            None,
+        )
+        if not subtask_type:
+            raise ValueError("Subtask link type not found on this YouTrack instance")
+
+        try:
+            parent = self.client.get(f"issues/{parent_issue_id}?fields=id")
+        except ResourceNotFoundError as e:
+            # Other API errors (auth, permissions, server) propagate as they are
+            raise ValueError(
+                f"Parent issue not found: {parent_issue_id} ({e})"
+            ) from e
+
+        # The IssueLink ID is the link type ID plus a direction suffix; "t"
+        # (inward) makes the new issue the target of the link, i.e. the subtask
+        return {
+            "id": f"{subtask_type['id']}t",
+            "issues": [{"id": parent["id"]}],
+        }
 
     def _validate_custom_field_value(
         self, 
