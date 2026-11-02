@@ -304,12 +304,7 @@ class IssuesClient:
         use_commands: bool = False,  # Changed default to False - direct API works better
     ) -> Dict[str, Any]:
         """
-        Update multiple custom fields on an issue using proven working approach.
-
-        Based on successful testing with this YouTrack instance:
-        - Direct Field Update API works reliably for state transitions  
-        - Command API may be blocked by workflow restrictions
-        - Uses direct API as primary method with command fallback
+        Update multiple custom fields, resolving each field's YouTrack type.
 
         Args:
             issue_id: The issue identifier
@@ -491,31 +486,51 @@ class IssuesClient:
     
     def _apply_direct_state_update(self, issue_id: str, target_state: str) -> bool:
         """
-        Apply direct state field update using proven working format.
-        
-        Based on successful testing, the working format is:
-        {"customFields": [{"name": "State", "value": "In Progress"}]}
-        
-        NOT complex objects or ID references.
+        Apply a typed state field update and verify persistence.
         """
         try:
-            # Use the proven simple string format that works
             update_data = {
                 "customFields": [{
                     "name": "State",
-                    "value": target_state  # Simple string value - this is what works!
+                    "$type": "StateIssueCustomField",
+                    "value": {"name": target_state, "$type": "StateBundleElement"},
                 }]
             }
             
             logger.info(f"Applying direct state update to issue {issue_id}: State -> '{target_state}'")
             self.client.post(f"issues/{issue_id}", data=update_data)
-            
-            logger.info(f"Direct state update successful for issue {issue_id}")
+            persisted = self.client.get(
+                f"issues/{issue_id}?fields=customFields(name,value(name))"
+            )
+            state = next(
+                (field.get("value", {}).get("name") for field in persisted.get("customFields", [])
+                 if field.get("name") == "State"), None
+            )
+            if state != target_state:
+                logger.warning("State update for %s was not persisted: %r", issue_id, state)
+                return False
             return True
             
         except Exception as e:
             logger.warning(f"Direct state update failed for issue {issue_id}: {e}")
             return False
+
+    def _create_owned_field_object(self, project_id: str, field_name: str, value: str) -> Dict[str, Any]:
+        """Resolve an owned bundle value before writing an owned custom field."""
+        fields = self.client.get(
+            f"admin/projects/{project_id}/customFields?fields=field(name),bundle(values(name,id))"
+        )
+        for field in fields:
+            if field.get("field", {}).get("name") != field_name:
+                continue
+            for entry in field.get("bundle", {}).get("values", []):
+                if entry.get("name") == value:
+                    return {
+                        "name": field_name,
+                        "$type": "SingleOwnedIssueCustomField",
+                        "value": {"id": entry["id"], "$type": "OwnedBundleElement"},
+                    }
+        raise YouTrackAPIError(f"Owned value {value!r} not found for {field_name!r}")
     
     def _update_other_custom_fields(self, issue_id: str, custom_fields: Dict[str, Any], validate: bool, use_commands: bool) -> None:
         """
@@ -609,6 +624,8 @@ class IssuesClient:
                         field_data = self._create_user_field_object(field_name, field_value)
                     elif field_name.lower() in ['spent time']:
                         field_data = self._create_period_field_object(field_name, field_value)
+                    elif field_name.lower() == 'product':
+                        field_data = self._create_owned_field_object(project_id, field_name, field_value)
                     elif field_name.lower() in [
                         "sprints",
                         "sprint",
@@ -1805,6 +1822,8 @@ class IssuesClient:
                         field_data = self._create_user_field_object(field_name, field_value)
                     elif field_name.lower() in ['spent time']:
                         field_data = self._create_period_field_object(field_name, field_value)
+                    elif field_name.lower() == 'product':
+                        field_data = self._create_owned_field_object(project_id, field_name, field_value)
                     elif field_name.lower() in [
                         "sprints",
                         "sprint",

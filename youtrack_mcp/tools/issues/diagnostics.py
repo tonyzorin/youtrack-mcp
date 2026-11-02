@@ -113,15 +113,19 @@ class Diagnostics:
                         workflow_analysis["recommendations"].append(
                             "Direct state updates should work with proper field formatting"
                         )
-                else:
+                elif field_type == 'StateMachineIssueCustomField':
                     workflow_analysis["restrictions"].append(
-                        "No transition events available - may indicate permission restrictions"
+                        "No state-machine transition events are available"
                     )
                     workflow_analysis["recommendations"].extend([
                         "Check user permissions for state field updates",
                         "Verify workflow configuration allows transitions from current state",
                         "Contact YouTrack administrator if transitions should be available"
                     ])
+                else:
+                    workflow_analysis["recommendations"].append(
+                        "This direct state field has no transition events by design; test a typed update and inspect its API error"
+                    )
                 
                 # Add general workflow guidance
                 workflow_analysis["technical_notes"] = {
@@ -360,4 +364,4 @@ class Diagnostics:
                     "topic": "Help topic - 'all', 'state', 'priority', 'fields', 'projects', 'examples', 'workflow'. Defaults to 'all'"
                 }
             }
-        } 
+        }
