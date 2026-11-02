@@ -29,6 +29,7 @@ class SearchTools:
         limit: int = 10,
         sort_by: Optional[str] = None,
         sort_order: Optional[str] = None,
+        skip: int = 0,
     ) -> str:
         """
         Advanced search for issues using YouTrack query language with sorting.
@@ -40,6 +41,7 @@ class SearchTools:
             limit: Maximum number of results to return
             sort_by: Field to sort by (created, updated, priority, etc.)
             sort_order: Sort order ('asc' or 'desc')
+            skip: Number of results to skip (offset for paging)
 
         Returns:
             JSON string with search results
@@ -54,7 +56,9 @@ class SearchTools:
                     sort_param = f"{sort_by} desc"  # Default to desc
 
             # Perform the search (note: sort parameter not supported by search_issues API)
-            issues = self.issues_api.search_issues(query=query, limit=limit)
+            issues = self.issues_api.search_issues(
+                query=query, limit=limit, skip=skip
+            )
 
             # Handle response format
             if isinstance(issues, dict):
@@ -267,6 +271,7 @@ class SearchTools:
                     "limit": "Maximum number of results to return (default: 10)",
                     "sort_by": "Field to sort by (created, updated, priority, etc.)",
                     "sort_order": "Sort order ('asc' or 'desc')",
+                    "skip": "Number of results to skip, for paging (default: 0)",
                 },
             },
             "search_with_custom_field_values": {
