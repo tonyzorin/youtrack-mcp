@@ -12,6 +12,7 @@ import requests
 from pydantic import BaseModel, ConfigDict
 
 from youtrack_mcp.config import config
+from youtrack_mcp.version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,7 @@ class YouTrackClient:
             {
                 "Authorization": f"Bearer {self.api_token}",
                 "Accept": "application/json",
+                "User-Agent": f"youtrack-mcp/{__version__}",
                 "Content-Type": "application/json",
             }
         )

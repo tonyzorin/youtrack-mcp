@@ -19,6 +19,7 @@ from youtrack_mcp.api.client import (
     ValidationError,
     ServerError,
 )
+from youtrack_mcp.version import __version__
 
 
 class TestYouTrackModel:
@@ -112,6 +113,26 @@ class TestYouTrackClient:
 
             with pytest.raises(ValueError, match="API token is required"):
                 YouTrackClient()
+
+    @pytest.mark.unit
+    def test_client_session_user_agent(self):
+        """Session sends a custom User-Agent instead of python-requests default."""
+        with patch("youtrack_mcp.api.client.config") as mock_config:
+            mock_config.get_base_url.return_value = (
+                "https://test.youtrack.cloud"
+            )
+            mock_config.get_api_token.return_value = "test-token"
+            mock_config.VERIFY_SSL = True
+            mock_config.is_cloud_instance.return_value = True
+
+            client = YouTrackClient()
+            try:
+                assert (
+                    client.session.headers["User-Agent"]
+                    == f"youtrack-mcp/{__version__}"
+                )
+            finally:
+                client.session.close()
 
     @pytest.mark.unit
     def test_get_api_url_with_api_suffix(self, client):
