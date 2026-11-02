@@ -302,7 +302,7 @@ class IssuesClient:
         issue_id: str,
         custom_fields: Dict[str, Any],
         validate: bool = True,
-        use_commands: bool = False,  # Changed default to False - direct API works better
+        use_commands: bool = False,
     ) -> Dict[str, Any]:
         """
         Update multiple custom fields on an issue.
