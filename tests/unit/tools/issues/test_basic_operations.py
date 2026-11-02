@@ -75,7 +75,7 @@ class TestBasicOperations:
         assert result_data["project"] == mock_issue_data["project"]
         
         # Verify API call with correct fields
-        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login))"
         self.mock_client.get.assert_called_once_with(f"issues/{issue_id}?fields={expected_fields}")
 
     def test_get_issue_minimal_response_enhancement(self):
@@ -143,7 +143,7 @@ class TestBasicOperations:
         assert result_data == mock_search_results
         
         # Verify API call with correct parameters
-        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login))"
         expected_params = {"query": query, "$top": limit, "fields": expected_fields}
         self.mock_client.get.assert_called_once_with("issues", params=expected_params)
 

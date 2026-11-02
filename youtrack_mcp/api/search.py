@@ -70,12 +70,12 @@ class SearchClient:
         if custom_fields:
             # Build the customFields part with specific field names
             cf_string = ",".join(
-                [f"customFields(id,name,value)" for _ in custom_fields]
+                [f"customFields(id,name,value($type,id,name,text,login))" for _ in custom_fields]
             )
             requested_fields.append(cf_string)
         else:
             # By default, include all custom fields
-            requested_fields.append("customFields(id,name,value)")
+            requested_fields.append("customFields(id,name,value($type,id,name,text,login))")
 
         # Build the fields parameter
         fields_param = ",".join(requested_fields)
