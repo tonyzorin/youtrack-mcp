@@ -59,3 +59,42 @@ def test_product_update_uses_owned_bundle_element():
     payload = client.post.call_args.kwargs["data"]["customFields"][0]
     assert payload == {"name": "Product", "$type": "SingleOwnedIssueCustomField",
                        "value": {"id": "151-172", "$type": "OwnedBundleElement"}}
+
+
+def test_product_update_accepts_case_insensitive_field_name():
+    client = Mock()
+    issues = IssuesClient(client)
+    issues.get_issue = Mock(return_value=Issue(id="2-2312", project={"id": "0-66"}))
+    client.get.return_value = [{"field": {"name": "Product"}, "bundle": {
+        "values": [{"name": "~Datalake", "id": "151-172"}]}}]
+
+    issues.update_issue_custom_fields("DEV-2312", {"product": "~Datalake"}, validate=False)
+
+    payload = client.post.call_args.kwargs["data"]["customFields"][0]
+    assert payload["name"] == "Product"
+
+
+def test_state_command_fallback_requires_persisted_state():
+    client = Mock()
+    issues = IssuesClient(client)
+    issues._apply_direct_state_update = Mock(return_value=False)
+    client.get.side_effect = [
+        {"customFields": [{"name": "State", "value": {"name": "In Progress"}}]},
+        [],
+    ]
+
+    assert issues._handle_state_transition("DEV-2312", "Done", use_commands=True) is False
+    client.post.assert_called_once_with(
+        "commands", data={"query": 'State "Done"', "issues": [{"idReadable": "DEV-2312"}]}
+    )
+
+
+def test_state_command_fallback_accepts_persisted_state():
+    client = Mock()
+    issues = IssuesClient(client)
+    issues._apply_direct_state_update = Mock(return_value=False)
+    client.get.return_value = {
+        "customFields": [{"name": "State", "value": {"name": "Done"}}]
+    }
+
+    assert issues._handle_state_transition("DEV-2312", "Done", use_commands=True) is True

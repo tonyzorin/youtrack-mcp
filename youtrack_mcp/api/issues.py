@@ -393,13 +393,22 @@ class IssuesClient:
                 try:
                     command_data = {
                         "query": f"State \"{target_state}\"",
-                        "issues": [{"id": issue_id}]
+                        "issues": [{"idReadable": issue_id}]
                     }
                     
                     logger.info(f"Applying state transition command 'State \"{target_state}\"' to issue {issue_id}")
                     self.client.post("commands", data=command_data)
-                    logger.info(f"Command-based transition succeeded for issue {issue_id}")
-                    return True
+                    persisted = self.client.get(
+                        f"issues/{issue_id}?fields=customFields(name,value(name))"
+                    )
+                    state = next(
+                        (field.get("value", {}).get("name") for field in persisted.get("customFields", [])
+                         if field.get("name") == "State"), None
+                    )
+                    if state == target_state:
+                        logger.info(f"Command-based transition succeeded for issue {issue_id}")
+                        return True
+                    logger.warning("Command-based state update for %s was not persisted: %r", issue_id, state)
                     
                 except Exception as cmd_error:
                     logger.warning(f"Command-based approach failed: {cmd_error}")
@@ -521,12 +530,13 @@ class IssuesClient:
             f"admin/projects/{project_id}/customFields?fields=field(name),bundle(values(name,id))"
         )
         for field in fields:
-            if field.get("field", {}).get("name") != field_name:
+            actual_name = field.get("field", {}).get("name")
+            if not actual_name or actual_name.lower() != field_name.lower():
                 continue
             for entry in field.get("bundle", {}).get("values", []):
                 if entry.get("name") == value:
                     return {
-                        "name": field_name,
+                        "name": actual_name,
                         "$type": "SingleOwnedIssueCustomField",
                         "value": {"id": entry["id"], "$type": "OwnedBundleElement"},
                     }
