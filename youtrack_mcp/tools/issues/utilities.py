@@ -113,6 +113,7 @@ class Utilities:
                     "summary": "Title/summary for the new issue",
                     "description": "Optional detailed description of the issue",
                     "custom_fields": "Optional dictionary of custom fields such as Assignee, Type, State, Priority",
+                    "tags": "Optional list of tag names to attach; missing tags are created",
                 },
             },
             "update_issue": {

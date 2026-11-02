@@ -170,6 +170,55 @@ class IssuesClient:
             # Create minimal issue to avoid breaking calls
             return Issue(id=issue_id, summary=f"Error: {str(e)[:100]}...")
 
+    def resolve_tag_ids(self, names: List[str]) -> List[Dict[str, str]]:
+        """
+        Resolve tag names to YouTrack tag objects, creating missing tags.
+
+        YouTrack attaches tags by id, not by name, and does not create tags
+        implicitly. Returns a list of {"id": ...} ready to be sent as the
+        issue "tags" field.
+
+        Args:
+            names: Tag names to resolve
+
+        Returns:
+            List of tag references
+        """
+        if not names:
+            return []
+
+        existing = {}
+        skip = 0
+        while True:
+            batch = self.client.get(
+                "issueTags", params={"fields": "id,name", "$top": 300, "$skip": skip}
+            )
+            if not isinstance(batch, list) or not batch:
+                break
+            for tag in batch:
+                name = (tag.get("name") or "").strip()
+                if name:
+                    existing.setdefault(name.casefold(), tag.get("id"))
+            if len(batch) < 300:
+                break
+            skip += 300
+
+        refs = []
+        for name in names:
+            key = name.strip().casefold()
+            tag_id = existing.get(key)
+            if tag_id is None:
+                logger.info(f"Tag not found, creating: {name}")
+                created = self.client.post("issueTags", data={"name": name.strip()})
+                tag_id = created.get("id") if isinstance(created, dict) else None
+                if tag_id:
+                    existing[key] = tag_id
+            if tag_id:
+                refs.append({"id": tag_id})
+            else:
+                logger.warning(f"Could not resolve or create tag: {name}")
+        return refs
+
     def create_issue(
         self,
         project_id: str,
