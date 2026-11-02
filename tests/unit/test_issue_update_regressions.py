@@ -1,4 +1,4 @@
-"""Regression coverage for the field shapes used by the live DEV project."""
+"""Regression coverage for issue state and owned custom field updates."""
 
 import json
 from unittest.mock import Mock
@@ -16,9 +16,9 @@ def test_direct_state_update_sends_typed_field_and_checks_persisted_value():
     client.get.return_value = {"customFields": [{"name": "State", "value": {"name": "Done"}}]}
     issues = IssuesClient(client)
 
-    assert issues._apply_direct_state_update("DEV-2312", "Done") is True
+    assert issues._apply_direct_state_update("DEMO-123", "Done") is True
     client.post.assert_called_once_with(
-        "issues/DEV-2312",
+        "issues/DEMO-123",
         data={"customFields": [{"name": "State", "$type": "StateIssueCustomField",
                                 "value": {"name": "Done", "$type": "StateBundleElement"}}]},
     )
@@ -28,7 +28,7 @@ def test_direct_state_update_does_not_claim_success_when_state_stays_old():
     client = Mock()
     client.get.return_value = {"customFields": [{"name": "State", "value": {"name": "In Progress"}}]}
 
-    assert IssuesClient(client)._apply_direct_state_update("DEV-2312", "Done") is False
+    assert IssuesClient(client)._apply_direct_state_update("DEMO-123", "Done") is False
 
 
 def test_state_command_uses_readable_id_and_does_not_claim_unpersisted_success():
@@ -37,10 +37,10 @@ def test_state_command_uses_readable_id_and_does_not_claim_unpersisted_success()
     issues.client.post.return_value = {}
     issues.client.get.return_value = {"customFields": [{"name": "State", "value": {"name": "In Progress"}}]}
 
-    result = json.loads(DedicatedUpdates(issues, Mock()).update_issue_state("DEV-2312", "Done"))
+    result = json.loads(DedicatedUpdates(issues, Mock()).update_issue_state("DEMO-123", "Done"))
 
     issues.client.post.assert_called_once_with(
-        "commands", data={"query": 'State "Done"', "issues": [{"idReadable": "DEV-2312"}]}
+        "commands", data={"query": 'State "Done"', "issues": [{"idReadable": "DEMO-123"}]}
     )
     assert result.get("status") != "success"
     assert "In Progress" in result["error"]
@@ -52,9 +52,9 @@ def test_product_update_uses_owned_bundle_element():
     issues.get_issue = Mock(return_value=Issue(id="2-2312", project={"id": "0-66"}))
     issues._validate_custom_field_value = Mock(return_value=True)
     client.get.return_value = [{"field": {"name": "Product"}, "bundle": {
-        "values": [{"name": "~Datalake", "id": "151-172"}]}}]
+        "values": [{"name": "Platform", "id": "151-172"}]}}]
 
-    issues.update_issue_custom_fields("DEV-2312", {"Product": "~Datalake"}, validate=False)
+    issues.update_issue_custom_fields("DEMO-123", {"Product": "Platform"}, validate=False)
 
     payload = client.post.call_args.kwargs["data"]["customFields"][0]
     assert payload == {"name": "Product", "$type": "SingleOwnedIssueCustomField",
@@ -66,9 +66,9 @@ def test_product_update_accepts_case_insensitive_field_name():
     issues = IssuesClient(client)
     issues.get_issue = Mock(return_value=Issue(id="2-2312", project={"id": "0-66"}))
     client.get.return_value = [{"field": {"name": "Product"}, "bundle": {
-        "values": [{"name": "~Datalake", "id": "151-172"}]}}]
+        "values": [{"name": "Platform", "id": "151-172"}]}}]
 
-    issues.update_issue_custom_fields("DEV-2312", {"product": "~Datalake"}, validate=False)
+    issues.update_issue_custom_fields("DEMO-123", {"product": "Platform"}, validate=False)
 
     payload = client.post.call_args.kwargs["data"]["customFields"][0]
     assert payload["name"] == "Product"
@@ -83,9 +83,9 @@ def test_state_command_fallback_requires_persisted_state():
         [],
     ]
 
-    assert issues._handle_state_transition("DEV-2312", "Done", use_commands=True) is False
+    assert issues._handle_state_transition("DEMO-123", "Done", use_commands=True) is False
     client.post.assert_called_once_with(
-        "commands", data={"query": 'State "Done"', "issues": [{"idReadable": "DEV-2312"}]}
+        "commands", data={"query": 'State "Done"', "issues": [{"idReadable": "DEMO-123"}]}
     )
 
 
@@ -97,4 +97,4 @@ def test_state_command_fallback_accepts_persisted_state():
         "customFields": [{"name": "State", "value": {"name": "Done"}}]
     }
 
-    assert issues._handle_state_transition("DEV-2312", "Done", use_commands=True) is True
+    assert issues._handle_state_transition("DEMO-123", "Done", use_commands=True) is True
