@@ -3,8 +3,15 @@ Utility functions for YouTrack MCP server.
 """
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Union
+
+
+def issue_command_reference(issue_id: str) -> Dict[str, str]:
+    """Use the matching YouTrack command field for an internal or readable issue ID."""
+    key = "id" if re.fullmatch(r"[0-9]+-[0-9]+", issue_id) else "idReadable"
+    return {key: issue_id}
 
 
 def convert_timestamp_to_iso8601(timestamp_ms: int) -> str:

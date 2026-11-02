@@ -17,7 +17,7 @@ import logging
 from typing import Any, Dict
 
 from youtrack_mcp.mcp_wrappers import sync_wrapper
-from youtrack_mcp.utils import format_json_response
+from youtrack_mcp.utils import format_json_response, issue_command_reference
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +34,7 @@ class DedicatedUpdates:
     @sync_wrapper
     def update_issue_state(self, issue_id: str, new_state: str) -> str:
         """
-        Update an issue's state using the proven working REST API approach.
-        
-        🎯 PROVEN WORKING FORMAT (based on successful testing):
-        - Uses simple string values: "In Progress", "Fixed", "Open"
-        - NO complex objects or ID references needed
+        Update an issue's state with a typed field payload and verified readback.
         
         ✅ EXAMPLES THAT WORK:
         - update_issue_state("DEMO-123", "In Progress")
@@ -46,9 +42,9 @@ class DedicatedUpdates:
         - update_issue_state("TASK-789", "Closed")
         
         🔧 WHAT HAPPENS UNDER THE HOOD:
-        - Primary: Direct Field Update API with format {"customFields": [{"name": "State", "value": "In Progress"}]}
-        - Fallback: Commands API with "State In Progress" command
-        - Smart error handling with workflow restriction guidance
+        - Primary: typed StateIssueCustomField update
+        - Fallback: Commands API with the matching internal or readable issue ID
+        - Both paths verify the persisted state before reporting success
         
         FORMAT: update_issue_state(issue_id="DEMO-123", new_state="In Progress")
         
@@ -91,10 +87,23 @@ class DedicatedUpdates:
                 try:
                     command_data = {
                         "query": f"State \"{new_state}\"",
-                        "issues": [{"id": issue_id}]
+                        "issues": [issue_command_reference(issue_id)]
                     }
                     
                     self.issues_api.client.post("commands", data=command_data)
+                    persisted = self.issues_api.client.get(
+                        f"issues/{issue_id}?fields=customFields(name,value(name))"
+                    )
+                    actual_state = next(
+                        (field.get("value", {}).get("name") for field in persisted.get("customFields", [])
+                         if field.get("name") == "State"), None
+                    )
+                    if actual_state != new_state:
+                        return format_json_response({
+                            "error": f"State update was not persisted: expected {new_state!r}, found {actual_state!r}",
+                            "issue_id": issue_id,
+                            "target_state": new_state,
+                        })
                     
                     # Get the updated issue
                     updated_issue = self.issues_api.get_issue(issue_id)
@@ -114,9 +123,13 @@ class DedicatedUpdates:
                     
                     # Parse specific workflow failure reasons
                     specific_guidance = []
-                    workflow_reason = "Unknown workflow restriction"
+                    workflow_reason = error_msg
+                    is_workflow_restriction = False
                     
-                    if "workflow restrictions" in error_msg.lower() or "status 405" in error_msg or "Failed to transition" in error_msg:
+                    if any(phrase in error_msg.lower() for phrase in (
+                        "workflow restriction", "status 405", "failed to transition", "assertion failed"
+                    )):
+                        is_workflow_restriction = True
                         # Try to get current state for better context
                         try:
                             current_issue = self.issues_api.get_issue(issue_id)
@@ -190,7 +203,7 @@ class DedicatedUpdates:
                         "error": f"State transition failed: {workflow_reason}",
                         "issue_id": issue_id,
                         "target_state": new_state,
-                        "workflow_restriction": True,
+                        "workflow_restriction": is_workflow_restriction,
                         "specific_guidance": specific_guidance,
                         "general_troubleshooting": [
                             "Check if the target state exists in your YouTrack project",
@@ -598,4 +611,4 @@ class DedicatedUpdates:
                     "estimation": "Time estimate (e.g., '4h', '2d', '30m', '1w', '3d 5h')"
                 }
             }
-        } 
+        }

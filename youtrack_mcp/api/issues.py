@@ -10,6 +10,7 @@ import re
 from pydantic import BaseModel, Field
 
 from youtrack_mcp.api.client import YouTrackClient, YouTrackAPIError
+from youtrack_mcp.utils import issue_command_reference
 
 logger = logging.getLogger(__name__)
 
@@ -301,24 +302,29 @@ class IssuesClient:
         issue_id: str,
         custom_fields: Dict[str, Any],
         validate: bool = True,
-        use_commands: bool = False,  # Changed default to False - direct API works better
+        use_commands: bool = False,
     ) -> Dict[str, Any]:
         """
-        Update multiple custom fields on an issue using proven working approach.
+        Update multiple custom fields on an issue.
 
-        Based on successful testing with this YouTrack instance:
-        - Direct Field Update API works reliably for state transitions  
-        - Command API may be blocked by workflow restrictions
-        - Uses direct API as primary method with command fallback
+        State is handled first: a typed field update is checked against the
+        persisted value; command and state-machine transitions are available
+        as fallbacks. Other fields use payloads matching their YouTrack types.
+        The updated issue is fetched after the requested changes.
 
         Args:
             issue_id: The issue identifier
             custom_fields: Dictionary of field names and values to update
             validate: Whether to validate field values before updating
-            use_commands: Whether to try command-based approach as fallback (default: False)
+            use_commands: Whether to enable command fallback on the first state
+                transition attempt. If false, a failed attempt is retried with
+                command fallback enabled.
 
         Returns:
             Updated issue data
+
+        Raises:
+            YouTrackAPIError: If a requested field update fails.
         """
         try:
             # First, get current issue state to detect state machine workflows
@@ -398,13 +404,22 @@ class IssuesClient:
                 try:
                     command_data = {
                         "query": f"State \"{target_state}\"",
-                        "issues": [{"id": issue_id}]
+                        "issues": [issue_command_reference(issue_id)]
                     }
                     
                     logger.info(f"Applying state transition command 'State \"{target_state}\"' to issue {issue_id}")
                     self.client.post("commands", data=command_data)
-                    logger.info(f"Command-based transition succeeded for issue {issue_id}")
-                    return True
+                    persisted = self.client.get(
+                        f"issues/{issue_id}?fields=customFields(name,value(name))"
+                    )
+                    state = next(
+                        (field.get("value", {}).get("name") for field in persisted.get("customFields", [])
+                         if field.get("name") == "State"), None
+                    )
+                    if state == target_state:
+                        logger.info(f"Command-based transition succeeded for issue {issue_id}")
+                        return True
+                    logger.warning("Command-based state update for %s was not persisted: %r", issue_id, state)
                     
                 except Exception as cmd_error:
                     logger.warning(f"Command-based approach failed: {cmd_error}")
@@ -491,31 +506,52 @@ class IssuesClient:
     
     def _apply_direct_state_update(self, issue_id: str, target_state: str) -> bool:
         """
-        Apply direct state field update using proven working format.
-        
-        Based on successful testing, the working format is:
-        {"customFields": [{"name": "State", "value": "In Progress"}]}
-        
-        NOT complex objects or ID references.
+        Apply a typed state field update and verify persistence.
         """
         try:
-            # Use the proven simple string format that works
             update_data = {
                 "customFields": [{
                     "name": "State",
-                    "value": target_state  # Simple string value - this is what works!
+                    "$type": "StateIssueCustomField",
+                    "value": {"name": target_state, "$type": "StateBundleElement"},
                 }]
             }
             
             logger.info(f"Applying direct state update to issue {issue_id}: State -> '{target_state}'")
             self.client.post(f"issues/{issue_id}", data=update_data)
-            
-            logger.info(f"Direct state update successful for issue {issue_id}")
+            persisted = self.client.get(
+                f"issues/{issue_id}?fields=customFields(name,value(name))"
+            )
+            state = next(
+                (field.get("value", {}).get("name") for field in persisted.get("customFields", [])
+                 if field.get("name") == "State"), None
+            )
+            if state != target_state:
+                logger.warning("State update for %s was not persisted: %r", issue_id, state)
+                return False
             return True
             
         except Exception as e:
             logger.warning(f"Direct state update failed for issue {issue_id}: {e}")
             return False
+
+    def _create_owned_field_object(self, project_id: str, field_name: str, value: str) -> Dict[str, Any]:
+        """Resolve an owned bundle value before writing an owned custom field."""
+        fields = self.client.get(
+            f"admin/projects/{project_id}/customFields?fields=field(name),bundle(values(name,id))"
+        )
+        for field in fields:
+            actual_name = field.get("field", {}).get("name")
+            if not actual_name or actual_name.lower() != field_name.lower():
+                continue
+            for entry in field.get("bundle", {}).get("values", []):
+                if entry.get("name") == value:
+                    return {
+                        "name": actual_name,
+                        "$type": "SingleOwnedIssueCustomField",
+                        "value": {"id": entry["id"], "$type": "OwnedBundleElement"},
+                    }
+        raise YouTrackAPIError(f"Owned value {value!r} not found for {field_name!r}")
     
     def _update_other_custom_fields(self, issue_id: str, custom_fields: Dict[str, Any], validate: bool, use_commands: bool) -> None:
         """
@@ -623,12 +659,14 @@ class IssuesClient:
                             project_id, field_name, field_value, multi=True
                         )
                     else:
-                        # Query the schema to detect other version/sprint fields
+                        # Query the schema to detect the custom field type
                         value_type = self._get_field_value_type(project_id, field_name)
                         if value_type == "version":
                             field_data = self._create_version_field_object(
                                 project_id, field_name, field_value, multi=True
                             )
+                        elif value_type == "ownedField":
+                            field_data = self._create_owned_field_object(project_id, field_name, field_value)
                         else:
                             # Default to enum for unknown fields
                             field_data = self._create_enum_field_object(project_id, field_name, field_value)
@@ -1819,12 +1857,14 @@ class IssuesClient:
                             project_id, field_name, field_value, multi=True
                         )
                     else:
-                        # Query the schema to detect other version/sprint fields
+                        # Query the schema to detect the custom field type
                         value_type = self._get_field_value_type(project_id, field_name)
                         if value_type == "version":
                             field_data = self._create_version_field_object(
                                 project_id, field_name, field_value, multi=True
                             )
+                        elif value_type == "ownedField":
+                            field_data = self._create_owned_field_object(project_id, field_name, field_value)
                         else:
                             # Default to enum for unknown fields
                             field_data = self._create_enum_field_object(project_id, field_name, field_value)
@@ -1969,6 +2009,8 @@ class IssuesClient:
                     return self._create_version_field_object(
                         project_id, field_name, field_value, multi=True
                     )
+                elif value_type == "ownedField":
+                    return self._create_owned_field_object(project_id, field_name, field_value)
                 else:
                     # Default to enum for unknown fields
                     return self._create_enum_field_object(project_id, field_name, field_value)

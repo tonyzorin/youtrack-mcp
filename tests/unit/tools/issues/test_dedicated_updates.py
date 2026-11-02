@@ -58,6 +58,9 @@ class TestDedicatedUpdates:
         
         self.mock_issues_api._apply_direct_state_update.return_value = False
         self.mock_issues_api.client.post.return_value = {}
+        self.mock_issues_api.client.get.return_value = {
+            "customFields": [{"name": "State", "value": {"name": new_state}}]
+        }
         self.mock_issues_api.get_issue.return_value = mock_issue
         
         # Act
@@ -71,7 +74,7 @@ class TestDedicatedUpdates:
         # Verify Commands API was called
         expected_command_data = {
             "query": f"State \"{new_state}\"",
-            "issues": [{"id": issue_id}]
+            "issues": [{"idReadable": issue_id}]
         }
         self.mock_issues_api.client.post.assert_called_once_with("commands", data=expected_command_data)
 
@@ -399,4 +402,4 @@ class TestDedicatedUpdates:
             
             result = self.dedicated_updates.update_issue_priority(issue_id, "Critical")
             result_data = json.loads(result)
-            assert "error" in result_data 
+            assert "error" in result_data
