@@ -305,16 +305,26 @@ class IssuesClient:
         use_commands: bool = False,  # Changed default to False - direct API works better
     ) -> Dict[str, Any]:
         """
-        Update multiple custom fields, resolving each field's YouTrack type.
+        Update multiple custom fields on an issue.
+
+        State is handled first: a typed field update is checked against the
+        persisted value; command and state-machine transitions are available
+        as fallbacks. Other fields use payloads matching their YouTrack types.
+        The updated issue is fetched after the requested changes.
 
         Args:
             issue_id: The issue identifier
             custom_fields: Dictionary of field names and values to update
             validate: Whether to validate field values before updating
-            use_commands: Whether to try command-based approach as fallback (default: False)
+            use_commands: Whether to enable command fallback on the first state
+                transition attempt. If false, a failed attempt is retried with
+                command fallback enabled.
 
         Returns:
             Updated issue data
+
+        Raises:
+            YouTrackAPIError: If a requested field update fails.
         """
         try:
             # First, get current issue state to detect state machine workflows
