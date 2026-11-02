@@ -645,8 +645,6 @@ class IssuesClient:
                         field_data = self._create_user_field_object(field_name, field_value)
                     elif field_name.lower() in ['spent time']:
                         field_data = self._create_period_field_object(field_name, field_value)
-                    elif field_name.lower() == 'product':
-                        field_data = self._create_owned_field_object(project_id, field_name, field_value)
                     elif field_name.lower() in [
                         "sprints",
                         "sprint",
@@ -661,12 +659,14 @@ class IssuesClient:
                             project_id, field_name, field_value, multi=True
                         )
                     else:
-                        # Query the schema to detect other version/sprint fields
+                        # Query the schema to detect the custom field type
                         value_type = self._get_field_value_type(project_id, field_name)
                         if value_type == "version":
                             field_data = self._create_version_field_object(
                                 project_id, field_name, field_value, multi=True
                             )
+                        elif value_type == "ownedField":
+                            field_data = self._create_owned_field_object(project_id, field_name, field_value)
                         else:
                             # Default to enum for unknown fields
                             field_data = self._create_enum_field_object(project_id, field_name, field_value)
@@ -1843,8 +1843,6 @@ class IssuesClient:
                         field_data = self._create_user_field_object(field_name, field_value)
                     elif field_name.lower() in ['spent time']:
                         field_data = self._create_period_field_object(field_name, field_value)
-                    elif field_name.lower() == 'product':
-                        field_data = self._create_owned_field_object(project_id, field_name, field_value)
                     elif field_name.lower() in [
                         "sprints",
                         "sprint",
@@ -1859,12 +1857,14 @@ class IssuesClient:
                             project_id, field_name, field_value, multi=True
                         )
                     else:
-                        # Query the schema to detect other version/sprint fields
+                        # Query the schema to detect the custom field type
                         value_type = self._get_field_value_type(project_id, field_name)
                         if value_type == "version":
                             field_data = self._create_version_field_object(
                                 project_id, field_name, field_value, multi=True
                             )
+                        elif value_type == "ownedField":
+                            field_data = self._create_owned_field_object(project_id, field_name, field_value)
                         else:
                             # Default to enum for unknown fields
                             field_data = self._create_enum_field_object(project_id, field_name, field_value)
@@ -2009,6 +2009,8 @@ class IssuesClient:
                     return self._create_version_field_object(
                         project_id, field_name, field_value, multi=True
                     )
+                elif value_type == "ownedField":
+                    return self._create_owned_field_object(project_id, field_name, field_value)
                 else:
                     # Default to enum for unknown fields
                     return self._create_enum_field_object(project_id, field_name, field_value)

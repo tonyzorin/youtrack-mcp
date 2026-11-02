@@ -51,7 +51,7 @@ def test_product_update_uses_owned_bundle_element():
     issues = IssuesClient(client)
     issues.get_issue = Mock(return_value=Issue(id="2-2312", project={"id": "0-66"}))
     issues._validate_custom_field_value = Mock(return_value=True)
-    client.get.return_value = [{"field": {"name": "Product"}, "bundle": {
+    client.get.return_value = [{"field": {"name": "Product", "fieldType": {"valueType": "ownedField"}}, "bundle": {
         "values": [{"name": "Platform", "id": "151-172"}]}}]
 
     issues.update_issue_custom_fields("DEMO-123", {"Product": "Platform"}, validate=False)
@@ -65,13 +65,40 @@ def test_product_update_accepts_case_insensitive_field_name():
     client = Mock()
     issues = IssuesClient(client)
     issues.get_issue = Mock(return_value=Issue(id="2-2312", project={"id": "0-66"}))
-    client.get.return_value = [{"field": {"name": "Product"}, "bundle": {
+    client.get.return_value = [{"field": {"name": "Product", "fieldType": {"valueType": "ownedField"}}, "bundle": {
         "values": [{"name": "Platform", "id": "151-172"}]}}]
 
     issues.update_issue_custom_fields("DEMO-123", {"product": "Platform"}, validate=False)
 
     payload = client.post.call_args.kwargs["data"]["customFields"][0]
     assert payload["name"] == "Product"
+
+
+def test_owned_field_update_uses_schema_without_a_special_field_name():
+    client = Mock()
+    issues = IssuesClient(client)
+    issues.get_issue = Mock(return_value=Issue(id="2-123", project={"id": "0-1"}))
+    client.get.return_value = [{"field": {"name": "Component", "fieldType": {
+        "valueType": "ownedField"}}, "bundle": {"values": [{"name": "Platform", "id": "151-1"}]}}]
+
+    issues.update_issue_custom_fields("DEMO-123", {"Component": "Platform"}, validate=False)
+
+    payload = client.post.call_args.kwargs["data"]["customFields"][0]
+    assert payload == {"name": "Component", "$type": "SingleOwnedIssueCustomField",
+                       "value": {"id": "151-1", "$type": "OwnedBundleElement"}}
+
+
+def test_product_name_does_not_force_owned_type_when_schema_says_enum():
+    client = Mock()
+    issues = IssuesClient(client)
+    issues.get_issue = Mock(return_value=Issue(id="2-123", project={"id": "0-1"}))
+    client.get.return_value = [{"field": {"name": "Product", "fieldType": {
+        "valueType": "enum"}}}]
+    issues._create_enum_field_object = Mock(return_value={"name": "Product", "$type": "SingleEnumIssueCustomField"})
+
+    issues.update_issue_custom_fields("DEMO-123", {"Product": "Platform"}, validate=False)
+
+    issues._create_enum_field_object.assert_called_once_with("0-1", "Product", "Platform")
 
 
 def test_state_command_fallback_requires_persisted_state():
