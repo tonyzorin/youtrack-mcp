@@ -10,6 +10,7 @@ import re
 from pydantic import BaseModel, Field
 
 from youtrack_mcp.api.client import YouTrackClient, YouTrackAPIError
+from youtrack_mcp.utils import issue_command_reference
 
 logger = logging.getLogger(__name__)
 
@@ -393,7 +394,7 @@ class IssuesClient:
                 try:
                     command_data = {
                         "query": f"State \"{target_state}\"",
-                        "issues": [{"idReadable": issue_id}]
+                        "issues": [issue_command_reference(issue_id)]
                     }
                     
                     logger.info(f"Applying state transition command 'State \"{target_state}\"' to issue {issue_id}")

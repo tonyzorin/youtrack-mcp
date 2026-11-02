@@ -17,7 +17,7 @@ import logging
 from typing import Any, Dict
 
 from youtrack_mcp.mcp_wrappers import sync_wrapper
-from youtrack_mcp.utils import format_json_response
+from youtrack_mcp.utils import format_json_response, issue_command_reference
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class DedicatedUpdates:
         
         🔧 WHAT HAPPENS UNDER THE HOOD:
         - Primary: typed StateIssueCustomField update
-        - Fallback: Commands API with the issue's readable ID
+        - Fallback: Commands API with the matching internal or readable issue ID
         - Both paths verify the persisted state before reporting success
         
         FORMAT: update_issue_state(issue_id="DEMO-123", new_state="In Progress")
@@ -87,7 +87,7 @@ class DedicatedUpdates:
                 try:
                     command_data = {
                         "query": f"State \"{new_state}\"",
-                        "issues": [{"idReadable": issue_id}]
+                        "issues": [issue_command_reference(issue_id)]
                     }
                     
                     self.issues_api.client.post("commands", data=command_data)

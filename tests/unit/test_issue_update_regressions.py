@@ -98,3 +98,33 @@ def test_state_command_fallback_accepts_persisted_state():
     }
 
     assert issues._handle_state_transition("DEMO-123", "Done", use_commands=True) is True
+
+
+def test_state_command_fallback_accepts_internal_issue_id():
+    client = Mock()
+    issues = IssuesClient(client)
+    issues._apply_direct_state_update = Mock(return_value=False)
+    client.get.return_value = {
+        "customFields": [{"name": "State", "value": {"name": "Done"}}]
+    }
+
+    assert issues._handle_state_transition("2-123", "Done", use_commands=True) is True
+    client.post.assert_called_once_with(
+        "commands", data={"query": 'State "Done"', "issues": [{"id": "2-123"}]}
+    )
+
+
+def test_dedicated_state_fallback_accepts_internal_issue_id():
+    issues = Mock()
+    issues._apply_direct_state_update.return_value = False
+    issues.get_issue.return_value = {"id": "2-123", "idReadable": "DEMO-123"}
+    issues.client.get.return_value = {
+        "customFields": [{"name": "State", "value": {"name": "Done"}}]
+    }
+
+    result = json.loads(DedicatedUpdates(issues, Mock()).update_issue_state("2-123", "Done"))
+
+    assert result["status"] == "success"
+    issues.client.post.assert_called_once_with(
+        "commands", data={"query": 'State "Done"', "issues": [{"id": "2-123"}]}
+    )
