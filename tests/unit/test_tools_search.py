@@ -53,7 +53,8 @@ class TestSearchToolsAdvancedSearch:
         
         mock_issues_api.search_issues.assert_called_once_with(
             query="project: DEMO #Unresolved",
-            limit=10
+            limit=10,
+            skip=0
         )
     
     @patch('youtrack_mcp.tools.search.IssuesClient')
@@ -78,7 +79,8 @@ class TestSearchToolsAdvancedSearch:
         
         mock_issues_api.search_issues.assert_called_once_with(
             query="project: DEMO",
-            limit=5
+            limit=5,
+            skip=0
         )
     
     @patch('youtrack_mcp.tools.search.IssuesClient')

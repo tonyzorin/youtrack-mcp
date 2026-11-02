@@ -1019,13 +1019,16 @@ class IssuesClient:
         
         return results
 
-    def search_issues(self, query: str, limit: int = 10) -> List[Issue]:
+    def search_issues(
+        self, query: str, limit: int = 10, skip: int = 0
+    ) -> List[Issue]:
         """
         Search for issues using YouTrack query language.
 
         Args:
             query: The search query
             limit: Maximum number of issues to return
+            skip: Number of issues to skip (offset for paging)
 
         Returns:
             List of matching issues
@@ -1033,6 +1036,8 @@ class IssuesClient:
         # Request additional fields to ensure we get summary
         fields = "id,idReadable,summary,description,created,updated,project,reporter,assignee,customFields"
         params = {"query": query, "$top": limit, "fields": fields}
+        if skip:
+            params["$skip"] = skip
         response = self.client.get("issues", params=params)
 
         issues = []
@@ -2390,13 +2395,16 @@ class IssuesClient:
         
         return results
 
-    def search_issues(self, query: str, limit: int = 10) -> List[Issue]:
+    def search_issues(
+        self, query: str, limit: int = 10, skip: int = 0
+    ) -> List[Issue]:
         """
         Search for issues using YouTrack query language.
 
         Args:
             query: The search query
             limit: Maximum number of issues to return
+            skip: Number of issues to skip (offset for paging)
 
         Returns:
             List of matching issues
@@ -2404,6 +2412,8 @@ class IssuesClient:
         # Request additional fields to ensure we get summary
         fields = "id,idReadable,summary,description,created,updated,project,reporter,assignee,customFields"
         params = {"query": query, "$top": limit, "fields": fields}
+        if skip:
+            params["$skip"] = skip
         response = self.client.get("issues", params=params)
 
         issues = []

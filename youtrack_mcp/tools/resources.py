@@ -646,10 +646,19 @@ class ResourcesTools:
             logger.exception(f"Error getting user: {user_id}")
             return json.dumps({"error": str(e)})
 
-    def search_issues(self, query: str) -> str:
-        """Search issues as a resource."""
+    def search_issues(self, query: str, limit: int = 100, skip: int = 0) -> str:
+        """Search issues as a resource.
+
+        Args:
+            query: YouTrack query string
+            limit: Maximum number of issues to return
+            skip: Number of issues to skip (offset for paging)
+        """
         try:
-            results = self.client.get("issues", params={"query": query, "$top": 100})
+            params = {"query": query, "$top": limit}
+            if skip:
+                params["$skip"] = skip
+            results = self.client.get("issues", params=params)
 
             return json.dumps(
                 {
@@ -738,7 +747,9 @@ class ResourcesTools:
             "search_issues": {
                 "description": "Search issues as a resource.",
                 "parameter_descriptions": {
-                    "query": "The search query (e.g., 'project: DEMO #Unresolved')"
+                    "query": "The search query (e.g., 'project: DEMO #Unresolved')",
+                    "limit": "Maximum number of issues to return (default: 100)",
+                    "skip": "Number of issues to skip, for paging (default: 0)",
                 },
             },
         }
