@@ -116,6 +116,7 @@ class YouTrackClient:
             {
                 "Authorization": f"Bearer {self.api_token}",
                 "Accept": "application/json",
+                "User-Agent": "youtrack-mcp/1.0",
                 "Content-Type": "application/json",
             }
         )
