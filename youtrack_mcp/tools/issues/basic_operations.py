@@ -46,7 +46,7 @@ class BasicOperations:
         """
         try:
             # First try to get the issue data with explicit fields
-            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login))"
             raw_issue = self.client.get(f"issues/{issue_id}?fields={fields}")
 
             # If we got a minimal response, enhance it with default values
@@ -82,7 +82,7 @@ class BasicOperations:
         """
         try:
             # Request with explicit fields to get complete data
-            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login))"
             params = {"query": query, "$top": limit, "fields": fields}
             raw_issues = self.client.get("issues", params=params)
 

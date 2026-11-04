@@ -85,7 +85,7 @@ class TestAttachments:
             ]
         }
         
-        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value(id,name)),attachments(id,name,size,url),comments(id,text,author(login,name),created)"
+        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login)),attachments(id,name,size,url),comments(id,text,author(login,name),created)"
         self.mock_client.get.return_value = mock_raw_issue
         
         # Act

@@ -44,7 +44,7 @@ class Attachments:
         """
         try:
             # Request comprehensive fields for raw issue data
-            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value(id,name)),attachments(id,name,size,url),comments(id,text,author(login,name),created)"
+            fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login)),attachments(id,name,size,url),comments(id,text,author(login,name),created)"
             raw_issue = self.client.get(f"issues/{issue_id}?fields={fields}")
             return format_json_response(raw_issue)
         except Exception as e:
