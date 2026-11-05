@@ -135,10 +135,16 @@ class IssueTools:
         summary: str,
         description: Optional[str] = None,
         custom_fields: Optional[Any] = None,
+        subtask_of: Optional[str] = None,
     ) -> str:
-        """Create a new issue in the specified project."""
+        """Create a new issue in the specified project.
+
+        subtask_of (e.g. "DEMO-100") creates it as a subtask of that issue in the
+        same request, for workflows that require a parent. Other links are added
+        afterwards with link_issues.
+        """
         return self.basic_operations.create_issue(
-            project, summary, description, custom_fields
+            project, summary, description, custom_fields, subtask_of
         )
     
     def update_issue(self, issue_id: str, summary: Optional[str] = None, description: Optional[str] = None, uses_markdown: Optional[bool] = None, additional_fields: Optional[Dict[str, Any]] = None) -> str:

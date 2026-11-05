@@ -113,6 +113,7 @@ class Utilities:
                     "summary": "Title/summary for the new issue",
                     "description": "Optional detailed description of the issue",
                     "custom_fields": "Optional dictionary of custom fields such as Assignee, Type, State, Priority",
+                    "subtask_of": "Optional parent issue ID like 'DEMO-100'; the issue is created as its subtask",
                 },
             },
             "update_issue": {

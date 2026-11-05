@@ -266,6 +266,123 @@ class TestBasicOperations:
         additional = self.mock_issues_api.create_issue.call_args[0][3]
         assert additional["customFields"][0]["name"] == "Assignee"
 
+    def test_create_issue_subtask_of_sends_link_in_create_request(self):
+        """Test subtask_of puts the parent link into the create request."""
+        self.mock_issues_api.create_issue.return_value = {"id": "3-1", "summary": "x"}
+        self.mock_issues_api.build_subtask_link.return_value = {
+            "id": "105-3t",
+            "issues": [{"id": "3-100"}],
+        }
+        self.mock_client.get.return_value = {"parent": {"issues": [{"id": "3-100"}]}}
+
+        result = self.basic_ops.create_issue(
+            "0-1", "Child", None, None, " DEMO-100 "
+        )
+
+        result_data = json.loads(result)
+        assert result_data["id"] == "3-1"
+        assert "warning" not in result_data
+        self.mock_issues_api.build_subtask_link.assert_called_once_with("DEMO-100")
+        additional = self.mock_issues_api.create_issue.call_args[0][3]
+        assert additional == {"links": [{"id": "105-3t", "issues": [{"id": "3-100"}]}]}
+        self.mock_client.get.assert_called_once_with(
+            "issues/3-1?fields=parent(issues(id))"
+        )
+
+    def test_create_issue_subtask_of_parent_not_applied_warns(self):
+        """Test an issue created without its parent is reported with a warning."""
+        self.mock_issues_api.create_issue.return_value = {
+            "id": "3-1",
+            "idReadable": "DEMO-1",
+        }
+        self.mock_issues_api.build_subtask_link.return_value = {
+            "id": "105-3t",
+            "issues": [{"id": "3-100"}],
+        }
+        self.mock_client.get.return_value = {"parent": {"issues": []}}
+
+        result_data = json.loads(
+            self.basic_ops.create_issue("0-1", "Child", None, None, "DEMO-100")
+        )
+
+        assert result_data["id"] == "3-1"
+        assert "not as a subtask of DEMO-100" in result_data["warning"]
+        assert 'link_issues("DEMO-1", "DEMO-100", "subtask of")' in result_data["warning"]
+
+    def test_create_issue_subtask_of_parent_check_failure_warns(self):
+        """Test a failed parent check is reported rather than claimed as success."""
+        self.mock_issues_api.create_issue.return_value = {"id": "3-1"}
+        self.mock_issues_api.build_subtask_link.return_value = {
+            "id": "105-3t",
+            "issues": [{"id": "3-100"}],
+        }
+        self.mock_client.get.side_effect = Exception("Connection reset")
+
+        result_data = json.loads(
+            self.basic_ops.create_issue("0-1", "Child", None, None, "DEMO-100")
+        )
+
+        assert result_data["id"] == "3-1"
+        assert "Could not verify" in result_data["warning"]
+        assert "Connection reset" in result_data["warning"]
+
+    def test_create_issue_subtask_of_api_error_creates_nothing(self):
+        """Test an API error while resolving the parent fails before creation."""
+        from youtrack_mcp.api.client import YouTrackAPIError
+
+        self.mock_issues_api.build_subtask_link.side_effect = YouTrackAPIError(
+            "Server error", 500
+        )
+
+        result_data = json.loads(
+            self.basic_ops.create_issue("0-1", "Child", None, None, "DEMO-100")
+        )
+
+        assert result_data["status"] == "error"
+        assert "Server error" in result_data["error"]
+        self.mock_issues_api.create_issue.assert_not_called()
+
+    def test_create_issue_subtask_of_with_custom_fields(self):
+        """Test subtask_of is sent together with custom fields."""
+        self.mock_issues_api.create_issue.return_value = {"id": "3-1", "summary": "x"}
+        self.mock_issues_api._create_enhanced_field_object.return_value = {
+            "$type": "SingleEnumIssueCustomField",
+            "name": "Type",
+            "value": "Task",
+        }
+        self.mock_issues_api.build_subtask_link.return_value = {
+            "id": "105-3t",
+            "issues": [{"id": "3-100"}],
+        }
+
+        self.basic_ops.create_issue("0-1", "Child", None, {"Type": "Task"}, "DEMO-100")
+
+        additional = self.mock_issues_api.create_issue.call_args[0][3]
+        assert additional["customFields"][0]["name"] == "Type"
+        assert additional["links"][0]["id"] == "105-3t"
+
+    def test_create_issue_subtask_of_unresolved_parent_creates_nothing(self):
+        """Test an unresolvable parent fails before the issue is created."""
+        self.mock_issues_api.build_subtask_link.side_effect = ValueError(
+            "Parent issue not found: DEMO-404"
+        )
+
+        result = self.basic_ops.create_issue("0-1", "Child", None, None, "DEMO-404")
+
+        result_data = json.loads(result)
+        assert result_data["status"] == "error"
+        assert "DEMO-404" in result_data["error"]
+        self.mock_issues_api.create_issue.assert_not_called()
+
+    def test_create_issue_blank_subtask_of_is_ignored(self):
+        """Test a blank subtask_of creates a plain issue."""
+        self.mock_issues_api.create_issue.return_value = {"id": "3-1", "summary": "x"}
+
+        self.basic_ops.create_issue("0-1", "Plain", None, None, "  ")
+
+        self.mock_issues_api.build_subtask_link.assert_not_called()
+        self.mock_issues_api.create_issue.assert_called_once_with("0-1", "Plain", None)
+
     def test_create_issue_success_with_project_id(self):
         """Test successful issue creation with project ID."""
         # Arrange
@@ -531,6 +648,9 @@ class TestBasicOperations:
         search_def = definitions["search_issues"]
         assert "query" in search_def["parameter_descriptions"]
         assert "limit" in search_def["parameter_descriptions"]
+
+        create_def = definitions["create_issue"]
+        assert "subtask_of" in create_def["parameter_descriptions"]
         
         create_def = definitions["create_issue"]
         assert "project" in create_def["parameter_descriptions"]

@@ -119,6 +119,39 @@ class BasicOperations:
             )
         return {"customFields": field_objects}
 
+    def _check_parent_link(
+        self, issue: Any, subtask_link: Dict[str, Any], parent_issue_id: str
+    ) -> Optional[str]:
+        """
+        Confirm the created issue got its parent.
+
+        The REST docs list Issue.links as read-only, so an instance that
+        ignores links sent with the issue would otherwise report success for
+        an issue without a parent.
+
+        Returns:
+            A warning for the response, or None when the parent is in place
+        """
+        if isinstance(issue, dict):
+            candidates = [issue.get("idReadable"), issue.get("id")]
+        else:
+            candidates = [getattr(issue, "idReadable", None), getattr(issue, "id", None)]
+        issue_id = next((c for c in candidates if isinstance(c, str) and c), None)
+        parent_id = subtask_link["issues"][0]["id"]
+        try:
+            created = self.client.get(f"issues/{issue_id}?fields=parent(issues(id))")
+            parents = (created.get("parent") or {}).get("issues") or []
+        except Exception as e:
+            logger.warning(f"Could not verify parent of {issue_id}: {str(e)}")
+            return f"Could not verify that the issue is a subtask of {parent_issue_id}: {str(e)}"
+
+        if any(p.get("id") == parent_id for p in parents):
+            return None
+        return (
+            f"The issue was created, but not as a subtask of {parent_issue_id}. "
+            f"Link it with link_issues(\"{issue_id}\", \"{parent_issue_id}\", \"subtask of\")"
+        )
+
     @sync_wrapper
     def create_issue(
         self,
@@ -126,11 +159,12 @@ class BasicOperations:
         summary: str,
         description: Optional[str] = None,
         custom_fields: Optional[Any] = None,
+        subtask_of: Optional[str] = None,
     ) -> str:
         """
         Create a new issue in YouTrack.
 
-        FORMAT: create_issue(project="DEMO", summary="Bug in login", description="Users cannot log in", custom_fields={"Assignee": "admin", "Type": "Bug"})
+        FORMAT: create_issue(project="DEMO", summary="Bug in login", description="Users cannot log in", custom_fields={"Assignee": "admin", "Type": "Bug"}, subtask_of="DEMO-100")
 
         Args:
             project: The project identifier (e.g., "DEMO", "PROJECT")
@@ -138,13 +172,16 @@ class BasicOperations:
             description: Optional detailed description of the issue
             custom_fields: Optional dict or JSON object of custom fields
                 (e.g. Assignee, Type, State, Priority, Sprints)
+            subtask_of: Optional parent issue ID; the new issue is created as
+                its subtask in the same request (for workflows that require
+                a parent). Other links are added afterwards with link_issues.
 
         Returns:
             JSON string with the created issue information
         """
         try:
             logger.debug(
-                f"Creating issue with: project={project}, summary={summary}, description={description}, custom_fields={custom_fields}"
+                f"Creating issue with: project={project}, summary={summary}, description={description}, custom_fields={custom_fields}, subtask_of={subtask_of}"
             )
 
             # Validate required parameters
@@ -198,6 +235,23 @@ class BasicOperations:
                     project_id, parsed_fields
                 )
 
+            # The parent link goes into the create request itself: a workflow
+            # that requires a parent rejects the issue before it can be linked
+            subtask_link = None
+            if subtask_of and subtask_of.strip():
+                try:
+                    subtask_link = self.issues_api.build_subtask_link(
+                        subtask_of.strip()
+                    )
+                except ValueError as e:
+                    return format_json_response(
+                        {"error": str(e), "status": "error"}
+                    )
+                additional_fields = {
+                    **(additional_fields or {}),
+                    "links": [subtask_link],
+                }
+
             # Call the API client to create the issue
             try:
                 if additional_fields:
@@ -214,6 +268,18 @@ class BasicOperations:
                     # Handle error returned as a dict
                     return format_json_response(issue)
 
+                # Confirm the parent link, the docs list Issue.links as read-only
+                warning = None
+                if subtask_link:
+                    warning = self._check_parent_link(
+                        issue, subtask_link, subtask_of.strip()
+                    )
+
+                def respond(data: Any) -> str:
+                    if warning and isinstance(data, dict):
+                        data = {**data, "warning": warning}
+                    return format_json_response(data)
+
                 # Try to get full issue details right after creation
                 if hasattr(issue, "id"):
                     try:
@@ -222,19 +288,17 @@ class BasicOperations:
                         detailed_issue = self.issues_api.get_issue(issue_id)
 
                         if hasattr(detailed_issue, "model_dump"):
-                            return format_json_response(
-                                detailed_issue.model_dump()
-                            )
+                            return respond(detailed_issue.model_dump())
                         else:
-                            return format_json_response(detailed_issue)
+                            return respond(detailed_issue)
                     except Exception as e:
                         logger.warning(
                             f"Could not retrieve detailed issue: {str(e)}"
                         )
                 if hasattr(issue, "model_dump"):
-                    return format_json_response(issue.model_dump())
+                    return respond(issue.model_dump())
                 else:
-                    return format_json_response(issue)
+                    return respond(issue)
             except Exception as e:
                 error_msg = str(e)
                 if hasattr(e, "response") and e.response:
@@ -335,12 +399,13 @@ class BasicOperations:
                 }
             },
             "create_issue": {
-                "description": "Create a new issue in YouTrack with automatic project validation. Accepts both project short names (DEMO) and project IDs (0-1). Optional custom_fields for Assignee, Type, State, Priority, Sprints, etc. Example: create_issue(project='DEMO', summary='Bug in login', custom_fields={'Assignee':'admin','Type':'Bug'})",
+                "description": "Create a new issue in YouTrack with automatic project validation. Accepts both project short names (DEMO) and project IDs (0-1). Optional custom_fields for Assignee, Type, State, Priority, Sprints, etc. Optional subtask_of creates the issue as a subtask of a parent in one call. Example: create_issue(project='DEMO', summary='Bug in login', custom_fields={'Assignee':'admin','Type':'Bug'}, subtask_of='DEMO-100')",
                 "parameter_descriptions": {
                     "project": "Project identifier (short name like 'DEMO' or ID like '0-1')",
                     "summary": "Issue title/summary (required)",
                     "description": "Detailed description of the issue (optional)",
                     "custom_fields": "Optional dictionary of custom fields, e.g. {\"Assignee\": \"admin\", \"Type\": \"Bug\", \"Priority\": \"Normal\"}",
+                    "subtask_of": "Optional parent issue ID (e.g. 'DEMO-100'). The issue is created as its subtask in the same request, for workflows that require a parent. Use link_issues for other links",
                 }
             },
             "update_issue": {
