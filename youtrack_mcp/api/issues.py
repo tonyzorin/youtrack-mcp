@@ -665,7 +665,7 @@ class IssuesClient:
                         error_msg += f": {error_details['error']}"
                     else:
                         error_msg += f": {str(direct_error)}"
-                except:
+                except (ValueError, AttributeError, TypeError):
                     error_msg += f": {str(direct_error)}"
             else:
                 error_msg += f": {str(direct_error)}"
@@ -1861,7 +1861,7 @@ class IssuesClient:
                         error_msg += f": {error_details['error']}"
                     else:
                         error_msg += f": {str(direct_error)}"
-                except:
+                except (ValueError, AttributeError, TypeError):
                     error_msg += f": {str(direct_error)}"
             else:
                 error_msg += f": {str(direct_error)}"
