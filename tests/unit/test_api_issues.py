@@ -227,6 +227,40 @@ class TestIssuesClientBasicMethods:
         assert "Error:" in issue.summary  # Error message is included in summary
 
 
+class TestIssuesClientResolveTags:
+    """Test tag name resolution for issue creation."""
+
+    def test_resolve_tag_ids_reuses_existing(self):
+        mock_client = Mock(spec=YouTrackClient)
+        mock_client.get.return_value = [
+            {"id": "tag-1", "name": "Hotfix"},
+            {"id": "tag-2", "name": "AI"},
+        ]
+        issues_client = IssuesClient(mock_client)
+
+        refs = issues_client.resolve_tag_ids(["hotfix", "ai"])
+
+        assert refs == [{"id": "tag-1"}, {"id": "tag-2"}]
+        mock_client.post.assert_not_called()
+
+    def test_resolve_tag_ids_creates_missing(self):
+        mock_client = Mock(spec=YouTrackClient)
+        mock_client.get.return_value = []
+        mock_client.post.return_value = {"id": "tag-new", "name": "Fresh"}
+        issues_client = IssuesClient(mock_client)
+
+        refs = issues_client.resolve_tag_ids(["Fresh"])
+
+        assert refs == [{"id": "tag-new"}]
+        mock_client.post.assert_called_once_with(
+            "issueTags", data={"name": "Fresh"}
+        )
+
+    def test_resolve_tag_ids_empty_names(self):
+        issues_client = IssuesClient(Mock(spec=YouTrackClient))
+        assert issues_client.resolve_tag_ids([]) == []
+
+
 class TestIssuesClientSearchMethods:
     """Test search-related methods."""
 

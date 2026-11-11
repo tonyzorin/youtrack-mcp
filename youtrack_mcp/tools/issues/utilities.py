@@ -100,10 +100,11 @@ class Utilities:
                 },
             },
             "search_issues": {
-                "description": 'Search for issues using YouTrack query syntax. Example: search_issues(query="project: DEMO #Unresolved", limit=5)',
+                "description": 'Search for issues using YouTrack query syntax. Example: search_issues(query="project: DEMO #Unresolved", limit=5, skip=10)',
                 "parameter_descriptions": {
                     "query": "YouTrack search query string",
                     "limit": "Maximum number of results to return (default: 10)",
+                    "skip": "Number of results to skip, for paging (default: 0)",
                 },
             },
             "create_issue": {
@@ -113,6 +114,7 @@ class Utilities:
                     "summary": "Title/summary for the new issue",
                     "description": "Optional detailed description of the issue",
                     "custom_fields": "Optional dictionary of custom fields such as Assignee, Type, State, Priority",
+                    "tags": "Optional list of tag names to attach; missing tags are created",
                 },
             },
             "update_issue": {

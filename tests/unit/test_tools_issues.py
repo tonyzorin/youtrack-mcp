@@ -62,7 +62,7 @@ class TestIssueToolsGetIssue:
         assert result_data["summary"] == "Test Issue"
         
         # Verify the API was called with correct parameters
-        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login)),tags(id,name)"
         mock_client.get.assert_called_once_with(f"issues/DEMO-123?fields={expected_fields}")
     
     @patch('youtrack_mcp.tools.issues.YouTrackClient')
@@ -133,7 +133,7 @@ class TestIssueToolsSearchIssues:
         assert result_data[1]["idReadable"] == "DEMO-124"
         
         # Verify the correct API call was made
-        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login))"
         expected_params = {"query": "project: DEMO", "$top": 5, "fields": expected_fields}
         mock_client.get.assert_called_once_with("issues", params=expected_params)
     
@@ -444,7 +444,7 @@ class TestIssueToolsGetIssueRaw:
         assert "comments" in result_data
         
         # Verify comprehensive fields were requested
-        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value(id,name)),attachments(id,name,size,url),comments(id,text,author(login,name),created)"
+        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login)),attachments(id,name,size,url),comments(id,text,author(login,name),created)"
         mock_client.get.assert_called_once_with(f"issues/DEMO-123?fields={expected_fields}")
     
     @patch('youtrack_mcp.tools.issues.YouTrackClient')

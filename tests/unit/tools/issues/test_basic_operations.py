@@ -75,7 +75,7 @@ class TestBasicOperations:
         assert result_data["project"] == mock_issue_data["project"]
         
         # Verify API call with correct fields
-        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login)),tags(id,name)"
         self.mock_client.get.assert_called_once_with(f"issues/{issue_id}?fields={expected_fields}")
 
     def test_get_issue_minimal_response_enhancement(self):
@@ -143,9 +143,21 @@ class TestBasicOperations:
         assert result_data == mock_search_results
         
         # Verify API call with correct parameters
-        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value)"
+        expected_fields = "id,idReadable,summary,description,created,updated,project(id,name,shortName),reporter(id,login,name),assignee(id,login,name),customFields(id,name,value($type,id,name,text,login))"
         expected_params = {"query": query, "$top": limit, "fields": expected_fields}
         self.mock_client.get.assert_called_once_with("issues", params=expected_params)
+
+    def test_search_issues_with_skip(self):
+        """Test search_issues passes $skip for paging."""
+        query = "project: DEMO"
+        limit = 10
+        skip = 20
+        self.mock_client.get.return_value = []
+
+        self.basic_ops.search_issues(query, limit=limit, skip=skip)
+
+        call_params = self.mock_client.get.call_args[1]["params"]
+        assert call_params["$skip"] == skip
 
     def test_search_issues_default_limit(self):
         """Test search_issues with default limit."""
@@ -248,6 +260,33 @@ class TestBasicOperations:
         assert "customFields" in additional
         names = {f["name"] for f in additional["customFields"]}
         assert names == {"Assignee", "Type"}
+
+    def test_create_issue_with_tags(self):
+        """Test create_issue passes resolved tag ids in additional_fields."""
+        self.mock_projects_api.get_project_by_name.return_value = None
+        self.mock_issues_api.create_issue.return_value = {
+            "id": "3-200",
+            "summary": "Tagged",
+        }
+        self.mock_issues_api.resolve_tag_ids.return_value = [
+            {"id": "tag-1"},
+            {"id": "tag-2"},
+        ]
+
+        result = self.basic_ops.create_issue(
+            "0-1",
+            "Tagged",
+            None,
+            tags=["hotfix", "ai-generated"],
+        )
+        result_data = json.loads(result)
+        assert result_data["id"] == "3-200"
+
+        self.mock_issues_api.resolve_tag_ids.assert_called_once_with(
+            ["hotfix", "ai-generated"]
+        )
+        additional = self.mock_issues_api.create_issue.call_args[0][3]
+        assert additional["tags"] == [{"id": "tag-1"}, {"id": "tag-2"}]
 
     def test_create_issue_custom_fields_json_string(self):
         """Test create_issue accepts custom_fields as a JSON string."""

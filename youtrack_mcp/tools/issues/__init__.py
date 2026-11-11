@@ -125,9 +125,9 @@ class IssueTools:
         """Get detailed issue information."""
         return self.basic_operations.get_issue(issue_id)
     
-    def search_issues(self, query: str, limit: int = 10) -> str:
+    def search_issues(self, query: str, limit: int = 10, skip: int = 0) -> str:
         """Search for issues using YouTrack query syntax."""
-        return self.basic_operations.search_issues(query, limit)
+        return self.basic_operations.search_issues(query, limit, skip)
     
     def create_issue(
         self,
@@ -135,10 +135,11 @@ class IssueTools:
         summary: str,
         description: Optional[str] = None,
         custom_fields: Optional[Any] = None,
+        tags: Optional[List[str]] = None,
     ) -> str:
         """Create a new issue in the specified project."""
         return self.basic_operations.create_issue(
-            project, summary, description, custom_fields
+            project, summary, description, custom_fields, tags
         )
     
     def update_issue(self, issue_id: str, summary: Optional[str] = None, description: Optional[str] = None, uses_markdown: Optional[bool] = None, additional_fields: Optional[Dict[str, Any]] = None) -> str:
