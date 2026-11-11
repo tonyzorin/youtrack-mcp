@@ -116,6 +116,7 @@ Pass **simple strings** for state, priority, assignee, type, and estimation. Nes
 search_issues("project: DEMO #Unresolved")
 get_issue("DEMO-123")
 create_issue(project="DEMO", summary="Login fails on special characters", custom_fields={"Assignee": "admin", "Type": "Bug"})
+create_issue(project="DEMO", summary="Sanitize the login form", subtask_of="DEMO-100")
 
 update_issue_state("DEMO-123", "In Progress")
 update_issue_priority("DEMO-123", "Critical")
@@ -127,7 +128,7 @@ add_comment("DEMO-123", "Reproduced on staging")
 add_dependency("DEMO-123", "DEMO-124")
 ```
 
-**Issues:** search, get, create, update, comments, links (relates / depends / duplicates).
+**Issues:** search, get, create, update, comments, links (relates / depends / duplicates). Use `subtask_of` on create when the workflow requires a parent; add other links with `link_issues`.
 
 **Custom fields:** dedicated helpers above, plus `update_custom_fields`, batch updates, schema and allowed-value lookup.
 

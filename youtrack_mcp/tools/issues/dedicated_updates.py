@@ -17,7 +17,7 @@ import logging
 from typing import Any, Dict
 
 from youtrack_mcp.mcp_wrappers import sync_wrapper
-from youtrack_mcp.utils import format_json_response
+from youtrack_mcp.utils import format_json_response, issue_command_reference
 
 logger = logging.getLogger(__name__)
 
@@ -91,14 +91,30 @@ class DedicatedUpdates:
                 try:
                     command_data = {
                         "query": f"State \"{new_state}\"",
-                        "issues": [{"id": issue_id}]
+                        "issues": [issue_command_reference(issue_id)],
                     }
-                    
+
                     self.issues_api.client.post("commands", data=command_data)
-                    
-                    # Get the updated issue
+                    persisted = self.issues_api.client.get(
+                        f"issues/{issue_id}?fields=customFields(name,value(name))"
+                    )
+                    actual_state = next(
+                        (
+                            field.get("value", {}).get("name")
+                            for field in persisted.get("customFields", [])
+                            if field.get("name") == "State"
+                        ),
+                        None,
+                    )
+                    if actual_state != new_state:
+                        return format_json_response({
+                            "error": f"State update was not persisted: expected {new_state!r}, found {actual_state!r}",
+                            "issue_id": issue_id,
+                            "target_state": new_state,
+                        })
+
                     updated_issue = self.issues_api.get_issue(issue_id)
-                    
+
                     return format_json_response({
                         "status": "success",
                         "message": f"Successfully updated issue {issue_id} state to '{new_state}' using fallback method",
@@ -114,9 +130,16 @@ class DedicatedUpdates:
                     
                     # Parse specific workflow failure reasons
                     specific_guidance = []
-                    workflow_reason = "Unknown workflow restriction"
-                    
-                    if "workflow restrictions" in error_msg.lower() or "status 405" in error_msg or "Failed to transition" in error_msg:
+                    workflow_reason = error_msg
+                    is_workflow_restriction = False
+
+                    if any(phrase in error_msg.lower() for phrase in (
+                        "workflow restriction",
+                        "status 405",
+                        "failed to transition",
+                        "assertion failed",
+                    )):
+                        is_workflow_restriction = True
                         # Try to get current state for better context
                         try:
                             current_issue = self.issues_api.get_issue(issue_id)
@@ -190,7 +213,7 @@ class DedicatedUpdates:
                         "error": f"State transition failed: {workflow_reason}",
                         "issue_id": issue_id,
                         "target_state": new_state,
-                        "workflow_restriction": True,
+                        "workflow_restriction": is_workflow_restriction,
                         "specific_guidance": specific_guidance,
                         "general_troubleshooting": [
                             "Check if the target state exists in your YouTrack project",

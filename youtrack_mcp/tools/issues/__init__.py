@@ -136,10 +136,11 @@ class IssueTools:
         description: Optional[str] = None,
         custom_fields: Optional[Any] = None,
         tags: Optional[List[str]] = None,
+        subtask_of: Optional[str] = None,
     ) -> str:
         """Create a new issue in the specified project."""
         return self.basic_operations.create_issue(
-            project, summary, description, custom_fields, tags
+            project, summary, description, custom_fields, tags, subtask_of
         )
     
     def update_issue(self, issue_id: str, summary: Optional[str] = None, description: Optional[str] = None, uses_markdown: Optional[bool] = None, additional_fields: Optional[Dict[str, Any]] = None) -> str:

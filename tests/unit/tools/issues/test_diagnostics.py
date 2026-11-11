@@ -124,8 +124,12 @@ class TestDiagnostics:
         workflow_analysis = result_data["workflow_analysis"]
         
         assert len(workflow_analysis["available_transitions"]) == 0
-        assert any("No transition events available" in restriction for restriction in workflow_analysis["restrictions"])
-        assert any("Check user permissions" in rec for rec in workflow_analysis["recommendations"])
+        assert workflow_analysis["restrictions"] == []
+        assert any(
+            "no transition events by design" in recommendation
+            for recommendation in workflow_analysis["recommendations"]
+        )
+        assert not any("Check user permissions" in rec for rec in workflow_analysis["recommendations"])
 
     def test_diagnose_workflow_restrictions_no_state_field(self):
         """Test workflow analysis when no state field is found."""

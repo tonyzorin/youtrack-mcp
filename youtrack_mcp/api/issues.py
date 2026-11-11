@@ -9,7 +9,12 @@ import re
 
 from pydantic import BaseModel, Field
 
-from youtrack_mcp.api.client import YouTrackClient, YouTrackAPIError
+from youtrack_mcp.api.client import (
+    ResourceNotFoundError,
+    YouTrackAPIError,
+    YouTrackClient,
+)
+from youtrack_mcp.utils import issue_command_reference
 
 logger = logging.getLogger(__name__)
 
@@ -447,14 +452,31 @@ class IssuesClient:
                 try:
                     command_data = {
                         "query": f"State \"{target_state}\"",
-                        "issues": [{"id": issue_id}]
+                        "issues": [issue_command_reference(issue_id)],
                     }
-                    
+
                     logger.info(f"Applying state transition command 'State \"{target_state}\"' to issue {issue_id}")
                     self.client.post("commands", data=command_data)
-                    logger.info(f"Command-based transition succeeded for issue {issue_id}")
-                    return True
-                    
+                    persisted = self.client.get(
+                        f"issues/{issue_id}?fields=customFields(name,value(name))"
+                    )
+                    state = next(
+                        (
+                            field.get("value", {}).get("name")
+                            for field in persisted.get("customFields", [])
+                            if field.get("name") == "State"
+                        ),
+                        None,
+                    )
+                    if state == target_state:
+                        logger.info(f"Command-based transition succeeded for issue {issue_id}")
+                        return True
+                    logger.warning(
+                        "Command-based state update for %s was not persisted: %r",
+                        issue_id,
+                        state,
+                    )
+
                 except Exception as cmd_error:
                     logger.warning(f"Command-based approach failed: {cmd_error}")
             
@@ -539,32 +561,63 @@ class IssuesClient:
             return False
     
     def _apply_direct_state_update(self, issue_id: str, target_state: str) -> bool:
-        """
-        Apply direct state field update using proven working format.
-        
-        Based on successful testing, the working format is:
-        {"customFields": [{"name": "State", "value": "In Progress"}]}
-        
-        NOT complex objects or ID references.
-        """
+        """Apply a typed state field update and verify persistence."""
         try:
-            # Use the proven simple string format that works
             update_data = {
                 "customFields": [{
                     "name": "State",
-                    "value": target_state  # Simple string value - this is what works!
+                    "$type": "StateIssueCustomField",
+                    "value": {"name": target_state, "$type": "StateBundleElement"},
                 }]
             }
-            
+
             logger.info(f"Applying direct state update to issue {issue_id}: State -> '{target_state}'")
             self.client.post(f"issues/{issue_id}", data=update_data)
-            
-            logger.info(f"Direct state update successful for issue {issue_id}")
+            persisted = self.client.get(
+                f"issues/{issue_id}?fields=customFields(name,value(name))"
+            )
+            state = next(
+                (
+                    field.get("value", {}).get("name")
+                    for field in persisted.get("customFields", [])
+                    if field.get("name") == "State"
+                ),
+                None,
+            )
+            if state != target_state:
+                logger.warning(
+                    "State update for %s was not persisted: %r",
+                    issue_id,
+                    state,
+                )
+                return False
             return True
-            
+
         except Exception as e:
             logger.warning(f"Direct state update failed for issue {issue_id}: {e}")
             return False
+
+    def _create_owned_field_object(
+        self, project_id: str, field_name: str, value: str
+    ) -> Dict[str, Any]:
+        """Resolve an owned bundle value before writing an owned custom field."""
+        fields = self.client.get(
+            f"admin/projects/{project_id}/customFields?fields=field(name),bundle(values(name,id))"
+        )
+        for field in fields:
+            actual_name = field.get("field", {}).get("name")
+            if not actual_name or actual_name.lower() != field_name.lower():
+                continue
+            for entry in field.get("bundle", {}).get("values", []):
+                if entry.get("name") == value:
+                    return {
+                        "name": actual_name,
+                        "$type": "SingleOwnedIssueCustomField",
+                        "value": {"id": entry["id"], "$type": "OwnedBundleElement"},
+                    }
+        raise YouTrackAPIError(
+            f"Owned value {value!r} not found for {field_name!r}"
+        )
     
     def _update_other_custom_fields(self, issue_id: str, custom_fields: Dict[str, Any], validate: bool, use_commands: bool) -> None:
         """
@@ -672,11 +725,15 @@ class IssuesClient:
                             project_id, field_name, field_value, multi=True
                         )
                     else:
-                        # Query the schema to detect other version/sprint fields
+                        # Query the schema to detect the custom field type
                         value_type = self._get_field_value_type(project_id, field_name)
                         if value_type == "version":
                             field_data = self._create_version_field_object(
                                 project_id, field_name, field_value, multi=True
+                            )
+                        elif value_type == "ownedField":
+                            field_data = self._create_owned_field_object(
+                                project_id, field_name, field_value
                             )
                         else:
                             # Default to enum for unknown fields
@@ -1377,6 +1434,46 @@ class IssuesClient:
         response = self.client.get(f"issueLinkTypes?fields={fields}")
         return response
 
+    def build_subtask_link(self, parent_issue_id: str) -> Dict[str, Any]:
+        """
+        Build the links entry that makes a new issue a subtask of a parent.
+
+        The link is sent inside the create-issue request, so workflows that
+        require every issue to have a parent accept the new issue.
+
+        Args:
+            parent_issue_id: The parent issue ID (readable DEMO-1 or internal 2-1)
+
+        Returns:
+            IssueLink object for the links array of the create request
+
+        Raises:
+            ValueError: If the parent issue or the Subtask link type is not found
+        """
+        link_types = self.client.get("issueLinkTypes?fields=id,targetToSource")
+        subtask_type = next(
+            (
+                t
+                for t in link_types or []
+                if str(t.get("targetToSource") or "").lower() == "subtask of"
+            ),
+            None,
+        )
+        if not subtask_type:
+            raise ValueError("Subtask link type not found on this YouTrack instance")
+
+        try:
+            parent = self.client.get(f"issues/{parent_issue_id}?fields=id")
+        except ResourceNotFoundError as e:
+            raise ValueError(
+                f"Parent issue not found: {parent_issue_id} ({e})"
+            ) from e
+
+        return {
+            "id": f"{subtask_type['id']}t",
+            "issues": [{"id": parent["id"]}],
+        }
+
     def _validate_custom_field_value(
         self, 
         project_id: str, 
@@ -1873,11 +1970,15 @@ class IssuesClient:
                             project_id, field_name, field_value, multi=True
                         )
                     else:
-                        # Query the schema to detect other version/sprint fields
+                        # Query the schema to detect the custom field type
                         value_type = self._get_field_value_type(project_id, field_name)
                         if value_type == "version":
                             field_data = self._create_version_field_object(
                                 project_id, field_name, field_value, multi=True
+                            )
+                        elif value_type == "ownedField":
+                            field_data = self._create_owned_field_object(
+                                project_id, field_name, field_value
                             )
                         else:
                             # Default to enum for unknown fields
@@ -2022,6 +2123,10 @@ class IssuesClient:
                 if value_type == "version":
                     return self._create_version_field_object(
                         project_id, field_name, field_value, multi=True
+                    )
+                elif value_type == "ownedField":
+                    return self._create_owned_field_object(
+                        project_id, field_name, field_value
                     )
                 else:
                     # Default to enum for unknown fields
@@ -2720,6 +2825,46 @@ class IssuesClient:
         fields = "name,localizedName,sourceToTarget,targetToSource"
         response = self.client.get(f"issueLinkTypes?fields={fields}")
         return response
+
+    def build_subtask_link(self, parent_issue_id: str) -> Dict[str, Any]:
+        """
+        Build the links entry that makes a new issue a subtask of a parent.
+
+        The link is sent inside the create-issue request, so workflows that
+        require every issue to have a parent accept the new issue.
+
+        Args:
+            parent_issue_id: The parent issue ID (readable DEMO-1 or internal 2-1)
+
+        Returns:
+            IssueLink object for the links array of the create request
+
+        Raises:
+            ValueError: If the parent issue or the Subtask link type is not found
+        """
+        link_types = self.client.get("issueLinkTypes?fields=id,targetToSource")
+        subtask_type = next(
+            (
+                t
+                for t in link_types or []
+                if str(t.get("targetToSource") or "").lower() == "subtask of"
+            ),
+            None,
+        )
+        if not subtask_type:
+            raise ValueError("Subtask link type not found on this YouTrack instance")
+
+        try:
+            parent = self.client.get(f"issues/{parent_issue_id}?fields=id")
+        except ResourceNotFoundError as e:
+            raise ValueError(
+                f"Parent issue not found: {parent_issue_id} ({e})"
+            ) from e
+
+        return {
+            "id": f"{subtask_type['id']}t",
+            "issues": [{"id": parent["id"]}],
+        }
 
     def _validate_custom_field_value(
         self, 
