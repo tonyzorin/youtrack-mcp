@@ -293,14 +293,50 @@ jobs:
         echo "docker pull ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }}-wip" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
+  detect-release:
+    name: "🏷️ Detect Release"
+    needs: [test-unit, test-integration, test-docker]
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'production_release' && github.event.inputs.confirm_production == 'true')
+    outputs:
+      should_release: ${{ steps.detect.outputs.should_release }}
+      version: ${{ steps.detect.outputs.version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - id: detect
+      name: Compare version.py to tags
+      run: |
+        CURRENT=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
+        echo "version=$CURRENT" >> $GITHUB_OUTPUT
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "should_release=true" >> $GITHUB_OUTPUT
+          echo "Manual production release for v${CURRENT}"
+          exit 0
+        fi
+        if git rev-parse "refs/tags/v${CURRENT}" >/dev/null 2>&1; then
+          echo "should_release=false" >> $GITHUB_OUTPUT
+          echo "Tag v${CURRENT} already exists — skip production"
+        else
+          echo "should_release=true" >> $GITHUB_OUTPUT
+          echo "New version v${CURRENT} — production release will run"
+        fi
+
   # ==============================
-  # MANUAL PRODUCTION BUILD STAGE
+  # PRODUCTION BUILD STAGE
   # ==============================
   build-production:
     name: "🚀 Production Build"
-    needs: [build-dev]
+    needs: [build-dev, detect-release]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'production_release' && github.event.inputs.confirm_production == 'true'
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-release.outputs.should_release == 'true') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'production_release' && github.event.inputs.confirm_production == 'true')
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -319,7 +355,10 @@ jobs:
         CURRENT_VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
         echo "Current version: $CURRENT_VERSION"
         
-        if [[ "${{ github.event.inputs.release_type }}" == "current" ]] || [[ -z "${{ github.event.inputs.release_type }}" ]]; then
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          NEW_VERSION="$CURRENT_VERSION"
+          echo "🚀 Auto-release on main: $NEW_VERSION"
+        elif [[ "${{ github.event.inputs.release_type }}" == "current" ]] || [[ -z "${{ github.event.inputs.release_type }}" ]]; then
           NEW_VERSION="$CURRENT_VERSION"
           echo "🚀 Using current version for production: $NEW_VERSION"
         elif [[ "${{ github.event.inputs.release_type }}" == "custom" ]]; then
@@ -346,7 +385,9 @@ jobs:
         CURRENT_VERSION=$(python3 -c "exec(open('youtrack_mcp/version.py').read()); print(__version__)")
         NEW_VERSION="${{ steps.version.outputs.NEW_VERSION }}"
         
-        if [[ "${{ github.event.inputs.release_type }}" == "current" ]] || [[ -z "${{ github.event.inputs.release_type }}" ]]; then
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          echo "✅ Auto-release uses version $NEW_VERSION from main (no CI bump)"
+        elif [[ "${{ github.event.inputs.release_type }}" == "current" ]] || [[ -z "${{ github.event.inputs.release_type }}" ]]; then
           echo "✅ Using current version $NEW_VERSION for production build, no update needed"
         elif [[ "$CURRENT_VERSION" == "$NEW_VERSION" ]]; then
           echo "✅ Version is already $NEW_VERSION, no update needed"
@@ -389,44 +430,37 @@ jobs:
         cache-to: type=gha,mode=max
 
     - name: Create GitHub Release
-      if: github.event.inputs.create_github_release == 'true'
-      uses: actions/create-release@v1
+      if: |
+        github.event_name == 'push' ||
+        github.event.inputs.create_github_release == 'true'
+      run: |
+        VERSION="${{ steps.version.outputs.NEW_VERSION }}"
+        NOTES_FILE=$(mktemp)
+        cat > "$NOTES_FILE" <<'NOTES'
+        ## 🚀 Release vVERSION_PLACEHOLDER
+        
+        ### 🐳 Docker Images
+        - `tonyzorin/youtrack-mcp:VERSION_PLACEHOLDER`
+        - `tonyzorin/youtrack-mcp:latest`
+        - `ghcr.io/tonyzorin/youtrack-mcp:VERSION_PLACEHOLDER`
+        - `ghcr.io/tonyzorin/youtrack-mcp:latest`
+        
+        ### 📦 Installation
+        ```bash
+        docker pull tonyzorin/youtrack-mcp:VERSION_PLACEHOLDER
+        ```
+        NOTES
+        sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" "$NOTES_FILE"
+        if gh release view "v${VERSION}" >/dev/null 2>&1; then
+          echo "GitHub Release v${VERSION} already exists"
+        else
+          gh release create "v${VERSION}" \
+            --title "Release v${VERSION}" \
+            --notes-file "$NOTES_FILE" \
+            --latest
+        fi
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ steps.version.outputs.NEW_VERSION }}
-        release_name: Release v${{ steps.version.outputs.NEW_VERSION }}
-        body: |
-          ## 🚀 Release v${{ steps.version.outputs.NEW_VERSION }}
-          
-          ### 🐳 Docker Images
-          - `${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.version.outputs.NEW_VERSION }}`
-          - `${{ env.DOCKER_HUB_REPOSITORY }}:latest`
-          - `${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:${{ steps.version.outputs.NEW_VERSION }}`
-          - `${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:latest`
-          
-          ### 📦 Installation
-          ```bash
-          # Docker Hub
-          docker pull ${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.version.outputs.NEW_VERSION }}
-          
-          # GitHub Container Registry  
-          docker pull ${{ env.GITHUB_REGISTRY }}/${{ github.repository_owner }}/youtrack-mcp:${{ steps.version.outputs.NEW_VERSION }}
-          ```
-          
-          ### 🔧 Claude Desktop Configuration
-          ```json
-          "youtrack": {
-            "command": "docker",
-            "args": [
-              "run", "--rm", "-i",
-              "--env-file", ".env",
-              "${{ env.DOCKER_HUB_REPOSITORY }}:${{ steps.version.outputs.NEW_VERSION }}"
-            ]
-          }
-          ```
-        draft: false
-        prerelease: false
+        GH_TOKEN: ${{ github.token }}
 
   # ==============================
   # NPM PACKAGE PUBLISHING
@@ -435,7 +469,6 @@ jobs:
     name: "📦 Publish NPM"
     needs: [build-production]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'production_release' && github.event.inputs.confirm_production == 'true'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -450,7 +483,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         registry-url: 'https://registry.npmjs.org'
 
     - name: Check NPM secrets
@@ -561,7 +594,7 @@ jobs:
       if: always() && steps.validate.conclusion == 'success'
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         registry-url: 'https://npm.pkg.github.com'
         scope: '@${{ github.repository_owner }}'
 

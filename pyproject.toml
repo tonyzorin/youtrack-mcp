@@ -12,9 +12,9 @@ requires-python = ">=3.14"
 dependencies = [
     "httpx>=0.24.0",
     "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
-    "mcp>=2.0.0,<3",
-    "requests>=2.32.3",
+    "python-dotenv>=1.2.0",
+    "mcp>=2.3.0,<3",
+    "requests>=2.34.0",
 ]
 
 [project.scripts]
